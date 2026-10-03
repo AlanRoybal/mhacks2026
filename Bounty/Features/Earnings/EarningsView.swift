@@ -1,45 +1,101 @@
 import SwiftUI
 
+/// 17 Earnings.
 struct EarningsView: View {
     var body: some View {
-        ScrollView {
-            VStack(spacing: 22) {
-                VStack(spacing: 7) {
-                    Text("Available")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text(75, format: .currency(code: "USD"))
-                        .font(.system(size: 46, weight: .bold, design: .rounded))
-                    Text("$35 pending review")
-                        .font(.subheadline)
-                        .foregroundStyle(BountyTheme.warning)
+        BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 360)) {
+            ScreenTitle(title: "Earnings") {
+                IconButton(icon: .userRound, label: "Account") {}
+            }
+            .entrance(.top)
+
+            StackCard(tone: .yellow, height: 180, bandTop: 135) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("This week")
+                        .bountyType(.subheadStrong)
+                    Text("$124.00")
+                        .bountyType(.moneyL)
+                    Text("USD $99 · USDC $25")
+                        .bountyType(.footnote)
+                        .foregroundStyle(BountyColor.inkPill)
+                    Chip(label: "+$60 since Monday", tone: .dark)
+                        .padding(.top, 6)
                 }
-                .frame(maxWidth: .infinity)
-                .bountyPanel()
-
-                Button("Set up payouts", action: {})
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .frame(maxWidth: .infinity)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Recent")
-                        .font(.title2.bold())
-
-                    ForEach(SampleJobs.jobs.filter { $0.status == .paid || $0.status == .inReview }) { job in
-                        JobRow(job: job)
-                    }
+                .foregroundStyle(BountyColor.inkPrimary)
+                .padding(.leading, 20)
+                .padding(.top, 22)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .topTrailing) {
+                    StickerView(sticker: .coins, size: 120)
+                        .padding(.top, 18)
+                        .padding(.trailing, 15)
                 }
             }
-            .padding()
+            .entrance(.top)
+
+            HStack(spacing: 10) {
+                BalanceTile(label: "In escrow", amount: "$50", background: BountyColor.grey, foreground: BountyColor.navy)
+                BalanceTile(label: "Releasing", amount: "$15", background: BountyColor.cream, foreground: BountyColor.creamInk)
+                BalanceTile(label: "Paid out", amount: "$74", background: BountyColor.mint, foreground: BountyColor.mintInk)
+            }
+            .entrance(.top)
+
+            SectionHeader(title: "Activity", trailing: "Bank ••4821")
+                .entrance(.rest(0))
+
+            VStack(spacing: 0) {
+                ActivityRow(sticker: .poster, tile: BountyColor.lavender, title: "Event poster concepts", detail: "Stripe · paid out Oct 1", amount: "+$60.00", settled: true)
+                ActivityRow(sticker: .book, tile: BountyColor.sky, title: "Calculus worksheet", detail: "USDC · Base Sepolia · 0x8f3…a21", amount: "+$25.00", settled: true)
+                ActivityRow(sticker: .coffee, tile: BountyColor.cream, title: "Coffee shop logo", detail: "Stripe · releases in 1h 58m", amount: "$15.00", settled: false)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 4)
+            .borderedCard()
+            .entrance(.rest(1))
         }
-        .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle("Earnings")
+    }
+}
+
+private struct BalanceTile: View {
+    let label: String
+    let amount: String
+    let background: Color
+    let foreground: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).bountyType(.footnote)
+            Text(amount).bountyType(.moneyM)
+        }
+        .foregroundStyle(foreground)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .tintedPanel(background, radius: BountyRadius.row)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct ActivityRow: View {
+    let sticker: Sticker
+    let tile: Color
+    let title: String
+    let detail: String
+    let amount: String
+    let settled: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            StickerTile(sticker: sticker, background: tile, size: 44, stickerSize: 34, radius: 13)
+            TitleSubtitle(title: title, subtitle: detail)
+            Text(amount)
+                .bountyType(.subheadStrong)
+                .foregroundStyle(settled ? BountyColor.greenInk : BountyColor.inkSecondary)
+        }
+        .padding(.vertical, 10)
+        .accessibilityElement(children: .combine)
     }
 }
 
 #Preview {
-    NavigationStack {
-        EarningsView()
-    }
+    EarningsView()
 }

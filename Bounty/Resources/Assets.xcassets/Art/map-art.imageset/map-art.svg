@@ -1,0 +1,29 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="353" height="130" viewBox="0 0 353 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Map art" clip-path="url(#clip0_0_192)">
+<path id="Vector" d="M353 0H0V130H353V0Z" fill="#E3F8D2"/>
+<path id="Vector_2" d="M94 14H30C24.4772 14 20 18.4772 20 24V62C20 67.5228 24.4772 72 30 72H94C99.5229 72 104 67.5228 104 62V24C104 18.4772 99.5229 14 94 14Z" fill="#CDF0B0"/>
+<path id="Vector_3" d="M228 12H148C142.477 12 138 16.4772 138 22V64C138 69.5228 142.477 74 148 74H228C233.523 74 238 69.5228 238 64V22C238 16.4772 233.523 12 228 12Z" fill="#CDF0B0"/>
+<path id="Vector_4" d="M328 12H272C266.477 12 262 16.4772 262 22V42C262 47.5228 266.477 52 272 52H328C333.523 52 338 47.5228 338 42V22C338 16.4772 333.523 12 328 12Z" fill="#CDF0B0"/>
+<g id="Vector_5">
+<path d="M0 92H353Z" fill="black"/>
+<path d="M0 92H353" stroke="white" stroke-width="14"/>
+</g>
+<g id="Vector_6">
+<path d="M120 0V130Z" fill="black"/>
+<path d="M120 0V130" stroke="white" stroke-width="12"/>
+</g>
+<g id="Vector_7">
+<path d="M250 0L292 130Z" fill="black"/>
+<path d="M250 0L292 130" stroke="white" stroke-width="10"/>
+</g>
+<path id="Vector_8" d="M60 92H120V44H205" stroke="#8784FF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_9" d="M60 101C64.9706 101 69 96.9706 69 92C69 87.0294 64.9706 83 60 83C55.0294 83 51 87.0294 51 92C51 96.9706 55.0294 101 60 101Z" fill="#8784FF" stroke="white" stroke-width="4"/>
+<path id="Vector_10" d="M205 14C194 14 187 22 187 31C187 43 205 58 205 58C205 58 223 43 223 31C223 22 216 14 205 14Z" fill="#FF5A1F" stroke="white" stroke-width="3"/>
+<path id="Vector_11" d="M205 37C208.314 37 211 34.3137 211 31C211 27.6863 208.314 25 205 25C201.686 25 199 27.6863 199 31C199 34.3137 201.686 37 205 37Z" fill="white"/>
+</g>
+<defs>
+<clipPath id="clip0_0_192">
+<rect width="353" height="130" fill="white"/>
+</clipPath>
+</defs>
+</svg>

@@ -1,60 +1,334 @@
 import SwiftUI
 
-struct CreateJobView: View {
-    @State private var title = ""
-    @State private var details = ""
-    @State private var category = "Design"
-    @State private var isRemote = false
-    @State private var amount = 25.0
-    @State private var deadline = Date().addingTimeInterval(86_400)
+// MARK: - 12 Post a job
 
-    private let categories = ["Design", "Home", "Tutoring", "Photography", "Technology"]
+struct CreateJobView: View {
+    @Environment(AppRouter.self) private var router
+
+    @State private var title = "Mow my front lawn"
+    @State private var details = "Front yard only. Bag the clippings. The mower is in the open garage."
+    @State private var category = "Yard work"
+    @State private var inPerson = true
+    @State private var address = "1200 S University Ave"
+
+    private let categories = ["Yard work", "Design", "Photos", "Tutoring", "Errands"]
 
     var body: some View {
-        Form {
-            Section("What needs to be done?") {
-                TextField("Job title", text: $title)
-                TextField("Describe the finished result", text: $details, axis: .vertical)
-                    .lineLimit(4...8)
-                Picker("Category", selection: $category) {
-                    ForEach(categories, id: \.self) { category in
-                        Text(category).tag(category)
+        BountyScreen(spacing: 14) {
+            ScreenTitle(title: "Post a job") {
+                Chip(label: "Draft", tone: .grey)
+            }
+            .entrance(.top)
+
+            HStack(spacing: 10) {
+                StickerTile(sticker: .mower, background: BountyColor.mint, size: 84, stickerSize: 66, radius: 18)
+                Button {} label: {
+                    VStack(spacing: 4) {
+                        IconGlyph(icon: .images, size: 22)
+                        Text("Add photo")
+                            .bountyType(.caption)
+                    }
+                    .foregroundStyle(BountyColor.inkSecondary)
+                    .frame(width: 84, height: 84)
+                    .background(BountyColor.field, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(BountyColor.inkTertiary, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                    }
+                }
+                .buttonStyle(PressableStyle())
+            }
+            .entrance(.top)
+
+            VStack(alignment: .leading, spacing: 6) {
+                FieldLabel(text: "Title")
+                TextField("What do you need done?", text: $title)
+                    .bountyType(.body)
+                    .foregroundStyle(BountyColor.inkPrimary)
+                    .fieldBackground()
+            }
+            .entrance(.top)
+
+            VStack(alignment: .leading, spacing: 6) {
+                FieldLabel(text: "Description")
+                TextField("Add details", text: $details, axis: .vertical)
+                    .bountyType(.body)
+                    .foregroundStyle(BountyColor.inkPrimary)
+                    .lineLimit(2...4)
+                    .padding(.vertical, 14)
+                    .fieldBackground(height: 68)
+            }
+            .entrance(.rest(0))
+
+            VStack(alignment: .leading, spacing: 6) {
+                FieldLabel(text: "Category")
+                FlowLayout(spacing: 8) {
+                    ForEach(categories, id: \.self) { option in
+                        ChoiceChip(label: option, isSelected: option == category) { category = option }
                     }
                 }
             }
+            .entrance(.rest(1))
 
-            Section("Where and when") {
-                Toggle("Remote job", isOn: $isRemote)
-                if !isRemote {
-                    Label("Current location", systemImage: "location.fill")
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    FieldLabel(text: "Where")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    ChoiceChip(label: "In person", isSelected: inPerson) { inPerson = true }
+                    ChoiceChip(label: "Remote", isSelected: !inPerson) { inPerson = false }
                 }
-                DatePicker("Deadline", selection: $deadline, in: Date()...)
+                HStack(spacing: 10) {
+                    IconGlyph(icon: .mapPin, size: 20)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                    TextField("Address", text: $address)
+                        .bountyType(.body)
+                        .foregroundStyle(BountyColor.inkPrimary)
+                }
+                .fieldBackground()
+                .opacity(inPerson ? 1 : 0.4)
+                .disabled(!inPerson)
+                .animation(Motion.pressTint, value: inPerson)
             }
+            .entrance(.rest(2))
 
-            Section("Payment") {
-                HStack {
-                    Text("Amount")
-                    Spacer()
-                    TextField("25", value: $amount, format: .currency(code: "USD"))
-                        .multilineTextAlignment(.trailing)
-                        .keyboardType(.decimalPad)
+            HStack(spacing: 11) {
+                VStack(alignment: .leading, spacing: 6) {
+                    FieldLabel(text: "Deadline")
+                    HStack(spacing: 10) {
+                        IconGlyph(icon: .clock, size: 20)
+                            .foregroundStyle(BountyColor.inkSecondary)
+                        Text("Sun 12 PM")
+                            .bountyType(.body)
+                            .foregroundStyle(BountyColor.inkPrimary)
+                    }
+                    .fieldBackground()
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    FieldLabel(text: "Pay")
+                    HStack(spacing: 10) {
+                        Text("$40")
+                            .bountyType(.moneyM)
+                            .foregroundStyle(BountyColor.inkPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Chip(label: "USD", tone: .grey)
+                    }
+                    .fieldBackground()
                 }
             }
-
-            Section {
-                Button("Generate proof checklist", action: {})
-                    .frame(maxWidth: .infinity)
-                    .font(.headline)
-            } footer: {
-                Text("Your description becomes an editable checklist before you fund the job.")
-            }
+            .entrance(.rest(3))
+        } bottom: {
+            PillButton(title: "Draft the proof checklist", icon: .sparkles) { router.open(.proofChecklist) }
         }
-        .navigationTitle("Post a job")
     }
 }
 
-#Preview {
-    NavigationStack {
-        CreateJobView()
+// MARK: - 13 Proof checklist
+
+struct ProofChecklistView: View {
+    @Environment(AppRouter.self) private var router
+
+    private let requirements: [(title: String, evidenceIcon: BountyIcon, evidence: String)] = [
+        ("Front lawn mowed, under 3 in", .camera, "4 after photos from marked angles"),
+        ("Clippings bagged or mulched", .camera, "1 photo of the bags"),
+        ("Sidewalk edges trimmed", .camera, "2 close-up photos"),
+        ("On-site check-in and out", .locate, "GPS and time, automatic")
+    ]
+
+    var body: some View {
+        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 300), spacing: 14) {
+            NavRow(leadingAction: router.back) {
+                ProgressDots(total: 3, current: 1)
+            } trailing: {
+                Text("Step 2 of 3")
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.inkSecondary)
+            }
+            .entrance(.top)
+
+            Text("What counts as done")
+                .bountyType(.display)
+                .foregroundStyle(BountyColor.inkPrimary)
+                .entrance(.top)
+
+            Text("It locks once the job is funded.")
+                .bountyType(.body)
+                .foregroundStyle(BountyColor.inkSecondary)
+                .entrance(.top)
+
+            HStack(spacing: 10) {
+                IconGlyph(icon: .sparkles, size: 18)
+                Text("Drafted by AI from your description. Edit anything.")
+                    .bountyType(.subhead)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .foregroundStyle(BountyColor.lavenderInk)
+            .padding(12)
+            .tintedPanel(BountyColor.lavenderSoft, radius: 16)
+            .entrance(.rest(0))
+
+            VStack(spacing: 10) {
+                ForEach(Array(requirements.enumerated()), id: \.offset) { index, requirement in
+                    HStack(alignment: .top, spacing: 10) {
+                        GripDots()
+                            .frame(width: 20, height: 20)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(requirement.title)
+                                .bountyType(.bodyStrong)
+                                .foregroundStyle(BountyColor.inkPrimary)
+                            HStack(spacing: 6) {
+                                IconGlyph(icon: requirement.evidenceIcon, size: 14)
+                                Text(requirement.evidence)
+                                    .bountyType(.footnote)
+                            }
+                            .foregroundStyle(BountyColor.inkSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        IconGlyph(icon: .pencil, size: 18)
+                            .foregroundStyle(BountyColor.inkSecondary)
+                    }
+                    .padding(14)
+                    .borderedCard(radius: BountyRadius.row)
+                    .entrance(.rest(1 + index))
+                }
+            }
+
+            HStack(spacing: 6) {
+                IconGlyph(icon: .plus, size: 18, weight: .semibold)
+                Text("Add a requirement")
+                    .bountyType(.bodyStrong)
+            }
+            .foregroundStyle(BountyColor.lavenderInk)
+            .entrance(.rest(5))
+        } bottom: {
+            PillButton(title: "Looks right") { router.open(.fundJob) }
+        }
     }
+}
+
+/// Lucide grip-vertical: two columns of three dots.
+private struct GripDots: View {
+    var body: some View {
+        Grid(horizontalSpacing: 4, verticalSpacing: 4) {
+            ForEach(0..<3, id: \.self) { _ in
+                GridRow {
+                    Circle().frame(width: 3.5, height: 3.5)
+                    Circle().frame(width: 3.5, height: 3.5)
+                }
+            }
+        }
+        .foregroundStyle(BountyColor.inkTertiary)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - 14 Fund the job
+
+struct FundJobView: View {
+    @Environment(AppRouter.self) private var router
+    @State private var method = PaymentMethod.card
+
+    enum PaymentMethod: Hashable {
+        case card, usdc
+    }
+
+    var body: some View {
+        BountyScreen {
+            NavRow(leadingAction: router.back) {
+                ProgressDots(total: 3, current: 2)
+            } trailing: {
+                Text("Step 3 of 3")
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.inkSecondary)
+            }
+            .entrance(.top)
+
+            Text("Fund your job")
+                .bountyType(.display)
+                .foregroundStyle(BountyColor.inkPrimary)
+                .entrance(.top)
+
+            HStack(spacing: 12) {
+                StickerTile(sticker: .mower, background: BountyColor.mint, size: 56, stickerSize: 46, radius: 17)
+                TitleSubtitle(title: "Mow my front lawn", subtitle: "Due Sun 12 PM · 4 proof items")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .borderedCard(radius: BountyRadius.row)
+            .entrance(.top)
+
+            VStack(spacing: 12) {
+                priceRow("Job payment", "$40.00")
+                priceRow("Platform fee (10%)", "$4.00")
+                BountyColor.divider.frame(height: 1)
+                HStack {
+                    Text("Total").bountyType(.bodyStrong)
+                    Spacer()
+                    Text("$44.00").bountyType(.moneyM)
+                }
+                .foregroundStyle(BountyColor.inkPrimary)
+            }
+            .padding(16)
+            .borderedCard()
+            .entrance(.rest(0))
+
+            VStack(alignment: .leading, spacing: 8) {
+                FieldLabel(text: "Pay with")
+                SegmentedPill(options: [(PaymentMethod.card, "Card or Apple Pay"), (.usdc, "USDC")], selection: $method)
+            }
+            .entrance(.rest(1))
+
+            HStack(spacing: 14) {
+                StickerView(sticker: .shield, size: 56)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Held until it’s done")
+                        .bountyType(.bodyStrong)
+                    Text("The worker gets $40 only after the proof passes. Nobody finishes by Sunday noon? Full refund.")
+                        .bountyType(.footnote)
+                }
+                .foregroundStyle(BountyColor.mintInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(16)
+            .tintedPanel(BountyColor.mint)
+            .entrance(.rest(2))
+        } bottom: {
+            VStack(spacing: 12) {
+                PillButton(
+                    title: method == .card ? "Pay $44.00" : "Pay 44.00 USDC",
+                    icon: method == .card ? .apple : nil,
+                    style: .dark
+                ) {
+                    router.jobsSegment = .posted
+                    router.finish(on: .jobs)
+                }
+                Text("Test mode · card 4242 4242 4242 4242")
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.inkTertiary)
+            }
+        }
+    }
+
+    private func priceRow(_ label: String, _ amount: String) -> some View {
+        HStack {
+            Text(label).foregroundStyle(BountyColor.inkSecondary)
+            Spacer()
+            Text(amount).foregroundStyle(BountyColor.inkPrimary)
+        }
+        .bountyType(.body)
+    }
+}
+
+#Preview("Post a job") {
+    CreateJobView()
+        .environment(AppRouter())
+}
+
+#Preview("Proof checklist") {
+    ProofChecklistView()
+        .environment(AppRouter())
+}
+
+#Preview("Fund") {
+    FundJobView()
+        .environment(AppRouter())
 }
