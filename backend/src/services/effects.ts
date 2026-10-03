@@ -9,10 +9,19 @@ import { timerName, type TimerPayload } from "../scheduler/index.js";
 import { sendJobPush } from "./notify.js";
 import { bumpStats } from "./users.js";
 
+// Effects that are not naturally idempotent run at most once per ledger row: a retry of the row
+// must not double-count reliability stats or re-send notifications.
+const AT_MOST_ONCE = new Set<Effect["kind"]>(["stats", "push"]);
+const CLAIM_TTL_SEC = 7 * 24 * 3600;
+
 export async function runEffects(deps: Deps, ledger: LedgerEvent): Promise<void> {
   const failures: unknown[] = [];
-  for (const effect of ledger.effects) {
+  for (const [index, effect] of ledger.effects.entries()) {
     try {
+      if (AT_MOST_ONCE.has(effect.kind)) {
+        const claimed = await deps.store.kvPut(`effect:${ledger.jobId}:${ledger.seq}:${index}`, effect.kind, { ifAbsent: true, ttlSeconds: CLAIM_TTL_SEC });
+        if (!claimed) continue;
+      }
       await runEffect(deps, ledger, effect);
     } catch (error) {
       // The job moved on (e.g. someone accepted while we were sending the next offer). Nothing to do.

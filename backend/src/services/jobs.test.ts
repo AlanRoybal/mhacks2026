@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { TransitionError } from "../domain/jobMachine.js";
 import type { Actor, Job } from "../domain/types.js";
 import { testDeps } from "../testing/harness.js";
+import { runEffects } from "./effects.js";
 import { applyEvent, createJobRecord } from "./jobs.js";
 import { getUserOrThrow, newUser } from "./users.js";
 
@@ -89,4 +90,21 @@ test("stats effects update the user after the commit", async () => {
   const worker = await getUserOrThrow(deps, "worker");
   assert.equal(worker.stats.offersReceived, 1);
   assert.equal(worker.stats.offersAccepted, 1);
+});
+
+test("re-running a ledger row does not double-count stats or re-send pushes", async () => {
+  const deps = testDeps();
+  const now = deps.now();
+  await deps.store.createUser(newUser({ userId: "worker", displayName: "W" }, now));
+  await createJobRecord(deps, draft(now), { kind: "user", userId: "poster" });
+  await applyEvent(deps, "job1", { type: "FUND_CONFIRMED", amountCents: 1650 }, SYSTEM);
+  const expiresAt = new Date(now.getTime() + 30_000).toISOString();
+  await applyEvent(deps, "job1", { type: "OFFER_SENT", offerId: "o1", workerId: "worker", expiresAt }, SYSTEM);
+  await deps.inlineEffects.drain();
+  const row = (await deps.store.listLedger("job1")).at(-1);
+  assert.ok(row);
+  await runEffects(deps, row);
+  const worker = await getUserOrThrow(deps, "worker");
+  assert.equal(worker.stats.offersReceived, 1);
+  assert.equal(deps.push.sent.filter((p) => p.message.type === "offer").length, 1);
 });
