@@ -5,6 +5,7 @@ import SwiftUI
 struct CreateJobView: View {
     @Environment(AppRouter.self) private var router
     @Environment(PostDraft.self) private var draft
+    @State private var pickingDeadline = false
 
     var body: some View {
         @Bindable var draft = draft
@@ -88,14 +89,20 @@ struct CreateJobView: View {
             HStack(spacing: 11) {
                 VStack(alignment: .leading, spacing: 6) {
                     FieldLabel(text: "Deadline")
-                    HStack(spacing: 10) {
-                        IconGlyph(icon: .clock, size: 20)
-                            .foregroundStyle(BountyColor.inkSecondary)
-                        DatePicker("Deadline", selection: $draft.deadline, in: Date()..., displayedComponents: [.date, .hourAndMinute])
-                            .labelsHidden()
-                            .datePickerStyle(.compact)
+                    Button { pickingDeadline = true } label: {
+                        HStack(spacing: 10) {
+                            IconGlyph(icon: .clock, size: 20)
+                                .foregroundStyle(BountyColor.inkSecondary)
+                            Text(draft.deadlineText)
+                                .bountyType(.body)
+                                .foregroundStyle(BountyColor.inkPrimary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .fieldBackground()
                     }
-                    .fieldBackground()
+                    .buttonStyle(PressableStyle())
+                    .accessibilityLabel("Deadline, \(draft.deadlineText)")
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     FieldLabel(text: "Pay")
@@ -116,6 +123,12 @@ struct CreateJobView: View {
             .entrance(.rest(3))
         } bottom: {
             PillButton(title: "Draft the proof checklist", icon: .sparkles) { router.open(.proofChecklist) }
+        }
+        .sheet(isPresented: $pickingDeadline) {
+            DatePicker("Deadline", selection: $draft.deadline, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                .datePickerStyle(.graphical)
+                .padding()
+                .presentationDetents([.medium, .large])
         }
     }
 }
