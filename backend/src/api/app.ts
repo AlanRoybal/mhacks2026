@@ -10,6 +10,7 @@ import { jobRoutes } from "./routes/jobs.js";
 import { localBlobRoutes } from "./routes/localBlobs.js";
 import { meRoutes } from "./routes/me.js";
 import { offerRoutes } from "./routes/offers.js";
+import { proofRoutes } from "./routes/proof.js";
 import { twinRoutes } from "./routes/twin.js";
 import { fileRoutes, uploadRoutes } from "./routes/uploads.js";
 
@@ -33,6 +34,7 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   authed.route("/twin", twinRoutes(deps));
   authed.route("/uploads", uploadRoutes(deps));
   authed.route("/jobs", jobRoutes(deps));
+  authed.route("/jobs", proofRoutes(deps));
   authed.route("/offers", offerRoutes(deps));
   app.route("/", authed);
 
