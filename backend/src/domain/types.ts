@@ -94,7 +94,8 @@ export interface Job {
     requiresPosterAction: boolean;
     windowEndsAt: string;
   };
-  dispute?: { itemId: string; reason: string; openedAt: string };
+  // openedBy "system": the poster never decided on an unclear grade, so an admin must.
+  dispute?: { itemId?: string; reason: string; openedBy: "poster" | "system"; openedAt: string };
   resolution?: { outcome: "release" | "refund"; by: string; note?: string; at: string };
   payment: { paymentIntentId?: string; chargeId?: string; transferId?: string; refundId?: string };
   ratings: { byPoster?: Rating; byWorker?: Rating };
@@ -108,7 +109,8 @@ export interface Job {
   closedAt?: string;
 }
 
-export type OfferStatus = "queued" | "sent" | "accepted" | "declined" | "expired";
+// "canceled": the job was canceled or refunded while this offer was out.
+export type OfferStatus = "queued" | "sent" | "accepted" | "declined" | "expired" | "canceled";
 
 export interface Offer {
   offerId: string;
