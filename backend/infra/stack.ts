@@ -169,9 +169,10 @@ export class BountyStack extends cdk.Stack {
       apiName: name("api"),
       defaultIntegration: new HttpLambdaIntegration("ApiIntegration", api),
     });
-    // The API builds absolute URLs (OAuth redirects, file links) from its own address.
-    api.addEnvironment("PUBLIC_BASE_URL", process.env.PUBLIC_BASE_URL ?? httpApi.apiEndpoint);
-    worker.addEnvironment("PUBLIC_BASE_URL", process.env.PUBLIC_BASE_URL ?? httpApi.apiEndpoint);
+    // The API builds absolute URLs (OAuth redirects, file links) from its own address. PUBLIC_BASE_URL in
+    // .env is the laptop's address for local dev, so it is deliberately not passed through.
+    api.addEnvironment("PUBLIC_BASE_URL", httpApi.apiEndpoint);
+    worker.addEnvironment("PUBLIC_BASE_URL", httpApi.apiEndpoint);
 
     new cdk.CfnOutput(this, "ApiUrl", { value: httpApi.apiEndpoint });
     new cdk.CfnOutput(this, "StripeWebhookUrl", { value: `${httpApi.apiEndpoint}/webhooks/stripe` });
