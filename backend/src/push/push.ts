@@ -33,6 +33,7 @@ export function apsPayload(message: PushMessage): Record<string, unknown> {
     type: message.type,
     jobId: message.jobId,
     ...(message.offerId ? { offerId: message.offerId } : {}),
-    ...(message.expiresAt ? { expiresAt: message.expiresAt } : {}),
+    // Same format as the API: no fractional seconds.
+    ...(message.expiresAt ? { expiresAt: message.expiresAt.replace(/\.\d{3}Z$/, "Z") } : {}),
   };
 }
