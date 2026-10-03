@@ -13,6 +13,7 @@ struct Job: Identifiable, Hashable {
 }
 
 enum JobStatus: String, CaseIterable, Identifiable {
+    case funded = "Funded"
     case offered = "Offered"
     case accepted = "Accepted"
     case inProgress = "In progress"
@@ -23,6 +24,7 @@ enum JobStatus: String, CaseIterable, Identifiable {
 
     var chipTone: ChipTone {
         switch self {
+        case .funded: .grey
         case .offered: .yellow
         case .accepted, .inProgress: .lavender
         case .inReview: .cream

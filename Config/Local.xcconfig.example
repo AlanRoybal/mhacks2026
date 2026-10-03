@@ -1,0 +1,8 @@
+// An iPhone needs your Mac's LAN IP or an HTTPS server URL.
+// In xcconfig, /$()/ preserves the second slash in a URL.
+// Main backend: `cd backend && npm run dev` serves port 8787.
+BOUNTY_API_BASE_URL = http:/$()/192.168.1.100:8787
+// Payments test server: `cd payments-server && npm run dev` serves port 4242.
+BOUNTY_PAYMENTS_BASE_URL = http:/$()/192.168.1.100:4242
+// Set only after adding the matching Apple Pay capability and Stripe certificate.
+BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER =

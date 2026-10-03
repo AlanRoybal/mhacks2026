@@ -1,0 +1,127 @@
+import { DatabaseSync } from 'node:sqlite';
+
+export class PaymentError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+
+export function validateDraft(input) {
+  if (!input || typeof input !== 'object') throw new PaymentError(400, 'A job is required.');
+  if (typeof input.id !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(input.id)) {
+    throw new PaymentError(400, 'A valid job ID is required.');
+  }
+  const text = (key, max) => {
+    if (typeof input[key] !== 'string' || !input[key].trim() || input[key].trim().length > max) {
+      throw new PaymentError(400, `Invalid ${key}.`);
+    }
+    return input[key].trim();
+  };
+  if (!Number.isSafeInteger(input.amountCents) || input.amountCents < 50 || input.amountCents > 1_000_000) {
+    throw new PaymentError(400, 'Job pay must be between $0.50 and $10,000, in whole cents.');
+  }
+  const deadline = new Date(input.deadline);
+  if (!Number.isFinite(deadline.getTime()) || deadline <= new Date()) {
+    throw new PaymentError(400, 'Choose a future deadline.');
+  }
+  if (typeof input.isRemote !== 'boolean') throw new PaymentError(400, 'Choose a job location.');
+  const category = text('category', 40);
+  if (!['Design', 'Home', 'Tutoring', 'Photography', 'Technology'].includes(category)) {
+    throw new PaymentError(400, 'Choose a supported category.');
+  }
+  return {
+    id: input.id.toLowerCase(), title: text('title', 120), details: text('details', 4000),
+    category, isRemote: input.isRemote, deadline: deadline.toISOString(), amountCents: input.amountCents,
+  };
+}
+
+export class JobStore {
+  constructor(path = ':memory:') {
+    this.db = new DatabaseSync(path);
+    this.db.exec('PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, record TEXT NOT NULL)');
+  }
+  get(id) {
+    const row = this.db.prepare('SELECT record FROM jobs WHERE id = ?').get(id);
+    return row ? JSON.parse(row.record) : null;
+  }
+  save(job) {
+    this.db.prepare('INSERT INTO jobs VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET record = excluded.record')
+      .run(job.id, JSON.stringify(job));
+    return job;
+  }
+  close() { this.db.close(); }
+}
+
+export class Payments {
+  constructor({ stripe, store, publishableKey }) {
+    this.stripe = stripe; this.store = store; this.publishableKey = publishableKey;
+    this.inFlight = new Map();
+  }
+
+  async prepare(input) {
+    const draft = validateDraft(input);
+    // A retry after a timeout, cancellation, or concurrent tap must reuse the same charge.
+    if (this.inFlight.has(draft.id)) {
+      await this.inFlight.get(draft.id);
+      return this.prepare(input);
+    }
+    const operation = this.createSheet(draft);
+    this.inFlight.set(draft.id, operation);
+    try { return await operation; }
+    finally { this.inFlight.delete(draft.id); }
+  }
+
+  async createSheet(draft) {
+    let job = this.store.get(draft.id);
+    if (job && JSON.stringify(job.draft) !== JSON.stringify(draft)) {
+      throw new PaymentError(409, 'This checkout already belongs to another job. Start a new checkout.');
+    }
+    if (!job) {
+      const feeCents = Math.round(draft.amountCents * 0.10);
+      job = this.store.save({ ...draft, draft, feeCents, totalCents: draft.amountCents + feeCents,
+        currency: 'usd', status: 'draft', paymentIntentID: null });
+    }
+    const intent = job.paymentIntentID
+      ? await this.stripe.paymentIntents.retrieve(job.paymentIntentID)
+      : await this.stripe.paymentIntents.create({
+          amount: job.totalCents, currency: job.currency,
+          allowed_payment_method_types: ['card'],
+          description: `Bounty: ${job.title}`,
+          metadata: { job_id: job.id }, transfer_group: `job_${job.id}`,
+        }, { idempotencyKey: `bounty-funding-${job.id}` });
+    job.paymentIntentID = intent.id;
+    this.store.save(job);
+    job = this.applyIntent(intent);
+    if (intent.status === 'canceled') throw new PaymentError(409, 'This payment expired. Start a new checkout.');
+    return { job: this.publicJob(job), paymentIntentClientSecret: intent.client_secret,
+      publishableKey: this.publishableKey };
+  }
+
+  applyIntent(intent) {
+    if (typeof intent.metadata?.job_id !== 'string') return null;
+    const job = this.store.get(intent.metadata?.job_id);
+    if (!job || job.paymentIntentID !== intent.id) return null;
+    if (intent.livemode || intent.amount !== job.totalCents || intent.currency !== job.currency) {
+      throw new PaymentError(409, 'Payment details do not match this job.');
+    }
+    if (intent.status === 'succeeded') {
+      if (intent.amount_received !== job.totalCents) throw new PaymentError(409, 'The full job payment has not been received.');
+      job.status = 'funded';
+    }
+    // Failure/processing events delivered out of order must never undo a successful charge.
+    return this.store.save(job);
+  }
+
+  async status(id) {
+    const job = this.store.get(id.toLowerCase());
+    if (!job) throw new PaymentError(404, 'Job not found.');
+    if (job.paymentIntentID) {
+      const intent = await this.stripe.paymentIntents.retrieve(job.paymentIntentID);
+      return this.publicJob(this.applyIntent(intent));
+    }
+    return this.publicJob(job);
+  }
+
+  publicJob(job) {
+    const { draft, paymentIntentID, ...safe } = job;
+    return safe;
+  }
+}

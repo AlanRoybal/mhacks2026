@@ -4,16 +4,10 @@ import SwiftUI
 
 struct CreateJobView: View {
     @Environment(AppRouter.self) private var router
-
-    @State private var title = "Mow my front lawn"
-    @State private var details = "Front yard only. Bag the clippings. The mower is in the open garage."
-    @State private var category = "Yard work"
-    @State private var inPerson = true
-    @State private var address = "1200 S University Ave"
-
-    private let categories = ["Yard work", "Design", "Photos", "Tutoring", "Errands"]
+    @Environment(PostDraft.self) private var draft
 
     var body: some View {
+        @Bindable var draft = draft
         BountyScreen(spacing: 14) {
             ScreenTitle(title: "Post a job") {
                 Chip(label: "Draft", tone: .grey)
@@ -21,7 +15,7 @@ struct CreateJobView: View {
             .entrance(.top)
 
             HStack(spacing: 10) {
-                StickerTile(sticker: .mower, background: BountyColor.mint, size: 84, stickerSize: 66, radius: 18)
+                StickerTile(sticker: draft.sticker, background: draft.tileColor, size: 84, stickerSize: 66, radius: 18)
                 Button {} label: {
                     VStack(spacing: 4) {
                         IconGlyph(icon: .images, size: 22)
@@ -42,7 +36,7 @@ struct CreateJobView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 FieldLabel(text: "Title")
-                TextField("What do you need done?", text: $title)
+                TextField("What do you need done?", text: $draft.title)
                     .bountyType(.body)
                     .foregroundStyle(BountyColor.inkPrimary)
                     .fieldBackground()
@@ -51,7 +45,7 @@ struct CreateJobView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 FieldLabel(text: "Description")
-                TextField("Add details", text: $details, axis: .vertical)
+                TextField("Add details", text: $draft.details, axis: .vertical)
                     .bountyType(.body)
                     .foregroundStyle(BountyColor.inkPrimary)
                     .lineLimit(2...4)
@@ -63,8 +57,8 @@ struct CreateJobView: View {
             VStack(alignment: .leading, spacing: 6) {
                 FieldLabel(text: "Category")
                 FlowLayout(spacing: 8) {
-                    ForEach(categories, id: \.self) { option in
-                        ChoiceChip(label: option, isSelected: option == category) { category = option }
+                    ForEach(PostDraft.categories, id: \.self) { option in
+                        ChoiceChip(label: option, isSelected: option == draft.category) { draft.category = option }
                     }
                 }
             }
@@ -74,20 +68,20 @@ struct CreateJobView: View {
                 HStack(spacing: 6) {
                     FieldLabel(text: "Where")
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    ChoiceChip(label: "In person", isSelected: inPerson) { inPerson = true }
-                    ChoiceChip(label: "Remote", isSelected: !inPerson) { inPerson = false }
+                    ChoiceChip(label: "In person", isSelected: draft.inPerson) { draft.inPerson = true }
+                    ChoiceChip(label: "Remote", isSelected: !draft.inPerson) { draft.inPerson = false }
                 }
                 HStack(spacing: 10) {
                     IconGlyph(icon: .mapPin, size: 20)
                         .foregroundStyle(BountyColor.inkSecondary)
-                    TextField("Address", text: $address)
+                    TextField("Address", text: $draft.address)
                         .bountyType(.body)
                         .foregroundStyle(BountyColor.inkPrimary)
                 }
                 .fieldBackground()
-                .opacity(inPerson ? 1 : 0.4)
-                .disabled(!inPerson)
-                .animation(Motion.pressTint, value: inPerson)
+                .opacity(draft.inPerson ? 1 : 0.4)
+                .disabled(!draft.inPerson)
+                .animation(Motion.pressTint, value: draft.inPerson)
             }
             .entrance(.rest(2))
 
@@ -97,19 +91,23 @@ struct CreateJobView: View {
                     HStack(spacing: 10) {
                         IconGlyph(icon: .clock, size: 20)
                             .foregroundStyle(BountyColor.inkSecondary)
-                        Text("Sun 12 PM")
-                            .bountyType(.body)
-                            .foregroundStyle(BountyColor.inkPrimary)
+                        DatePicker("Deadline", selection: $draft.deadline, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                            .labelsHidden()
+                            .datePickerStyle(.compact)
                     }
                     .fieldBackground()
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     FieldLabel(text: "Pay")
                     HStack(spacing: 10) {
-                        Text("$40")
-                            .bountyType(.moneyM)
-                            .foregroundStyle(BountyColor.inkPrimary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(spacing: 0) {
+                            Text("$")
+                            TextField("40", value: $draft.pay, format: .number)
+                                .keyboardType(.numberPad)
+                        }
+                        .bountyType(.moneyM)
+                        .foregroundStyle(BountyColor.inkPrimary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         Chip(label: "USD", tone: .grey)
                     }
                     .fieldBackground()
@@ -225,7 +223,10 @@ private struct GripDots: View {
 
 struct FundJobView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(PostDraft.self) private var draft
     @State private var method = PaymentMethod.card
+    /// Set to open Stripe's PaymentSheet through the payments server (PaymentCheckoutView).
+    @State private var checkout: FundingDraft?
 
     enum PaymentMethod: Hashable {
         case card, usdc
@@ -248,8 +249,8 @@ struct FundJobView: View {
                 .entrance(.top)
 
             HStack(spacing: 12) {
-                StickerTile(sticker: .mower, background: BountyColor.mint, size: 56, stickerSize: 46, radius: 17)
-                TitleSubtitle(title: "Mow my front lawn", subtitle: "Due Sun 12 PM · 4 proof items")
+                StickerTile(sticker: draft.sticker, background: draft.tileColor, size: 56, stickerSize: 46, radius: 17)
+                TitleSubtitle(title: draft.title, subtitle: "Due \(draft.deadlineText) · 4 proof items")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -257,13 +258,13 @@ struct FundJobView: View {
             .entrance(.top)
 
             VStack(spacing: 12) {
-                priceRow("Job payment", "$40.00")
-                priceRow("Platform fee (10%)", "$4.00")
+                priceRow("Job payment", money(draft.payCents))
+                priceRow("Platform fee (10%)", money(draft.feeCents))
                 BountyColor.divider.frame(height: 1)
                 HStack {
                     Text("Total").bountyType(.bodyStrong)
                     Spacer()
-                    Text("$44.00").bountyType(.moneyM)
+                    Text(money(draft.totalCents)).bountyType(.moneyM)
                 }
                 .foregroundStyle(BountyColor.inkPrimary)
             }
@@ -282,7 +283,7 @@ struct FundJobView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Held until it’s done")
                         .bountyType(.bodyStrong)
-                    Text("The worker gets $40 only after the proof passes. Nobody finishes by Sunday noon? Full refund.")
+                    Text("The worker gets \(money(draft.payCents)) only after the proof passes. Nobody finishes by the deadline? Full refund.")
                         .bountyType(.footnote)
                 }
                 .foregroundStyle(BountyColor.mintInk)
@@ -294,18 +295,39 @@ struct FundJobView: View {
         } bottom: {
             VStack(spacing: 12) {
                 PillButton(
-                    title: method == .card ? "Pay $44.00" : "Pay 44.00 USDC",
+                    title: method == .card ? "Pay \(money(draft.totalCents))" : "Pay \(usdc(draft.totalCents)) USDC",
                     icon: method == .card ? .apple : nil,
                     style: .dark
                 ) {
-                    router.jobsSegment = .posted
-                    router.finish(on: .jobs)
+                    if method == .card {
+                        checkout = draft.fundingDraft()
+                    } else {
+                        // USDC escrow isn't built yet; this keeps the original simulated flow.
+                        router.jobsSegment = .posted
+                        router.finish(on: .jobs)
+                    }
                 }
+                .disabled(!draft.canFund)
                 Text("Test mode · card 4242 4242 4242 4242")
                     .bountyType(.footnote)
                     .foregroundStyle(BountyColor.inkTertiary)
             }
         }
+        .sheet(item: $checkout) { funding in
+            PaymentCheckoutView(draft: funding) {
+                draft.reset()
+                router.jobsSegment = .posted
+                router.finish(on: .jobs)
+            }
+        }
+    }
+
+    private func money(_ cents: Int) -> String {
+        (Decimal(cents) / 100).formatted(.currency(code: "USD"))
+    }
+
+    private func usdc(_ cents: Int) -> String {
+        (Decimal(cents) / 100).formatted(.number.precision(.fractionLength(2)))
     }
 
     private func priceRow(_ label: String, _ amount: String) -> some View {
@@ -321,6 +343,7 @@ struct FundJobView: View {
 #Preview("Post a job") {
     CreateJobView()
         .environment(AppRouter())
+        .environment(PostDraft())
 }
 
 #Preview("Proof checklist") {
@@ -331,4 +354,6 @@ struct FundJobView: View {
 #Preview("Fund") {
     FundJobView()
         .environment(AppRouter())
+        .environment(PostDraft())
+        .environmentObject(PostedJobsStore())
 }

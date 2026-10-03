@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BountyAPIBaseURL</key>
+	<string>$(BOUNTY_API_BASE_URL)</string>
+	<key>BountyApplePayMerchantIdentifier</key>
+	<string>$(BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER)</string>
 	<key>BountyLinkedInClientID</key>
 	<string>86rcq1bjy06k5g</string>
 	<key>CFBundleDevelopmentRegion</key>
@@ -37,14 +41,23 @@
 	<false/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.business</string>
+	<key>BountyPaymentsBaseURL</key>
+	<string>$(BOUNTY_PAYMENTS_BASE_URL)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Bounty uses your calendar availability to avoid offering jobs when you are busy. Event names never leave this device.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Bounty uses the camera to capture proof that a job was completed.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Bounty uses Face ID to confirm you want to accept a job.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Bounty connects to the local Bounty and payment test servers during development.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Bounty uses your location to match nearby jobs and verify on-site work.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

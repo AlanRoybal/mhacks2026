@@ -8,11 +8,13 @@ enum JobsSegment: Hashable {
 
 struct JobsView: View {
     @Environment(AppRouter.self) private var router
+    // Jobs funded through Stripe checkout (real data) come before the sample cards.
+    @EnvironmentObject private var postedJobs: PostedJobsStore
 
     private func jobs(for segment: JobsSegment) -> [Job] {
         switch segment {
         case .working: SampleJobs.working
-        case .posted: SampleJobs.posted
+        case .posted: postedJobs.fundedJobs.map(\.job) + SampleJobs.posted
         case .done: SampleJobs.working.filter { $0.status == .paid }
         }
     }
@@ -44,13 +46,14 @@ struct JobsView: View {
 
     private func open(_ job: Job) {
         if router.jobsSegment == .posted {
-            router.open(.reviewProof)
+            // A job that is only funded has no proof to review yet.
+            if job.status != .funded { router.open(.reviewProof) }
             return
         }
         switch job.status {
         case .offered: router.open(.offer)
         case .accepted, .inProgress: router.open(.jobDetail)
-        case .inReview, .paid: break
+        case .funded, .inReview, .paid: break
         }
     }
 }
@@ -200,6 +203,7 @@ struct ReviewProofView: View {
 #Preview("Jobs") {
     JobsView()
         .environment(AppRouter())
+        .environmentObject(PostedJobsStore())
 }
 
 #Preview("Review proof") {

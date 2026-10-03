@@ -2,6 +2,10 @@ import SwiftUI
 
 struct RootTabView: View {
     @Environment(AppRouter.self) private var router
+    // Jobs funded through Stripe checkout (payments branch), shown under Jobs > Posted.
+    @StateObject private var postedJobs = PostedJobsStore()
+    // The job being posted, shared by Post a job → Proof checklist → Fund.
+    @State private var postDraft = PostDraft()
 
     var body: some View {
         Group {
@@ -23,6 +27,9 @@ struct RootTabView: View {
         }
         .environment(\.screenExiting, router.transition.isExiting)
         .preferredColorScheme(router.route?.usesDarkStatusBar == true ? .dark : .light)
+        .environmentObject(postedJobs)
+        .environment(postDraft)
+        .task { await postedJobs.refresh() }
         .onAppear(perform: consumePendingPushRoute)
         .onReceive(NotificationCenter.default.publisher(for: .pushRouteChanged)) { _ in
             consumePendingPushRoute()

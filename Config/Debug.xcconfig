@@ -1,0 +1,5 @@
+// Main backend (backend/). Empty keeps the app on its built-in sample data; set it in Local.xcconfig.
+BOUNTY_API_BASE_URL =
+BOUNTY_PAYMENTS_BASE_URL = http:/$()/127.0.0.1:4242
+BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER =
+#include? "Local.xcconfig"
