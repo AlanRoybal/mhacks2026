@@ -86,7 +86,8 @@ export interface Config extends Omit<Env, "JWT_SECRET" | "SCHEDULER_GROUP"> {
 const LOCAL_JWT_SECRET = "local-dev-secret-do-not-use-in-production!!";
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = schema.safeParse(env);
+  // `KEY=` in a .env file means "not set", not "set to an empty string".
+  const parsed = schema.safeParse(Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined && v.trim() !== "")));
   if (!parsed.success) {
     const problems = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Invalid configuration: ${problems}`);

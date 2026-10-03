@@ -4,6 +4,13 @@ import { createApp } from "./api/app.js";
 import { getDeps } from "./deps.js";
 import { sweep } from "./services/sweeper.js";
 
+// Reads backend/.env if present (see .env.example). Config is loaded lazily by getDeps(), after this.
+try {
+  process.loadEnvFile(".env");
+} catch {
+  // No .env: the defaults run fully offline.
+}
+
 const deps = getDeps();
 const app = createApp(deps);
 
