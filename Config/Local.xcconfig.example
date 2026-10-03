@@ -1,0 +1,5 @@
+// An iPhone needs your Mac's LAN IP or an HTTPS server URL.
+// In xcconfig, /$()/ preserves the second slash in a URL.
+BOUNTY_PAYMENTS_BASE_URL = http:/$()/192.168.1.100:4242
+// Set only after adding the matching Apple Pay capability and Stripe certificate.
+BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER =

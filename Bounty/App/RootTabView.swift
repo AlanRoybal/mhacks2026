@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootTabView: View {
     @State private var selection = AppTab.home
+    @StateObject private var postedJobs = PostedJobsStore()
 
     var body: some View {
         TabView(selection: $selection) {
@@ -46,6 +47,8 @@ struct RootTabView: View {
             .tag(AppTab.earnings)
         }
         .tint(BountyTheme.accent)
+        .environmentObject(postedJobs)
+        .task { await postedJobs.refresh() }
         .onAppear(perform:consumePendingPushRoute)
         .onReceive(NotificationCenter.default.publisher(for: .pushRouteChanged)) { _ in
             consumePendingPushRoute()

@@ -1,0 +1,26 @@
+# Compiler files
+/cache/
+/out/
+
+# Generated transaction logs and reports
+/broadcast/
+/coverage/
+/lcov.info
+
+# Commonly ignored directories
+.logs/
+.ignore/
+
+# Docs
+/docs/
+
+# Dotenv file
+.env
+.env.*
+!.env.example
+
+# Local credentials and signing material
+/keystores/
+/secrets/
+*.key
+*.pem

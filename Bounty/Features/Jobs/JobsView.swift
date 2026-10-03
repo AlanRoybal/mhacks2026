@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct JobsView: View {
+    @EnvironmentObject private var postedJobs: PostedJobsStore
     @State private var selection = JobCollection.working
 
     var filteredJobs: [Job] {
@@ -8,7 +9,7 @@ struct JobsView: View {
         case .working:
             SampleJobs.jobs.filter { [.accepted, .inProgress, .inReview].contains($0.status) }
         case .posted:
-            []
+            postedJobs.fundedJobs.map(\.job)
         case .completed:
             SampleJobs.jobs.filter { $0.status == .paid }
         }
@@ -23,6 +24,15 @@ struct JobsView: View {
             }
             .pickerStyle(.segmented)
             .padding()
+
+            if selection == .posted, let error = postedJobs.refreshError {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(error).font(.footnote).foregroundStyle(.secondary)
+                    Button("Check payments again") { Task { await postedJobs.refresh() } }
+                }
+                .padding(.horizontal)
+                .padding(.bottom)
+            }
 
             if filteredJobs.isEmpty {
                 ContentUnavailableView(
@@ -40,6 +50,7 @@ struct JobsView: View {
             }
         }
         .navigationTitle("Jobs")
+        .refreshable { await postedJobs.refresh() }
         .navigationDestination(for: Job.self) { job in
             JobDetailView(job: job)
         }
@@ -130,4 +141,5 @@ struct JobDetailView: View {
     NavigationStack {
         JobsView()
     }
+    .environmentObject(PostedJobsStore())
 }

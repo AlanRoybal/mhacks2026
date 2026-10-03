@@ -1,7 +1,7 @@
 import Foundation
 
 struct Job: Identifiable, Hashable {
-    let id = UUID()
+    var id = UUID()
     let title: String
     let pay: Decimal
     let distance: String
@@ -11,6 +11,7 @@ struct Job: Identifiable, Hashable {
 }
 
 enum JobStatus: String, CaseIterable, Identifiable {
+    case funded = "Funded"
     case offered = "Offered"
     case accepted = "Accepted"
     case inProgress = "In progress"

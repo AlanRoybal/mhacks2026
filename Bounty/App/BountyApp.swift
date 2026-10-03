@@ -1,4 +1,5 @@
 import SwiftUI
+import StripePaymentSheet
 
 @main
 struct BountyApp: App {
@@ -20,6 +21,9 @@ struct BountyApp: App {
                 if hasCompletedOnboarding {
                     await pushNotifications.requestAuthorization()
                 }
+            }
+            .onOpenURL { url in
+                _ = StripeAPI.handleURLCallback(with: url)
             }
         }
     }

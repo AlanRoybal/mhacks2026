@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000000000000000000001 /* PaymentCheckoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* PaymentCheckoutView.swift */; };
+		A10000000000000000000003 /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000004 /* StripePaymentSheet */; };
 		0BFBABD98AF3B1B0E44A71E2 /* CreateJobView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F611717A4A9F0276C3E9675 /* CreateJobView.swift */; };
 		1506E89A595E9BD62C89C674 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 00653F176E5F56A7F9330976 /* Assets.xcassets */; };
 		27A55C706B72D4F97913F92B /* BountyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B75E78AC19B705475CC363 /* BountyApp.swift */; };
@@ -22,6 +24,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A10000000000000000000002 /* PaymentCheckoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentCheckoutView.swift; sourceTree = "<group>"; };
+		A10000000000000000000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000008 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		A10000000000000000000009 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		00653F176E5F56A7F9330976 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0CC90A7ACD84995DB726CAAA /* JobsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsView.swift; sourceTree = "<group>"; };
 		0E62E1AB9621E26837315559 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
@@ -38,7 +44,22 @@
 		FDEE0685875FF28B9B991034 /* Job.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Job.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		A10000000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (A10000000000000000000003 /* StripePaymentSheet in Frameworks */,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
+		A1000000000000000000000A /* Config */ = {
+			isa = PBXGroup;
+			children = (A10000000000000000000008 /* Debug.xcconfig */, A10000000000000000000009 /* Release.xcconfig */,);
+			path = Config;
+			sourceTree = "<group>";
+		};
 		0A402854BB9C2234CA090DE6 /* Twin */ = {
 			isa = PBXGroup;
 			children = (
@@ -68,6 +89,7 @@
 		31D185DA9D3C2251ADBCED05 /* Bounty */ = {
 			isa = PBXGroup;
 			children = (
+				A10000000000000000000007 /* Info.plist */,
 				B67D53F052CE5224398EF8F6 /* Bounty.entitlements */,
 				0ACAEBBA700E99E7E07D0A61 /* App */,
 				7235CD2904B243EEAF06B4A9 /* Design */,
@@ -94,6 +116,7 @@
 		6390ED63261F50D839F4A443 = {
 			isa = PBXGroup;
 			children = (
+				A1000000000000000000000A /* Config */,
 				31D185DA9D3C2251ADBCED05 /* Bounty */,
 				14CAADA9C42464F5656FD4C9 /* Products */,
 			);
@@ -150,6 +173,7 @@
 		B1412E7AEF0697DD3B63290D /* Post */ = {
 			isa = PBXGroup;
 			children = (
+				A10000000000000000000002 /* PaymentCheckoutView.swift */,
 				7F611717A4A9F0276C3E9675 /* CreateJobView.swift */,
 			);
 			path = Post;
@@ -171,6 +195,7 @@
 			buildConfigurationList = 6AE01037BF3CC444E4699D3B /* Build configuration list for PBXNativeTarget "Bounty" */;
 			buildPhases = (
 				C993DA9255A88FA5CB5ED6E9 /* Sources */,
+				A10000000000000000000006 /* Frameworks */,
 				D16124D811F63A0A9DAB6D93 /* Resources */,
 			);
 			buildRules = (
@@ -179,6 +204,7 @@
 			);
 			name = Bounty;
 			packageProductDependencies = (
+				A10000000000000000000004 /* StripePaymentSheet */,
 			);
 			productName = Bounty;
 			productReference = EF3E583821FF7F355811EAC9 /* Bounty.app */;
@@ -210,6 +236,7 @@
 			mainGroup = 6390ED63261F50D839F4A443;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 54;
+			packageReferences = (A10000000000000000000005 /* stripe-ios-spm */,);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -234,6 +261,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000001 /* PaymentCheckoutView.swift in Sources */,
 				27A55C706B72D4F97913F92B /* BountyApp.swift in Sources */,
 				34D8FC0D39B9BDA019E2486B /* BountyTheme.swift in Sources */,
 				0BFBABD98AF3B1B0E44A71E2 /* CreateJobView.swift in Sources */,
@@ -260,6 +288,7 @@
 				DEVELOPMENT_TEAM = DVX8YZ9GG9;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
+				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
 			};
@@ -267,11 +296,13 @@
 		};
 		5E850E3B6F5BC9E925470F90 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000009 /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Bounty/Bounty.entitlements;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Bounty/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Bounty;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Bounty uses your calendar availability to avoid offering jobs when you are busy.";
@@ -302,11 +333,13 @@
 		};
 		D94DD693020319A705ACC3B7 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000008 /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Bounty/Bounty.entitlements;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Bounty/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Bounty;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Bounty uses your calendar availability to avoid offering jobs when you are busy.";
@@ -343,6 +376,22 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A10000000000000000000005 /* stripe-ios-spm */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stripe/stripe-ios-spm";
+			requirement = {kind = exactVersion; version = 26.12.1;};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A10000000000000000000004 /* StripePaymentSheet */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000005 /* stripe-ios-spm */;
+			productName = StripePaymentSheet;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 209C86035F696DCD6A8B3A57 /* Project object */;
 }
