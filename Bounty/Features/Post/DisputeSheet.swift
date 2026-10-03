@@ -3,7 +3,7 @@ import SwiftUI
 /// A dispute has to point at a specific requirement (plan feature 32), so it can be re-checked.
 struct DisputeSheet: View {
     @Environment(\.dismiss) private var dismiss
-    let job: Job
+    let job: PostedJob
     let onSubmit: (ChecklistItem, String) async throws -> Void
 
     @State private var selectedId: ChecklistItem.ID?

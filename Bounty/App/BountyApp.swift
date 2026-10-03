@@ -1,4 +1,5 @@
 import SwiftUI
+import StripePaymentSheet
 
 @main
 struct BountyApp: App {
@@ -6,8 +7,8 @@ struct BountyApp: App {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var services = AppServices()
     @State private var router = AppRouter()
-    /// Poster-side state. Swap `MockJobsAPI()` for the real client once Backend is live.
-    @State private var posterStore = PosterStore(api: MockJobsAPI())
+    /// The poster's posted jobs: the backend when configured and running, sample data otherwise.
+    @State private var posterStore = PosterStore.live()
 
     var body: some Scene {
         WindowGroup {
@@ -34,6 +35,9 @@ struct BountyApp: App {
                 if DebugLaunch.screen != nil { return }
                 #endif
                 await pushNotifications.requestAuthorization()
+            }
+            .onOpenURL { url in
+                _ = StripeAPI.handleURLCallback(with: url)
             }
         }
     }

@@ -7,25 +7,25 @@ protocol JobsAPI: Sendable {
     func presignUpload(contentType: String) async throws -> PresignedUpload
 
     /// `jobs/create`: creates a DRAFT job and returns it with the AI-generated checklist.
-    func createJob(_ draft: NewJobDraft) async throws -> Job
+    func createJob(_ draft: NewJobDraft) async throws -> PostedJob
 
     /// `jobs/{id}/checklist`: saves the poster's edits to the checklist.
-    func updateChecklist(jobId: String, checklist: [ChecklistItem]) async throws -> Job
+    func updateChecklist(jobId: String, checklist: [ChecklistItem]) async throws -> PostedJob
 
     /// `jobs/fund` (owned by Payments): returns the Stripe PaymentSheet client secret.
     func startFunding(jobId: String) async throws -> FundingSession
 
     /// `jobs/{id}`: current state, worker, proof and verdicts.
-    func job(id: String) async throws -> Job
+    func job(id: String) async throws -> PostedJob
 
     /// `jobs/mine`: the signed-in poster's jobs, newest first.
-    func myJobs() async throws -> [Job]
+    func myJobs() async throws -> [PostedJob]
 
     /// `jobs/{id}/approve`: asks the server to release payment. The server decides; the app never moves money.
-    func approve(jobId: String) async throws -> Job
+    func approve(jobId: String) async throws -> PostedJob
 
     /// `jobs/{id}/dispute` (stretch).
-    func dispute(jobId: String, checklistItemId: String, note: String) async throws -> Job
+    func dispute(jobId: String, checklistItemId: String, note: String) async throws -> PostedJob
 }
 
 struct PresignedUpload: Codable, Hashable, Sendable {
@@ -54,7 +54,7 @@ struct FundingSession: Codable, Hashable, Sendable {
 
 enum JobsAPIError: Error, LocalizedError, Sendable {
     case notFound
-    case invalidState(JobStatus)
+    case invalidState(PostedJobStatus)
     case server(String)
 
     var errorDescription: String? {

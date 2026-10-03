@@ -4,7 +4,7 @@ import Foundation
 /// It starts with one sample job in each interesting status, and it plays a newly funded job
 /// forward through the state machine so the timeline and review screens can be tested live.
 actor MockJobsAPI: JobsAPI {
-    private var jobs: [String: Job]
+    private var jobs: [String: PostedJob]
     /// Seconds between automatic status changes after funding. 0 turns the simulation off.
     private let stepDelay: Double
 
@@ -24,9 +24,9 @@ actor MockJobsAPI: JobsAPI {
         )
     }
 
-    func createJob(_ draft: NewJobDraft) async throws -> Job {
+    func createJob(_ draft: NewJobDraft) async throws -> PostedJob {
         try await latency(seconds: 1.5) // the real call waits on the LLM
-        let job = Job(
+        let job = PostedJob(
             id: "job_\(UUID().uuidString.prefix(8))",
             title: draft.title,
             description: draft.description,
@@ -43,7 +43,7 @@ actor MockJobsAPI: JobsAPI {
         return job
     }
 
-    func updateChecklist(jobId: String, checklist: [ChecklistItem]) async throws -> Job {
+    func updateChecklist(jobId: String, checklist: [ChecklistItem]) async throws -> PostedJob {
         try await latency()
         var job = try existing(jobId)
         guard job.status == .draft else { throw JobsAPIError.invalidState(job.status) }
@@ -66,17 +66,17 @@ actor MockJobsAPI: JobsAPI {
         )
     }
 
-    func job(id: String) async throws -> Job {
+    func job(id: String) async throws -> PostedJob {
         try await latency(seconds: 0.2)
         return try existing(id)
     }
 
-    func myJobs() async throws -> [Job] {
+    func myJobs() async throws -> [PostedJob] {
         try await latency()
         return jobs.values.sorted { $0.createdAt > $1.createdAt }
     }
 
-    func approve(jobId: String) async throws -> Job {
+    func approve(jobId: String) async throws -> PostedJob {
         try await latency()
         var job = try existing(jobId)
         guard job.status == .inReview else { throw JobsAPIError.invalidState(job.status) }
@@ -86,7 +86,7 @@ actor MockJobsAPI: JobsAPI {
         return job
     }
 
-    func dispute(jobId: String, checklistItemId: String, note: String) async throws -> Job {
+    func dispute(jobId: String, checklistItemId: String, note: String) async throws -> PostedJob {
         try await latency()
         var job = try existing(jobId)
         guard job.status == .inReview else { throw JobsAPIError.invalidState(job.status) }
@@ -100,7 +100,7 @@ actor MockJobsAPI: JobsAPI {
 
     private func simulateLifecycle(jobId: String) async {
         guard stepDelay > 0 else { return }
-        let steps: [JobStatus] = [.funded, .offered, .accepted, .inProgress, .submitted, .inReview]
+        let steps: [PostedJobStatus] = [.funded, .offered, .accepted, .inProgress, .submitted, .inReview]
         for status in steps {
             try? await Task.sleep(for: .seconds(stepDelay))
             guard var job = jobs[jobId], !job.status.isTerminal, job.status != .disputed else { return }
@@ -129,7 +129,7 @@ actor MockJobsAPI: JobsAPI {
 
     // MARK: Helpers
 
-    private func existing(_ id: String) throws -> Job {
+    private func existing(_ id: String) throws -> PostedJob {
         guard let job = jobs[id] else { throw JobsAPIError.notFound }
         return job
     }
@@ -149,7 +149,7 @@ enum PosterFixtures {
         URL(string: "https://picsum.photos/seed/\(seed)/800/600")!
     }
 
-    static var jobs: [Job] {
+    static var jobs: [PostedJob] {
         let lawnChecklist = [
             ChecklistItem(id: "c_lawn_1", text: "Entire front lawn is mowed to an even height", evidenceType: .photo, photoCount: 4),
             ChecklistItem(id: "c_lawn_2", text: "Clippings are removed from the sidewalk and driveway", evidenceType: .photo, photoCount: 1),
@@ -160,7 +160,7 @@ enum PosterFixtures {
             ChecklistItem(id: "c_logo_2", text: "Shop name \"Bean There\" is legible in the sketch", evidenceType: .photo, photoCount: 1),
         ]
 
-        var inReview = Job(
+        var inReview = PostedJob(
             id: "job_lawn",
             title: "Mow front lawn",
             description: "Small front yard, mower is in the garage. Please bag the clippings.",
@@ -180,7 +180,7 @@ enum PosterFixtures {
 
         return [
             inReview,
-            Job(
+            PostedJob(
                 id: "job_logo",
                 title: "Sketch a logo for a coffee shop",
                 description: "Paper sketch of a logo for \"Bean There.\" Any style.",
@@ -191,7 +191,7 @@ enum PosterFixtures {
                 status: .offered,
                 createdAt: .now.addingTimeInterval(-600)
             ),
-            Job(
+            PostedJob(
                 id: "job_move",
                 title: "Help move a couch upstairs",
                 description: "One couch, second floor, no elevator.",
@@ -205,7 +205,7 @@ enum PosterFixtures {
                 worker: WorkerSummary(id: "w_2", name: "Sam T.", rating: nil),
                 createdAt: .now.addingTimeInterval(-5 * 3600)
             ),
-            Job(
+            PostedJob(
                 id: "job_tutor",
                 title: "Calc II tutoring, 1 hour",
                 description: "Series convergence tests before Friday's exam.",
@@ -235,7 +235,7 @@ enum PosterFixtures {
         return items
     }
 
-    static func proof(for job: Job) -> Proof {
+    static func proof(for job: PostedJob) -> Proof {
         Proof(
             items: job.checklist.map { item -> ProofItem in
                 switch item.evidenceType {
@@ -251,7 +251,7 @@ enum PosterFixtures {
         )
     }
 
-    static func verdicts(for job: Job) -> [Verdict] {
+    static func verdicts(for job: PostedJob) -> [Verdict] {
         job.checklist.enumerated().map { index, item -> Verdict in
             // The last item is a low-confidence pass so the review screen shows both looks.
             let isLast = index == job.checklist.count - 1 && job.checklist.count > 1

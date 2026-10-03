@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// How a job looks in Alan's design system: its sticker, tile color, status chip and short price.
-/// Kept apart from `Job.swift` so the data model stays shaped like the backend's JSON.
-extension Job {
+/// Kept apart from `PostedJob.swift` so the data model stays shaped like the backend's JSON.
+extension PostedJob {
     /// "$15" for whole dollars, "$12.50" otherwise, "40 USDC" for USDC. Used on cards and rows.
     var payShort: String {
         switch currency {
@@ -37,26 +37,28 @@ extension Job {
 extension JobCategory {
     var sticker: Sticker {
         switch self {
-        case .yardWork: .mower
+        case .home, .yardWork: .mower
         case .design: .poster
-        case .photos: .camera
+        case .photography: .camera
         case .tutoring: .book
-        case .errands: .check
+        case .technology: .phone
+        case .errands, .moving: .mail
+        case .other: .check
         }
     }
 
     var tileColor: Color {
         switch self {
-        case .yardWork: BountyColor.mint
-        case .design: BountyColor.lavender
-        case .photos: BountyColor.grey
+        case .home, .yardWork: BountyColor.mint
+        case .design: BountyColor.lavenderSoft
+        case .photography: BountyColor.grey
         case .tutoring: BountyColor.sky
-        case .errands: BountyColor.cream
+        case .technology, .errands, .moving, .other: BountyColor.cream
         }
     }
 }
 
-extension JobStatus {
+extension PostedJobStatus {
     var chipTone: ChipTone {
         switch self {
         case .draft, .refunded: .grey
@@ -65,6 +67,31 @@ extension JobStatus {
         case .submitted, .inReview: .cream
         case .disputed: .coral
         case .released: .mint
+        }
+    }
+}
+
+extension ChecklistItem {
+    /// The one-line evidence description under each requirement, e.g. "4 photos".
+    var evidenceSummary: String {
+        switch evidenceType {
+        case .photo:
+            let count = photoCount ?? 1
+            return count == 1 ? "1 photo" : "\(count) photos"
+        case .checkIn: return "On-site check-in, GPS and time"
+        case .link: return "A link to the finished work"
+        case .file: return "A file upload"
+        }
+    }
+}
+
+extension EvidenceType {
+    var symbolName: String {
+        switch self {
+        case .photo: "camera"
+        case .checkIn: "location"
+        case .link: "link"
+        case .file: "doc"
         }
     }
 }

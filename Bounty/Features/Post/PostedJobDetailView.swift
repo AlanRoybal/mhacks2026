@@ -7,7 +7,7 @@ struct PostedJobDetailView: View {
     @Environment(AppRouter.self) private var router
     @Environment(PosterStore.self) private var store
 
-    private var job: Job? { store.job(router.posterJobId) }
+    private var job: PostedJob? { store.job(router.posterJobId) }
 
     var body: some View {
         BountyScreen {
@@ -93,10 +93,6 @@ struct PostedJobDetailView: View {
         } bottom: {
             if let job {
                 switch job.status {
-                case .draft:
-                    PillButton(title: "Fund the job", icon: .lock) {
-                        router.open(.fundJob, posterJob: job.id)
-                    }
                 case .inReview:
                     PillButton(title: "Review the work", icon: .shieldCheck) {
                         router.open(.reviewProof, posterJob: job.id)
@@ -123,10 +119,10 @@ struct PostedJobDetailView: View {
     }
 
     /// The one thing the poster should know right now.
-    private func statusNote(for job: Job) -> StatusNote? {
+    private func statusNote(for job: PostedJob) -> StatusNote? {
         switch job.status {
         case .draft:
-            return StatusNote(text: "Not live yet. Workers see it once it’s funded.", sticker: .coins, fill: BountyColor.cream, ink: BountyColor.creamInk)
+            return StatusNote(text: "Not live yet. Workers see it once it’s funded through checkout.", sticker: .coins, fill: BountyColor.cream, ink: BountyColor.creamInk)
         case .funded, .offered, .accepted, .inProgress, .submitted:
             return StatusNote(text: "\(job.payShort) is held safely. It releases when the proof passes and you approve, or the review window closes.", sticker: .shield, fill: BountyColor.mint, ink: BountyColor.mintInk)
         case .inReview:
@@ -140,7 +136,7 @@ struct PostedJobDetailView: View {
         }
     }
 
-    private func badge(for item: ChecklistItem, in job: Job) -> StepStatus {
+    private func badge(for item: ChecklistItem, in job: PostedJob) -> StepStatus {
         guard let verdict = job.verdict(for: item) else { return .todo }
         return verdict.pass && verdict.confidence >= Verdict.reviewThreshold ? .done : .active
     }
@@ -153,7 +149,7 @@ struct PostedJobDetailView: View {
 /// The six steps from plan feature 11, in the horizontal style of Alan's worker timeline:
 /// green for done, a wide yellow capsule for the current step.
 private struct StatusTimeline: View {
-    let job: Job
+    let job: PostedJob
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

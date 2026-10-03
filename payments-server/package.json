@@ -1,0 +1,24 @@
+{
+  "name": "bounty-payments",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch server.mjs",
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test payments.test.mjs",
+    "test:sandbox": "node --env-file=.env smoke-test.mjs",
+    "test:webhook": "node --env-file=.env smoke-test.mjs --webhook",
+    "webhooks": "stripe --config .stripe/config.toml listen --events payment_intent.succeeded,payment_intent.payment_failed,payment_intent.processing,payment_intent.canceled --forward-to http://127.0.0.1:4242/stripe/webhook"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "stripe": "^23.0.0"
+  },
+  "devDependencies": {
+    "@stripe/cli": "^1.53.0"
+  }
+}
