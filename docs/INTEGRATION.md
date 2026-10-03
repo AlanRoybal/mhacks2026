@@ -31,6 +31,7 @@ Added on top of the integration without changing iosA's screens, `PostDraft` or 
 - **A posted job** opens its status timeline (route `postedJob`). One in review opens the live **Review proof**, with per-item AI grades, approve (`POST /jobs/{id}/approve`) and dispute (`POST /jobs/{id}/dispute`, which must name a checklist item). With no job selected, Review proof shows iosA's sample.
 - **Post a job:** the address field has a locate button (search or current location). The picked coordinates go to `/payment-sheet` as the optional `location`.
 - **No backend running:** `PosterStore` switches to `MockJobsAPI` sample jobs and says so under the Posted list.
+- **Poster alerts:** the app registers its APNs token with `POST /me/devices` (as `guest-poster`) at launch. Tapping a poster push (`proof_ready`, `proof_needs_decision`, `offer_accepted`, …) opens that job: the review when it's waiting on the poster, else its timeline. A local "Review closing soon" reminder fires before payment auto-releases (30 s ahead in 2-minute windows, an hour ahead otherwise). `PosterPush.swift` has the type lists.
 - **Models:** the backend-shaped model is `PostedJob` (`Bounty/Models/PostedJob.swift`); `Job` stays iosA's display model for the worker screens.
 
 Verified on the iPhone 17 simulator (build, Posted list, review, approve, locate) and against `npm run dev` with curl (checkout with location, `/jobs/mine`, dispute, approve).
@@ -59,7 +60,7 @@ With fake payments, Fund shows "Job funded" right away. With `PAYMENTS_PROVIDER=
 
 ## Gaps between the app and the backend
 
-1. **Push tokens are never registered.** TwinKit has no call for `POST /me/devices`, so workers can't receive offers. Add it after `registerForRemoteNotifications`.
+1. **Push tokens for workers.** The app now registers its token, but as the poster (`guest-poster`), so poster alerts arrive. Workers still can't receive offers until the worker side signs in with TwinKit and registers under that account.
 2. **The checkout sends no session.** That's fine locally, where jobs go to a guest poster. Deployed stages need `Authorization: Bearer <token>` from TwinKit's `SessionStore` on `PaymentAPI` requests.
 3. **Location for in-person jobs.** Fixed when the poster uses the address field's locate button. A typed address with no pick still has no coordinates, so the backend uses its campus default; geocoding typed addresses would close this.
 4. **Offer accept/decline from a push.** `PushNotificationManager` should read `offerId` and call `OfferService.respond`. TwinKit's `JobOffer` DTO has no fetch endpoint; use `GET /offers/{id}`.
