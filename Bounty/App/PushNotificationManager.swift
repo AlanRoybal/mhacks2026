@@ -1,0 +1,119 @@
+import UIKit
+@preconcurrency import UserNotifications
+
+enum PushNotificationDefinition {
+    static let offerCategoryIdentifier = "BOUNTY_JOB_OFFER"
+    static let acceptActionIdentifier = "BOUNTY_OFFER_ACCEPT"
+    static let declineActionIdentifier = "BOUNTY_OFFER_DECLINE"
+}
+
+final class PushNotificationManager: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    private let notificationCenter = UNUserNotificationCenter.current()
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        notificationCenter.delegate = self
+        registerCategories()
+        return true
+    }
+
+    @MainActor
+    func requestAuthorization() async {
+        do {
+            let granted = try await notificationCenter.requestAuthorization(options: [.alert, .badge, .sound])
+            if granted {
+                UIApplication.shared.registerForRemoteNotifications()
+            }
+        } catch {
+            NotificationCenter.default.post(name: .pushRegistrationFailed, object: error.localizedDescription)
+        }
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        UserDefaults.standard.set(token, forKey: PushRegistration.deviceTokenKey)
+        NotificationCenter.default.post(name: .didRegisterPushToken, object: token)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .pushRegistrationFailed, object: error.localizedDescription)
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let jobID = response.notification.request.content.userInfo["jobId"] as? String
+
+        switch response.actionIdentifier {
+        case PushNotificationDefinition.acceptActionIdentifier:
+            await routeToJobs(jobID: jobID, action: "accept")
+        case PushNotificationDefinition.declineActionIdentifier:
+            await MainActor.run {
+                NotificationCenter.default.post(name: .offerDeclined, object: jobID)
+            }
+        case UNNotificationDefaultActionIdentifier:
+            await routeToJobs(jobID: jobID, action: "open")
+        default:
+            break
+        }
+    }
+
+    private func registerCategories() {
+        let accept = UNNotificationAction(
+            identifier: PushNotificationDefinition.acceptActionIdentifier,
+            title: "Accept",
+            options: [.authenticationRequired, .foreground]
+        )
+        let decline = UNNotificationAction(
+            identifier: PushNotificationDefinition.declineActionIdentifier,
+            title: "Decline",
+            options: []
+        )
+        let offerCategory = UNNotificationCategory(
+            identifier: PushNotificationDefinition.offerCategoryIdentifier,
+            actions: [accept, decline],
+            intentIdentifiers: [],
+            options: [.customDismissAction]
+        )
+        notificationCenter.setNotificationCategories([offerCategory])
+    }
+
+    private func routeToJobs(jobID: String?, action: String) async {
+        await MainActor.run {
+            let defaults = UserDefaults.standard
+            defaults.set("jobs", forKey: PushRoute.destinationKey)
+            defaults.set(action, forKey: PushRoute.actionKey)
+            if let jobID {
+                defaults.set(jobID, forKey: PushRoute.jobIDKey)
+            }
+            NotificationCenter.default.post(name: .pushRouteChanged, object: jobID)
+        }
+    }
+}
+
+enum PushRegistration {
+    static let deviceTokenKey = "pushDeviceToken"
+}
+
+enum PushRoute {
+    static let destinationKey = "pendingPushDestination"
+    static let actionKey = "pendingPushAction"
+    static let jobIDKey = "pendingPushJobID"
+}
+
+extension Notification.Name {
+    static let didRegisterPushToken = Notification.Name("didRegisterPushToken")
+    static let pushRegistrationFailed = Notification.Name("pushRegistrationFailed")
+    static let pushRouteChanged = Notification.Name("pushRouteChanged")
+    static let offerDeclined = Notification.Name("offerDeclined")
+}

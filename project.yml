@@ -1,0 +1,39 @@
+name: Bounty
+options:
+  bundleIdPrefix: com.alanroybal
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: DVX8YZ9GG9
+    CODE_SIGN_STYLE: Automatic
+    ALWAYS_SEARCH_USER_PATHS: NO
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Bounty:
+    type: application
+    platform: iOS
+    sources:
+      - path: Bounty
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alanroybal.BountyTwin
+        PRODUCT_NAME: Bounty
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: Bounty/Bounty.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        INFOPLIST_KEY_CFBundleDisplayName: Bounty
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.business
+        INFOPLIST_KEY_NSCameraUsageDescription: Bounty uses the camera to capture proof that a job was completed.
+        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: Bounty uses your calendar availability to avoid offering jobs when you are busy.
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: Bounty uses your location to match nearby jobs and verify on-site work.
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: "1"
+    scheme:
+      testTargets: []
