@@ -29,7 +29,7 @@ export function apiClient(deps: TestDeps) {
     const w = await login(handle);
     await call("POST", "/twin/skills", w.token, { name: opts.skill, level: 4 });
     await call("POST", "/me/devices", w.token, { token: handle.padEnd(64, "0").replace(/[^0-9a-f]/g, "a").slice(0, 64), env: "sandbox" });
-    await call("PUT", "/twin/prefs", w.token, { base: { lat: opts.lat, lng: opts.lng }, ...opts.prefs });
+    await call("PUT", "/twin/prefs", w.token, { base: { latitude: opts.lat, longitude: opts.lng }, ...opts.prefs });
     return w;
   }
 

@@ -64,7 +64,7 @@ async function seedDesigner(): Promise<void> {
   const put = await fetch(upload.uploadURL, { method: "PUT", headers: upload.headers, body: zip });
   if (!put.ok) throw new Error(`upload failed: ${put.status}`);
   await call("POST", "/twin/ingest", token, { blobKey: upload.blobKey, kind: "linkedin_zip" });
-  await call("PUT", "/twin/prefs", token, { base: { lat: PLACES.diag.latitude, lng: PLACES.diag.longitude }, minPayCents: 1000, maxRadiusKm: 8 });
+  await call("PUT", "/twin/prefs", token, { base: { latitude: PLACES.diag.latitude, longitude: PLACES.diag.longitude }, minPay: 10, maxRadiusMiles: 5 });
   console.log("  demo-designer: twin imported from a LinkedIn export (add a device token by signing in on a phone)");
 }
 

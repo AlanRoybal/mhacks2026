@@ -121,3 +121,20 @@ test("re-imports never resurrect deleted skills or override edits", () => {
   assert.equal(byName.get("welding")?.deleted, true);
   assert.equal(byName.get("branding")?.sources[0]?.kind, "linkedin");
 });
+
+test("preferences use the same units as jobs: dollars, miles, latitude/longitude", async () => {
+  const app = createApp(testDeps());
+  const token = await login(app, "worker1");
+  const { body } = await call(app, "PUT", "/twin/prefs", token, {
+    minPay: 15,
+    maxRadiusMiles: 5,
+    base: { latitude: 42.28, longitude: -83.74 },
+    quietHours: { start: "22:00", end: "07:00" },
+  });
+  assert.equal(body.prefs.minPay, 15);
+  assert.equal(body.prefs.maxRadiusMiles, 5);
+  assert.deepEqual(body.prefs.base, { latitude: 42.28, longitude: -83.74 });
+  assert.match(body.ingest.updatedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  const bad = await call(app, "PUT", "/twin/prefs", token, { quietHours: { start: "25:00", end: "07:00" } });
+  assert.equal(bad.status, 400);
+});

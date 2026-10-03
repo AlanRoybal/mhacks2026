@@ -3,11 +3,12 @@ import { z } from "zod";
 import { MAX_FILE_BYTES } from "../../blobs/index.js";
 import type { Deps } from "../../deps.js";
 import { isValidTimeZone } from "../../domain/availability.js";
-import { Category, LatLng, type SkillSourceKind, type User } from "../../domain/types.js";
+import { Category, type SkillSourceKind, type User } from "../../domain/types.js";
 import { badRequest, notFound } from "../../lib/errors.js";
 import { activeSkills, deleteSkill, normName, readiness, refreshEmbedding, upsertSkill } from "../../services/twin.js";
 import { updateUser } from "../../services/users.js";
 import { parseBody, type AppEnv } from "../http.js";
+import { kmToMiles, milesToKm, wireDate } from "../wire.js";
 import { ownedUploadKey } from "./uploads.js";
 
 // Labels the app shows next to each skill ("From LinkedIn").
@@ -40,9 +41,26 @@ export function twinView(deps: Deps, user: User) {
     roles: t.roles,
     education: t.education,
     certifications: t.certifications,
-    ingest: { status: t.ingest.status, error: t.ingest.error ?? null, sources: t.ingest.sources, updatedAt: t.ingest.updatedAt },
-    prefs: { ...user.prefs, quietHours: user.prefs.quietHours ?? null, base: user.prefs.base ?? null },
-    availability: user.availability ?? null,
+    ingest: { status: t.ingest.status, error: t.ingest.error ?? null, sources: t.ingest.sources, updatedAt: wireDate(t.ingest.updatedAt) },
+    // Same units as jobs: dollars, miles, { latitude, longitude }.
+    prefs: {
+      minPay: user.prefs.minPayCents / 100,
+      maxRadiusMiles: kmToMiles(user.prefs.maxRadiusKm),
+      blockedCategories: user.prefs.blockedCategories,
+      remoteOk: user.prefs.remoteOk,
+      inPersonOk: user.prefs.inPersonOk,
+      tz: user.prefs.tz,
+      quietHours: user.prefs.quietHours ?? null,
+      base: user.prefs.base ? { latitude: user.prefs.base.lat, longitude: user.prefs.base.lng } : null,
+    },
+    availability: user.availability
+      ? {
+          tz: user.availability.tz,
+          weekly: user.availability.weekly ?? null,
+          busy: user.availability.busy.map((b) => ({ start: wireDate(b.start), end: wireDate(b.end) })),
+          updatedAt: wireDate(user.availability.updatedAt),
+        }
+      : null,
     readiness: readiness(user, { payoutsRequired: payoutsRequired(deps) }),
   };
 }
@@ -95,22 +113,28 @@ export function twinRoutes(deps: Deps): Hono<AppEnv> {
       c,
       z
         .object({
-          minPayCents: z.number().int().min(0).max(100_000),
-          maxRadiusKm: z.number().min(0.5).max(100),
+          // Dollars, like payAmount.
+          minPay: z.number().min(0).max(1000),
+          maxRadiusMiles: z.number().min(0.5).max(60),
           blockedCategories: z.array(Category).max(10),
           remoteOk: z.boolean(),
           inPersonOk: z.boolean(),
           tz: TimeZone,
           quietHours: z.object({ start: HHMM, end: HHMM }).nullable(),
-          base: LatLng.nullable(),
+          // Where distance is measured from; the app sends the device location.
+          base: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }).nullable(),
         })
         .partial(),
     );
     const user = await updateUser(deps, userId(c), (u) => {
-      const { quietHours, base, ...rest } = body;
-      Object.assign(u.prefs, rest);
-      if (quietHours !== undefined) u.prefs.quietHours = quietHours ?? undefined;
-      if (base !== undefined) u.prefs.base = base ?? undefined;
+      if (body.minPay !== undefined) u.prefs.minPayCents = Math.round(body.minPay * 100);
+      if (body.maxRadiusMiles !== undefined) u.prefs.maxRadiusKm = milesToKm(body.maxRadiusMiles);
+      if (body.blockedCategories !== undefined) u.prefs.blockedCategories = body.blockedCategories;
+      if (body.remoteOk !== undefined) u.prefs.remoteOk = body.remoteOk;
+      if (body.inPersonOk !== undefined) u.prefs.inPersonOk = body.inPersonOk;
+      if (body.tz !== undefined) u.prefs.tz = body.tz;
+      if (body.quietHours !== undefined) u.prefs.quietHours = body.quietHours ?? undefined;
+      if (body.base !== undefined) u.prefs.base = body.base ? { lat: body.base.latitude, lng: body.base.longitude } : undefined;
     });
     return c.json(twinView(deps, user));
   });

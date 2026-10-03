@@ -5,6 +5,7 @@ import type { User } from "../../domain/types.js";
 import { reliability, updateUser } from "../../services/users.js";
 import { isAdmin } from "../auth.js";
 import { parseBody, type AppEnv } from "../http.js";
+import { wireDate } from "../wire.js";
 
 const MAX_DEVICES = 5;
 
@@ -27,7 +28,7 @@ export function meView(deps: Deps, user: User) {
       workerRating: avg(user.stats.ratingSum, user.stats.ratingCount),
       posterRating: avg(user.stats.posterRatingSum, user.stats.posterRatingCount),
     },
-    createdAt: user.createdAt,
+    createdAt: wireDate(user.createdAt),
   };
 }
 

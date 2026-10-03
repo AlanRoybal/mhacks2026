@@ -5,6 +5,7 @@ import type { Deps } from "../../deps.js";
 import { newId } from "../../domain/ids.js";
 import { badRequest, forbidden } from "../../lib/errors.js";
 import { parseBody, type AppEnv } from "../http.js";
+import { wireDate } from "../wire.js";
 
 const EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -37,7 +38,7 @@ export function uploadRoutes(deps: Deps): Hono<AppEnv> {
       uploadURL: upload.url,
       method: upload.method,
       headers: upload.headers,
-      expiresAt: upload.expiresAt,
+      expiresAt: wireDate(upload.expiresAt),
       fileURL: fileUrl(deps.config, blobKey),
       blobKey,
     });

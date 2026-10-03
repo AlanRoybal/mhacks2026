@@ -14,7 +14,7 @@ async function fundedLogoJob() {
   const designer = await api.readyWorker("designer", { skill: "Logo design", ...SITE });
   const illustrator = await api.readyWorker("illustrator", { skill: "Illustration and logo sketching", lat: 42.29, lng: -83.74 });
   const farAway = await api.readyWorker("faraway", { skill: "Logo design", lat: 42.33, lng: -83.04 });
-  const picky = await api.readyWorker("picky", { skill: "Logo design", ...SITE, prefs: { minPayCents: 5000 } });
+  const picky = await api.readyWorker("picky", { skill: "Logo design", ...SITE, prefs: { minPay: 50 } });
   const notReady = await api.login("noskills");
 
   const { body: job } = await api.call("POST", "/jobs", poster.token, {
