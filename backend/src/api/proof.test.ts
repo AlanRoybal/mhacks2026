@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { FakeAi } from "../ai/fake.js";
 import { test } from "node:test";
 import type { Job, Proof } from "../domain/types.js";
-import { decide } from "../services/grading.js";
+import { codeMatches, decide } from "../services/grading.js";
 import { applyEvent, getJobOrThrow } from "../services/jobs.js";
 import { apiClient, isoIn, type Json } from "../testing/api.js";
 import { testDeps, type TestDeps } from "../testing/harness.js";
@@ -204,4 +204,13 @@ test("a worker who takes over a job doesn't see the previous worker's proofs", a
   await api.call("POST", `/offers/${offer?.offerId}/accept`, next.token);
   assert.deepEqual((await api.call("GET", `/jobs/${job.id}/proofs`, next.token)).body, []);
   assert.equal(((await api.call("GET", `/jobs/${job.id}/proofs`, poster.token)).body as unknown as Json[]).length, 1);
+});
+
+test("the one-time code must actually match what the model read", async () => {
+  assert.equal(codeMatches("K7Q-4MX", "K7Q-4MX"), true);
+  assert.equal(codeMatches("k7q 4mx", "K7Q-4MX"), true, "case and separators don't matter");
+  assert.equal(codeMatches("K7Q4NX", "K7Q-4MX"), true, "one misread character is tolerated");
+  assert.equal(codeMatches("K7Q4M", "K7Q-4MX"), true, "one missing character is tolerated");
+  assert.equal(codeMatches("ABC-DEF", "K7Q-4MX"), false);
+  assert.equal(codeMatches("", "K7Q-4MX"), false);
 });
