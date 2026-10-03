@@ -38,7 +38,8 @@ enum PosterPush {
             guard let deadline = job.reviewDeadline, let fireDate = reminderDate(for: deadline) else { continue }
             let content = UNMutableNotificationContent()
             content.title = "Review closing soon"
-            content.body = "Payment for “\(job.title)” releases \(deadline.formatted(.relative(presentation: .named))) unless you respond."
+            // A clock time, not "in 2 minutes": the text is fixed when the reminder is scheduled.
+            content.body = "Payment for “\(job.title)” releases at \(deadline.formatted(date: .omitted, time: .shortened)) unless you respond."
             content.sound = .default
             content.interruptionLevel = .timeSensitive
             content.userInfo = ["type": reviewClosingType, "jobId": job.id]
