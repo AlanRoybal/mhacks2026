@@ -9,6 +9,8 @@ struct CreateJobView: View {
     /// Set when the AI checklist comes back; pushes step 2.
     @State private var draftJob: Job?
     @State private var fundedJobTitle: String?
+    /// True while the title or description has the keyboard up.
+    @FocusState private var isTyping: Bool
 
     var body: some View {
         @Bindable var model = model
@@ -18,11 +20,13 @@ struct CreateJobView: View {
 
             Section("Title") {
                 TextField("Mow my front lawn", text: $model.title)
+                    .focused($isTyping)
             }
 
             Section("Description") {
                 TextField("Describe the finished result", text: $model.description, axis: .vertical)
                     .lineLimit(3...8)
+                    .focused($isTyping)
             }
 
             Section("Category") {
@@ -57,6 +61,7 @@ struct CreateJobView: View {
                     TextField("40", value: $model.payAmount, format: .number.precision(.fractionLength(0...2)))
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
+                        .focused($isTyping)
                         .frame(maxWidth: 120)
                     Picker("Currency", selection: $model.currency) {
                         ForEach(PayCurrency.allCases) { currency in
@@ -94,6 +99,12 @@ struct CreateJobView: View {
         }
         .navigationTitle("Post a job")
         .toolbar {
+            // A Done button above the keyboard. Multi-line fields and the decimal pad have no
+            // return key, so without this the keyboard can't be put away.
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { isTyping = false }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Text("Draft")
                     .font(.caption.weight(.semibold))
@@ -102,7 +113,7 @@ struct CreateJobView: View {
                     .background(.quaternary, in: Capsule())
             }
         }
-        .scrollDismissesKeyboard(.interactively)
+        .scrollDismissesKeyboard(.immediately)
         .sheet(isPresented: $isPickingLocation) {
             LocationPicker(location: $model.location)
         }
