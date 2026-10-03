@@ -6,7 +6,7 @@ import { badRequest } from "../../lib/errors.js";
 import { getJobOrThrow } from "../../services/jobs.js";
 import { checkEvidence, requireWorker, submitProof } from "../../services/proof.js";
 import { isAdmin } from "../auth.js";
-import { parseBody, type AppEnv } from "../http.js";
+import { errorBody, parseBody, type AppEnv } from "../http.js";
 import { jobWire, proofWire, verdictsWire, WireContext } from "../wire.js";
 import { visibleJob } from "./jobs.js";
 import { ownedUploadKey } from "./uploads.js";
@@ -85,7 +85,7 @@ export function proofRoutes(deps: Deps): Hono<AppEnv> {
     const body = await parseBody(c, ProofBody);
     const result = await submitProof(deps, user, jobId, toEvidence(deps, user, job, body));
     if (!result.checks.ok) {
-      return c.json({ error: "proof_incomplete", message: "Some evidence is missing or invalid", checks: result.checks }, 422);
+      return c.json(errorBody("proof_incomplete", "Some evidence is missing or invalid", { checks: result.checks }), 422);
     }
     return c.json(await jobWire(new WireContext(deps), result.job, user));
   };

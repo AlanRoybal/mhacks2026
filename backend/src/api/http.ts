@@ -27,17 +27,22 @@ const TRANSITION_STATUS: Record<TransitionErrorCode, ContentfulStatusCode> = {
   bad_request: 400,
 };
 
-// Every error body is { error: <stable code>, message: <human text> }. The app switches on `error`.
+// Every error body is { error: { code: <stable code>, message: <human text> } }, the envelope TwinKit's
+// APIClient decodes (Packages/TwinKit/Sources/TwinNetworking/APIClient.swift). Apps switch on `code`.
+export function errorBody(code: string, message: string, extra: Record<string, unknown> = {}) {
+  return { error: { code, message }, ...extra };
+}
+
 export function toErrorResponse(c: Context, err: unknown, deps: Deps): Response {
-  if (err instanceof AppError) return c.json({ error: err.code, message: err.message }, err.status);
-  if (err instanceof TransitionError) return c.json({ error: err.code, message: err.message }, TRANSITION_STATUS[err.code]);
-  if (err instanceof VersionConflictError) return c.json({ error: "busy", message: "Please try again" }, 409);
+  if (err instanceof AppError) return c.json(errorBody(err.code, err.message), err.status);
+  if (err instanceof TransitionError) return c.json(errorBody(err.code, err.message), TRANSITION_STATUS[err.code]);
+  if (err instanceof VersionConflictError) return c.json(errorBody("busy", "Please try again"), 409);
   if (err instanceof z.ZodError) {
     const message = err.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ");
-    return c.json({ error: "invalid_request", message }, 400);
+    return c.json(errorBody("invalid_request", message), 400);
   }
   deps.log.error("Unhandled error", { path: c.req.path, error: err });
-  return c.json({ error: "internal", message: "Something went wrong" }, 500);
+  return c.json(errorBody("internal", "Something went wrong"), 500);
 }
 
 // Like parseBody, but an empty body counts as {} (for actions that take optional input).

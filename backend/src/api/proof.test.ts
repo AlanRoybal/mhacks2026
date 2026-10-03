@@ -87,7 +87,7 @@ test("missing evidence blocks submission with the reasons", async () => {
     items: [{ checklistItemId: photoItem?.id, photos: [{ fileURL: await uploadPhoto(deps, api, worker.token, [9]), capturedAt: "2020-01-01T00:00:00Z" }] }],
   });
   assert.equal(res.status, 422);
-  assert.equal(res.body.error, "proof_incomplete");
+  assert.equal(res.body.error.code, "proof_incomplete");
   assert.ok(res.body.checks.missingRequired.length > 0);
   assert.deepEqual(res.body.checks.outsideTimeWindow, [photoItem?.id], "old photos are rejected");
   assert.equal((await getJobOrThrow(deps, job.id)).state, "IN_PROGRESS");
@@ -181,7 +181,7 @@ test("upload references must be the caller's own, in the exact presigned shape",
     items: [{ checklistItemId: photoItem?.id, photos: [{ blobKey: `uploads/${me}/../someone/x.jpg`, capturedAt: deps.now().toISOString() }] }],
   });
   assert.equal(sneaky.status, 400);
-  assert.equal(sneaky.body.error, "unknown_upload");
+  assert.equal(sneaky.body.error.code, "unknown_upload");
 });
 
 test("a worker who takes over a job doesn't see the previous worker's proofs", async () => {

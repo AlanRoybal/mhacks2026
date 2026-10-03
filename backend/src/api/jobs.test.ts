@@ -137,13 +137,13 @@ test("bad drafts are rejected with readable errors", async () => {
   const token = await login(app, "poster");
   const tooCheap = await call(app, "POST", "/jobs", token, newJobDraft(deps, { payAmount: 2 }));
   assert.equal(tooCheap.status, 400);
-  assert.equal(tooCheap.body.message, "Pay must be between $5 and $1000");
+  assert.equal(tooCheap.body.error.message, "Pay must be between $5 and $1000");
   const soon = await call(app, "POST", "/jobs", token, newJobDraft(deps, { deadline: new Date(deps.now().getTime() + 60_000).toISOString() }));
   assert.equal(soon.status, 400);
   const unknownCategory = await call(app, "POST", "/jobs", token, newJobDraft(deps, { category: "design" }));
-  assert.equal(unknownCategory.body.error, "invalid_request");
+  assert.equal(unknownCategory.body.error.code, "invalid_request");
   const foreignPhoto = await call(app, "POST", "/jobs", token, newJobDraft(deps, { posterPhotos: ["https://example.com/x.jpg"] }));
-  assert.equal(foreignPhoto.body.error, "unknown_upload");
+  assert.equal(foreignPhoto.body.error.code, "unknown_upload");
 });
 
 test("PATCH keeps fields it doesn't mention; terms use the posting deadline rules", async () => {

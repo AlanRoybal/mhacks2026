@@ -17,7 +17,7 @@ test("health and auth routes are public; everything else needs a token", async (
   assert.equal((await call(app, "GET", "/health")).status, 200);
   const me = await call(app, "GET", "/me");
   assert.equal(me.status, 401);
-  assert.equal(me.body.error, "unauthorized");
+  assert.equal(me.body.error.code, "unauthorized");
 });
 
 test("demo login returns a session for a stable persona", async () => {
@@ -46,7 +46,7 @@ test("validation errors use a stable error code", async () => {
   const app = createApp(testDeps());
   const res = await call(app, "POST", "/auth/demo", { handle: "Not Valid!" });
   assert.equal(res.status, 400);
-  assert.equal(res.body.error, "invalid_request");
+  assert.equal(res.body.error.code, "invalid_request");
 });
 
 test("demo login is refused outside local dev unless DEMO_MODE is on", async () => {
@@ -88,4 +88,10 @@ test("without a demo key configured, demo login is off on deployed stages even i
   const app = createApp(testDeps({ STAGE: "dev", JWT_SECRET: "x".repeat(40), DEMO_MODE: "true" }));
   const res = await app.request("/auth/demo", { method: "POST", headers: { "content-type": "application/json", "x-demo-key": "anything-at-all" }, body: JSON.stringify({ handle: "judge" }) });
   assert.equal(res.status, 403);
+});
+
+test("errors use TwinKit's envelope: { error: { code, message } }", async () => {
+  const app = createApp(testDeps());
+  const res = await app.request("/me");
+  assert.deepEqual(await res.json(), { error: { code: "unauthorized", message: "Sign in first" } });
 });

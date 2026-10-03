@@ -75,7 +75,7 @@ test("decline moves to the next worker; accept assigns the job once", async () =
   const again = await api.call("POST", `/offers/${second?.offerId}/accept`, secondWorker.token);
   assert.equal(again.status, 200, "a second tap by the winner is not an error");
   const late = await api.call("POST", `/offers/${first.offerId}/accept`, firstWorker.token);
-  assert.equal(late.body.error, "offer_not_current");
+  assert.equal(late.body.error.code, "offer_not_current");
 
   await deps.settle();
   const working = await api.call("GET", "/jobs/working", secondWorker.token);

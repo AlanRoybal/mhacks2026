@@ -78,7 +78,7 @@ test("canceling a funded job refunds the poster", async () => {
   assert.equal(job.payment.refundId, `fake_re_${draft.id}`);
   assert.ok(deps.push.sent.some((p) => p.userId === poster.userId && p.message.type === "refunded"));
   const again = await api.call("POST", `/jobs/${draft.id}/fund`, poster.token);
-  assert.equal(again.body.error, "already_funded");
+  assert.equal(again.body.error.code, "already_funded");
 });
 
 test("USDC jobs cannot be funded until that rail exists", async () => {
@@ -88,7 +88,7 @@ test("USDC jobs cannot be funded until that rail exists", async () => {
   const { body: draft } = await api.call("POST", "/jobs", poster.token, draftBody(deps, { currency: "USDC" }));
   const fund = await api.call("POST", `/jobs/${draft.id}/fund`, poster.token);
   assert.equal(fund.status, 501);
-  assert.equal(fund.body.error, "rail_unavailable");
+  assert.equal(fund.body.error.code, "rail_unavailable");
 });
 
 test("a signed Stripe webhook funds the job once", async () => {
