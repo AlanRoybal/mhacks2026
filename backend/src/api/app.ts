@@ -12,6 +12,7 @@ import { meRoutes } from "./routes/me.js";
 import { offerRoutes } from "./routes/offers.js";
 import { fundingRoutes, publicPaymentRoutes, walletRoutes } from "./routes/payments.js";
 import { proofRoutes } from "./routes/proof.js";
+import { reviewRoutes } from "./routes/review.js";
 import { twinRoutes } from "./routes/twin.js";
 import { fileRoutes, uploadRoutes } from "./routes/uploads.js";
 
@@ -38,6 +39,7 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   authed.route("/uploads", uploadRoutes(deps));
   authed.route("/jobs", jobRoutes(deps));
   authed.route("/jobs", proofRoutes(deps));
+  authed.route("/jobs", reviewRoutes(deps));
   authed.route("/offers", offerRoutes(deps));
   authed.route("/jobs", fundingRoutes(deps));
   authed.route("/wallet", walletRoutes(deps));
