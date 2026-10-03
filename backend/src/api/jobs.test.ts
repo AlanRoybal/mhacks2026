@@ -76,6 +76,12 @@ test("remote jobs have location null and no check-in item", async () => {
   const { body: job } = await call(app, "POST", "/jobs", token, newJobDraft(deps, { location: null, category: "TECHNOLOGY" }));
   assert.equal(job.location, null);
   assert.ok(!job.checklist.some((i: Json) => i.evidenceType === "CHECK_IN"));
+
+  // Swift's JSONEncoder omits nil optionals, so a remote NewJobDraft has no location key at all.
+  const { location: _omitted, ...swiftBody } = newJobDraft(deps, { category: "TECHNOLOGY" });
+  const fromSwift = await call(app, "POST", "/jobs", token, swiftBody);
+  assert.equal(fromSwift.status, 201);
+  assert.equal(fromSwift.body.location, null);
 });
 
 test("checklist edits keep app-made ids and fill omitted fields from before", async () => {
@@ -131,6 +137,7 @@ test("bad drafts are rejected with readable errors", async () => {
   const token = await login(app, "poster");
   const tooCheap = await call(app, "POST", "/jobs", token, newJobDraft(deps, { payAmount: 2 }));
   assert.equal(tooCheap.status, 400);
+  assert.equal(tooCheap.body.message, "Pay must be between $5 and $1000");
   const soon = await call(app, "POST", "/jobs", token, newJobDraft(deps, { deadline: new Date(deps.now().getTime() + 60_000).toISOString() }));
   assert.equal(soon.status, 400);
   const unknownCategory = await call(app, "POST", "/jobs", token, newJobDraft(deps, { category: "design" }));

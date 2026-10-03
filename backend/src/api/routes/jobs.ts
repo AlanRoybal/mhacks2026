@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Deps } from "../../deps.js";
 import type { JobEvent } from "../../domain/events.js";
 import { challengeCode } from "../../domain/ids.js";
-import { quote } from "../../domain/money.js";
+import { MAX_BOUNTY_CENTS, MIN_BOUNTY_CENTS } from "../../domain/money.js";
 import { Category, EvidenceType, type Actor, type Job, type User } from "../../domain/types.js";
 import { badRequest, notFound } from "../../lib/errors.js";
 import { applyEvent, getJobOrThrow } from "../../services/jobs.js";
@@ -23,8 +23,8 @@ const DraftBody = z.object({
   title: z.string().trim().min(3).max(80),
   description: z.string().trim().min(1).max(2000),
   category: Category,
-  // null means remote.
-  location: LocationIn.nullable(),
+  // null or missing means remote. Swift's JSONEncoder leaves out nil optionals entirely.
+  location: LocationIn.nullish(),
   deadline: z.string().datetime({ offset: true }),
   payAmount: z.number().positive(),
   currency: z.enum(["USD", "USDC"]).default("USD"),
@@ -46,10 +46,8 @@ const ChecklistBody = z.union([z.array(ChecklistItemIn), z.object({ checklist: z
 
 export function centsOf(payAmount: number): number {
   const cents = Math.round(payAmount * 100);
-  try {
-    quote(cents);
-  } catch (e) {
-    throw badRequest(e instanceof Error ? e.message.replace("bountyCents", "payAmount (in cents)") : "Invalid amount");
+  if (cents < MIN_BOUNTY_CENTS || cents > MAX_BOUNTY_CENTS) {
+    throw badRequest(`Pay must be between $${MIN_BOUNTY_CENTS / 100} and $${MAX_BOUNTY_CENTS / 100}`, "invalid_amount");
   }
   return cents;
 }
@@ -91,7 +89,7 @@ export function jobRoutes(deps: Deps): Hono<AppEnv> {
   const create = async (c: Context<AppEnv>) => {
     const user = c.get("user");
     const body = await parseBody(c, DraftBody);
-    const job = await createDraft(deps, user, draftInput(deps, user, body) as DraftInput);
+    const job = await createDraft(deps, user, draftInput(deps, user, { ...body, location: body.location ?? null }) as DraftInput);
     return c.json(await wire(job, user), 201);
   };
   app.post("/", create);
