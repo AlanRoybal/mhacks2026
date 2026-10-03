@@ -24,14 +24,31 @@ const schema = z.object({
   LEDGER_TABLE: z.string().optional(),
   KV_TABLE: z.string().optional(),
   AWS_REGION: z.string().default("us-east-1"),
+
+  PORT: z.coerce.number().int().default(8787),
+  // Public URL of this API. Used for OAuth redirects and presigned local uploads.
+  PUBLIC_BASE_URL: z.string().url().default("http://localhost:8787"),
+  // Signs session tokens. Must be set outside local dev.
+  JWT_SECRET: z.string().min(32).optional(),
+  // Custom URL scheme the iOS app registers; sign-in redirects back to <scheme>://auth?token=...
+  APP_URL_SCHEME: z.string().default("bountytwin"),
+  APPLE_BUNDLE_ID: z.string().default("com.alanroybal.BountyTwin"),
+  LINKEDIN_CLIENT_ID: z.string().optional(),
+  LINKEDIN_CLIENT_SECRET: z.string().optional(),
+  // Comma-separated user IDs allowed to resolve disputes.
+  ADMIN_USER_IDS: z.string().default(""),
 });
 
 export type Env = z.infer<typeof schema>;
 
-export interface Config extends Env {
+export interface Config extends Omit<Env, "JWT_SECRET"> {
+  JWT_SECRET: string;
   rules: Rules;
   tables: { jobs: string; users: string; offers: string; proofs: string; ledger: string; kv: string };
+  adminUserIds: Set<string>;
 }
+
+const LOCAL_JWT_SECRET = "local-dev-secret-do-not-use-in-production!!";
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = schema.safeParse(env);
@@ -40,9 +57,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error(`Invalid configuration: ${problems}`);
   }
   const e = parsed.data;
+  if (!e.JWT_SECRET && e.STAGE !== "local") throw new Error("Invalid configuration: JWT_SECRET is required outside local dev");
   const table = (name: string, override?: string) => override ?? `bounty-${e.STAGE}-${name}`;
   return {
     ...e,
+    JWT_SECRET: e.JWT_SECRET ?? LOCAL_JWT_SECRET,
+    adminUserIds: new Set(e.ADMIN_USER_IDS.split(",").map((s) => s.trim()).filter(Boolean)),
     rules: rulesFor(e.DEMO_MODE),
     tables: {
       jobs: table("jobs", e.JOBS_TABLE),
