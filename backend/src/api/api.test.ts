@@ -53,3 +53,17 @@ test("demo login is refused outside local dev unless DEMO_MODE is on", async () 
   const app = createApp(testDeps({ STAGE: "prod", JWT_SECRET: "x".repeat(40) }));
   assert.equal((await call(app, "POST", "/auth/demo", { handle: "judge" })).status, 403);
 });
+
+test("local blob URLs accept a signed upload and reject a tampered one", async () => {
+  const deps = testDeps();
+  const app = createApp(deps);
+  const upload = await deps.blobs.presignPut("proofs/j1/p1/c1-after.jpg", "image/jpeg");
+  const path = upload.url.replace(deps.config.PUBLIC_BASE_URL, "");
+  const ok = await app.request(path, { method: "PUT", headers: upload.headers, body: new Uint8Array([1, 2, 3]) });
+  assert.equal(ok.status, 200);
+  assert.equal((await deps.blobs.head("proofs/j1/p1/c1-after.jpg"))?.size, 3);
+  const bad = await app.request(path.replace("sig=", "sig=0"), { method: "PUT", headers: upload.headers, body: new Uint8Array([1]) });
+  assert.equal(bad.status, 403);
+  const download = await app.request((await deps.blobs.presignGet("proofs/j1/p1/c1-after.jpg")).replace(deps.config.PUBLIC_BASE_URL, ""));
+  assert.equal(download.headers.get("content-type"), "image/jpeg");
+});

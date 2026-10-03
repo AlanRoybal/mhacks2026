@@ -58,6 +58,10 @@ const schema = z.object({
   AI_MODEL: z.string().optional(),
   // hash: offline feature hashing. titan: Titan Text Embeddings v2 on Bedrock.
   EMBED_PROVIDER: z.enum(["hash", "titan"]).default("hash"),
+
+  // local: files under DATA_DIR/blobs served by this API. s3: presigned S3 URLs.
+  BLOBS: z.enum(["local", "s3"]).default("local"),
+  BUCKET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

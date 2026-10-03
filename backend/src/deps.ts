@@ -2,6 +2,7 @@
 // Tests build their own with fakes via createDeps(config, overrides).
 
 import { createAi, createEmbedder, type Ai, type Embedder } from "./ai/index.js";
+import { createBlobs, type Blobs } from "./blobs/index.js";
 import { loadConfig, type Config } from "./config.js";
 import { createLogger, type Logger } from "./lib/log.js";
 import { createPushSender, type PushSender } from "./push/index.js";
@@ -19,6 +20,7 @@ export interface Deps {
   scheduler: Scheduler;
   ai: Ai;
   embedder: Embedder;
+  blobs: Blobs;
   // Present when effects run in this process (local dev, tests) instead of from the ledger stream.
   inlineEffects?: InlineEffectQueue;
 }
@@ -33,6 +35,7 @@ export function createDeps(config: Config = loadConfig(), overrides: Partial<Dep
     push: overrides.push ?? createPushSender(config, log),
     ai: overrides.ai ?? createAi(config, log),
     embedder: overrides.embedder ?? createEmbedder(config),
+    blobs: overrides.blobs ?? createBlobs(config),
     // Replaced below; the scheduler's fire callback needs the finished deps object.
     scheduler: overrides.scheduler ?? { schedule: async () => {} },
     inlineEffects: config.EFFECTS_MODE === "inline" ? new InlineEffectQueue(log) : undefined,
