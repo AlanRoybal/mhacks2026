@@ -8,8 +8,7 @@ struct PostedJobDetailView: View {
     let jobId: String
 
     @State private var isFunding = false
-    @State private var isApproving = false
-    @State private var errorMessage: String?
+    @State private var isReviewing = false
 
     private var job: Job? { store.jobs.first { $0.id == jobId } }
 
@@ -32,9 +31,8 @@ struct PostedJobDetailView: View {
 
                 NextActionSection(
                     job: job,
-                    isApproving: isApproving,
                     onFund: { isFunding = true },
-                    onApprove: { Task { await approve(job) } }
+                    onReview: { isReviewing = true }
                 )
 
                 if job.status != .draft {
@@ -75,13 +73,8 @@ struct PostedJobDetailView: View {
                 FundJobView(job: job) { _ in isFunding = false }
             }
         }
-        .alert("Something went wrong", isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button("OK") {}
-        } message: {
-            Text(errorMessage ?? "")
+        .navigationDestination(isPresented: $isReviewing) {
+            ReviewWorkView(jobId: jobId)
         }
         .task {
             // Poll while the screen is open so status changes appear live. Fine for the demo;
@@ -92,16 +85,6 @@ struct PostedJobDetailView: View {
             }
         }
     }
-
-    private func approve(_ job: Job) async {
-        isApproving = true
-        defer { isApproving = false }
-        do {
-            try await store.approve(job)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
 }
 
 // MARK: - Next action
@@ -109,9 +92,8 @@ struct PostedJobDetailView: View {
 /// The one thing the poster should know or do right now, placed above the timeline.
 private struct NextActionSection: View {
     let job: Job
-    let isApproving: Bool
     let onFund: () -> Void
-    let onApprove: () -> Void
+    let onReview: () -> Void
 
     var body: some View {
         switch job.status {
@@ -132,18 +114,8 @@ private struct NextActionSection: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Button {
-                    onApprove()
-                } label: {
-                    HStack {
-                        if isApproving { ProgressView() }
-                        Text("Approve and pay \(job.payText)")
-                    }
+                Button("Review the work", systemImage: "checklist", action: onReview)
                     .font(.headline)
-                }
-                .disabled(isApproving)
-            } footer: {
-                Text("Check the AI's grades below first. The full review screen is coming next.")
             }
         case .disputed:
             Section {

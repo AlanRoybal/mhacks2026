@@ -86,6 +86,11 @@ final class PosterStore {
         upsert(try await api.approve(jobId: job.id))
     }
 
+    /// Disputes submitted work. The poster must name the requirement that wasn't met.
+    func dispute(_ job: Job, item: ChecklistItem, note: String) async throws {
+        upsert(try await api.dispute(jobId: job.id, checklistItemId: item.id, note: note))
+    }
+
     enum FundingError: LocalizedError {
         case cancelled
 

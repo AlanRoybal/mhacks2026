@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CF31279CC86ED5EB87FC156C /* ReviewWorkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EB53A4BCE0415DB8F87240C /* ReviewWorkView.swift */; };
 		61FDC7B6CB64D70C40B87A03 /* PostedJobDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D820FC618FE18B19EB3176A /* PostedJobDetailView.swift */; };
 		48A2B5A1DCD6884922BA286E /* FundJobView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28AC76F01CF30D4698103931 /* FundJobView.swift */; };
 		6496312D65156F11D36D3958 /* CreateJobModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05297597F712CB7BEE4FF1C8 /* CreateJobModel.swift */; };
@@ -33,6 +34,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		4EB53A4BCE0415DB8F87240C /* ReviewWorkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewWorkView.swift; sourceTree = "<group>"; };
 		7D820FC618FE18B19EB3176A /* PostedJobDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostedJobDetailView.swift; sourceTree = "<group>"; };
 		28AC76F01CF30D4698103931 /* FundJobView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FundJobView.swift; sourceTree = "<group>"; };
 		05297597F712CB7BEE4FF1C8 /* CreateJobModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateJobModel.swift; sourceTree = "<group>"; };
@@ -182,6 +184,7 @@
 		B1412E7AEF0697DD3B63290D /* Post */ = {
 			isa = PBXGroup;
 			children = (
+				4EB53A4BCE0415DB8F87240C /* ReviewWorkView.swift */,
 				7D820FC618FE18B19EB3176A /* PostedJobDetailView.swift */,
 				28AC76F01CF30D4698103931 /* FundJobView.swift */,
 				05297597F712CB7BEE4FF1C8 /* CreateJobModel.swift */,
@@ -281,6 +284,7 @@
 				EEA12735F082E2CC54C7B4F0 /* EarningsView.swift in Sources */,
 				A260AAD49C3DC621DAB28FBF /* HomeView.swift in Sources */,
 				F5B1419706DA28BA5C504DB1 /* Job.swift in Sources */,
+				CF31279CC86ED5EB87FC156C /* ReviewWorkView.swift in Sources */,
 				61FDC7B6CB64D70C40B87A03 /* PostedJobDetailView.swift in Sources */,
 				48A2B5A1DCD6884922BA286E /* FundJobView.swift in Sources */,
 				6496312D65156F11D36D3958 /* CreateJobModel.swift in Sources */,
