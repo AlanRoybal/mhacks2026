@@ -40,6 +40,18 @@ export function toErrorResponse(c: Context, err: unknown, deps: Deps): Response 
   return c.json({ error: "internal", message: "Something went wrong" }, 500);
 }
 
+// Like parseBody, but an empty body counts as {} (for actions that take optional input).
+export async function parseOptionalBody<T extends z.ZodType>(c: Context, schema: T): Promise<z.infer<T>> {
+  const text = await c.req.text();
+  if (!text.trim()) return schema.parse({});
+  try {
+    return schema.parse(JSON.parse(text));
+  } catch (e) {
+    if (e instanceof SyntaxError) throw badRequest("Body must be JSON", "invalid_request");
+    throw e;
+  }
+}
+
 export async function parseBody<T extends z.ZodType>(c: Context, schema: T): Promise<z.infer<T>> {
   let raw: unknown;
   try {

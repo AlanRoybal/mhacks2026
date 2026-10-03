@@ -3,21 +3,16 @@ import { z } from "zod";
 import { MAX_FILE_BYTES } from "../../blobs/index.js";
 import type { Deps } from "../../deps.js";
 import { isValidTimeZone } from "../../domain/availability.js";
-import { newId } from "../../domain/ids.js";
 import { Category, LatLng, type SkillSourceKind, type User } from "../../domain/types.js";
 import { badRequest, notFound } from "../../lib/errors.js";
 import { activeSkills, deleteSkill, normName, readiness, refreshEmbedding, upsertSkill } from "../../services/twin.js";
 import { updateUser } from "../../services/users.js";
 import { parseBody, type AppEnv } from "../http.js";
+import { ownedUploadKey } from "./uploads.js";
 
 // Labels the app shows next to each skill ("From LinkedIn").
 const SOURCE_LABEL: Record<SkillSourceKind, string> = { linkedin: "LinkedIn", resume: "Résumé", email: "Email", user: "Added by you" };
 
-const UPLOAD_KINDS = {
-  resume_pdf: { contentType: "application/pdf", ext: "pdf" },
-  linkedin_pdf: { contentType: "application/pdf", ext: "pdf" },
-  linkedin_zip: { contentType: "application/zip", ext: "zip" },
-} as const;
 const UploadKind = z.enum(["resume_pdf", "linkedin_pdf", "linkedin_zip"]);
 
 const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
@@ -58,25 +53,18 @@ export function twinRoutes(deps: Deps): Hono<AppEnv> {
 
   app.get("/", (c) => c.json(twinView(deps, c.get("user"))));
 
-  // Step 1 of an import: get a presigned URL and PUT the file to it.
-  app.post("/uploads", async (c) => {
-    const { kind } = await parseBody(c, z.object({ kind: UploadKind }));
-    const { contentType, ext } = UPLOAD_KINDS[kind];
-    const blobKey = `uploads/${userId(c)}/${newId(deps.now().getTime())}.${ext}`;
-    return c.json({ blobKey, upload: await deps.blobs.presignPut(blobKey, contentType) });
-  });
-
-  // Step 2: start the import. Poll GET /twin until ingest.status is "done" or "failed".
+  // Import a résumé or LinkedIn file uploaded through /uploads/presign (application/pdf or application/zip).
+  // Poll GET /twin until ingest.status is "done" or "failed".
   app.post("/ingest", async (c) => {
-    const body = await parseBody(c, z.object({ blobKey: z.string(), kind: UploadKind }));
-    if (!body.blobKey.startsWith(`uploads/${userId(c)}/`)) throw notFound("Upload");
-    const info = await deps.blobs.head(body.blobKey);
+    const body = await parseBody(c, z.object({ blobKey: z.string().optional(), fileURL: z.string().optional(), kind: UploadKind }));
+    const blobKey = ownedUploadKey(deps, userId(c), body);
+    const info = await deps.blobs.head(blobKey);
     if (!info) throw badRequest("Upload the file before starting the import", "upload_missing");
     if (info.size > MAX_FILE_BYTES) throw badRequest("That file is too large (20 MB max)", "too_large");
     const user = await updateUser(deps, userId(c), (u) => {
       u.twin.ingest = { ...u.twin.ingest, status: "processing", error: undefined, updatedAt: deps.now().toISOString() };
     });
-    await deps.tasks.run({ kind: "task", name: "ingest_profile", userId: user.userId, blobKey: body.blobKey, sourceKind: body.kind });
+    await deps.tasks.run({ kind: "task", name: "ingest_profile", userId: user.userId, blobKey, sourceKind: body.kind });
     return c.json(twinView(deps, user), 202);
   });
 

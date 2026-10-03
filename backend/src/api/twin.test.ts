@@ -23,8 +23,9 @@ async function login(app: App, handle: string): Promise<string> {
 }
 
 async function upload(deps: TestDeps, app: App, token: string, kind: string, bytes: Uint8Array) {
-  const { body } = await call(app, "POST", "/twin/uploads", token, { kind });
-  const res = await app.request(body.upload.url.replace(deps.config.PUBLIC_BASE_URL, ""), { method: "PUT", headers: body.upload.headers, body: bytes });
+  const contentType = kind === "linkedin_zip" ? "application/zip" : "application/pdf";
+  const { body } = await call(app, "POST", "/uploads/presign", token, { contentType });
+  const res = await app.request(body.uploadURL.replace(deps.config.PUBLIC_BASE_URL, ""), { method: "PUT", headers: body.headers, body: bytes });
   assert.equal(res.status, 200);
   return body.blobKey as string;
 }
@@ -87,7 +88,7 @@ test("users cannot import someone else's upload", async () => {
   const alice = await login(app, "alice");
   const bob = await login(app, "bob");
   const blobKey = await upload(deps, app, alice, "resume_pdf", strToU8("%PDF-1.4"));
-  assert.equal((await call(app, "POST", "/twin/ingest", bob, { blobKey, kind: "resume_pdf" })).status, 404);
+  assert.equal((await call(app, "POST", "/twin/ingest", bob, { blobKey, kind: "resume_pdf" })).status, 400);
 });
 
 test("re-imports never resurrect deleted skills or override edits", () => {
