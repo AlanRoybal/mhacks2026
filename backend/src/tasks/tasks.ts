@@ -1,11 +1,16 @@
-// Background work started by an API request but not tied to a job (e.g. résumé import).
-// Inline mode runs it in-process; deployed, the API invokes the worker Lambda asynchronously.
+// Background work that should not run inside a request or the ordered ledger stream: résumé import,
+// AI grading and matching. Inline mode runs it in-process; deployed, it is an asynchronous invocation
+// of the worker Lambda (which retries twice on failure).
 
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import type { ProfileSourceKind } from "../ai/ai.js";
 import type { InlineEffectQueue } from "../services/effectQueue.js";
 
-export type Task = { kind: "task"; name: "ingest_profile"; userId: string; blobKey: string; sourceKind: ProfileSourceKind };
+export type Task =
+  | { kind: "task"; name: "ingest_profile"; userId: string; blobKey: string; sourceKind: ProfileSourceKind }
+  // Slow, AI-bound effects run as their own invocations so they never hold up the ordered ledger stream.
+  | { kind: "task"; name: "grade_proof"; jobId: string; proofId: string }
+  | { kind: "task"; name: "match_job"; jobId: string };
 
 export interface TaskRunner {
   run(task: Task): Promise<void>;

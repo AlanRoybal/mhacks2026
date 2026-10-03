@@ -13,6 +13,8 @@ import { fireTimer } from "./timers.js";
 
 // Leave fresh jobs to their normal effects; only step in once something is clearly overdue.
 const GRACE_MS = 2 * 60_000;
+// Longer than one full grading attempt (two 120 s model calls), so a slow grade isn't started twice.
+const REGRADE_AFTER_MS = 5 * 60_000;
 
 function overdueTimers(deps: Deps, job: Job, now: number): TimerPayload[] {
   const rules = deps.config.rules;
@@ -46,6 +48,10 @@ export async function sweep(deps: Deps): Promise<{ checked: number; actions: num
       if (!stale) continue;
       if (job.state === "FUNDED" && !job.currentOffer && job.exhaustedRound !== job.matchRounds) {
         await sendNextOffer(deps, job.jobId);
+        actions++;
+      }
+      if (job.state === "SUBMITTED" && job.latestProofId && now - Date.parse(job.updatedAt) > REGRADE_AFTER_MS) {
+        await deps.tasks.run({ kind: "task", name: "grade_proof", jobId: job.jobId, proofId: job.latestProofId });
         actions++;
       }
       if (job.state === "RELEASED" && !job.payment.transferId) {

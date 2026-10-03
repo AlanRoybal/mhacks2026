@@ -6,8 +6,7 @@ import type { Deps } from "../deps.js";
 import type { Effect, LedgerEvent } from "../domain/events.js";
 import { TransitionError } from "../domain/jobMachine.js";
 import { timerName, type TimerPayload } from "../scheduler/index.js";
-import { gradeProof } from "./grading.js";
-import { runMatch, sendNextOffer } from "./matching.js";
+import { sendNextOffer } from "./matching.js";
 import { sendJobPush } from "./notify.js";
 import { runPayout, runRefund } from "./payments.js";
 import { bumpStats } from "./users.js";
@@ -55,7 +54,7 @@ async function runEffect(deps: Deps, ledger: LedgerEvent, effect: Effect): Promi
       await sendJobPush(deps, ledger.jobId, effect);
       return;
     case "grade":
-      await gradeProof(deps, ledger.jobId, effect.proofId);
+      await deps.tasks.run({ kind: "task", name: "grade_proof", jobId: ledger.jobId, proofId: effect.proofId });
       return;
     case "schedule": {
       const payload: TimerPayload = {
@@ -71,16 +70,18 @@ async function runEffect(deps: Deps, ledger: LedgerEvent, effect: Effect): Promi
       return;
     }
     case "match":
-      await runMatch(deps, ledger.jobId);
+      await deps.tasks.run({ kind: "task", name: "match_job", jobId: ledger.jobId });
       return;
     case "offer.next":
       await sendNextOffer(deps, ledger.jobId);
       return;
+    // A payment provider outage must not stall every job behind this one on the stream. The job stays
+    // RELEASED/REFUNDED without a reference, and the sweeper retries it every minute.
     case "payout":
-      await runPayout(deps, ledger.jobId);
+      await runPayout(deps, ledger.jobId).catch((error: unknown) => deps.log.error("Payout failed; the sweeper will retry", { jobId: ledger.jobId, error }));
       return;
     case "refund":
-      await runRefund(deps, ledger.jobId);
+      await runRefund(deps, ledger.jobId).catch((error: unknown) => deps.log.error("Refund failed; the sweeper will retry", { jobId: ledger.jobId, error }));
       return;
   }
 }

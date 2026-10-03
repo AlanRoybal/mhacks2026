@@ -22,6 +22,9 @@ export class EventBridgeScheduler implements Scheduler {
   async schedule(name: string, payload: TimerPayload): Promise<void> {
     const at = Date.parse(payload.at);
     if (at - Date.now() < DIRECT_FIRE_MS) {
+      // Wait out the last few seconds so the event isn't rejected as early.
+      const wait = at - Date.now();
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait + 50));
       await this.fireNow(payload);
       return;
     }

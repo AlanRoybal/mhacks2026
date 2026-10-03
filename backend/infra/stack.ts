@@ -144,6 +144,8 @@ export class BountyStack extends cdk.Stack {
         batchSize: 10,
         retryAttempts: 8,
         reportBatchItemFailures: true,
+        // Split a failing batch so one bad record can't send healthy ones to the DLQ with it.
+        bisectBatchOnError: true,
         onFailure: new SqsDlq(deadLetters),
         filters: [lambda.FilterCriteria.filter({ eventName: lambda.FilterRule.isEqual("INSERT") })],
       }),
