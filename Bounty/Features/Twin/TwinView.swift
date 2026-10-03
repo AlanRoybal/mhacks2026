@@ -1,104 +1,115 @@
 import SwiftUI
 
+/// 04 Twin review.
 struct TwinView: View {
     private let skills = [
-        TwinSkill(name: "Graphic design", confidence: 0.94, source: "LinkedIn"),
-        TwinSkill(name: "Illustration", confidence: 0.89, source: "Résumé"),
-        TwinSkill(name: "Calculus tutoring", confidence: 0.82, source: "Added by you"),
-        TwinSkill(name: "Product photography", confidence: 0.76, source: "Résumé")
+        TwinSkill(name: "Logo & brand design", evidence: "Sent 3 logo invoices this year", source: "Gmail", confidence: 0.94),
+        TwinSkill(name: "Graphic design", evidence: "Freelance designer · 2 yrs", source: "LinkedIn", confidence: 0.90),
+        TwinSkill(name: "Calculus tutoring", evidence: "12 tutoring threads since 2025", source: "Gmail", confidence: 0.82),
+        TwinSkill(name: "Product photography", evidence: "Etsy listing photos in your sent mail", source: "Gmail", confidence: 0.76)
     ]
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 22) {
-                VStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(BountyTheme.accent.gradient)
-                            .frame(width: 92, height: 92)
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 42))
-                            .foregroundStyle(.white)
-                    }
+        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 320)) {
+            ScreenTitle(title: "Your twin") {
+                Chip(label: "Ready to match", tone: .mint)
+            }
+            .entrance(.top)
 
-                    Text("Alan's twin")
-                        .font(.title2.bold())
-                    Label("Ready to match", systemImage: "checkmark.seal.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(BountyTheme.success)
-                }
-                .frame(maxWidth: .infinity)
-
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Text("Skills")
-                            .font(.title2.bold())
-                        Spacer()
-                        Button("Add", systemImage: "plus", action: {})
-                    }
-
-                    ForEach(skills) { skill in
-                        SkillRow(skill: skill)
-                        if skill.id != skills.last?.id {
-                            Divider()
+            StackCard(tone: .lavender, height: 150, bandTop: 108) {
+                HStack(alignment: .top, spacing: 16) {
+                    StickerView(sticker: .twin, size: 110)
+                        .padding(.top, 18)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Alan’s twin")
+                            .bountyType(.headline)
+                        Text("Designer & tutor · Ann Arbor")
+                            .bountyType(.subhead)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                        HStack(alignment: .top, spacing: 18) {
+                            TwinStat(value: "14", label: "skills")
+                            TwinStat(value: "3", label: "sources")
+                            TwinStat(value: "92%", label: "confident")
                         }
+                        .padding(.top, 6)
+                    }
+                    .foregroundStyle(BountyColor.inkPrimary)
+                    .padding(.top, 22)
+                }
+                .padding(.leading, 14)
+            }
+            .entrance(.top)
+
+            SectionHeader(title: "Skills it found", trailing: "Edit", trailingColor: BountyColor.lavenderInk, trailingType: .bodyStrong) {}
+                .entrance(.rest(0))
+
+            VStack(spacing: 0) {
+                ForEach(skills) { skill in
+                    SkillRow(skill: skill)
+                    if skill.id != skills.last?.id {
+                        BountyColor.divider.frame(height: 1)
                     }
                 }
-                .bountyPanel()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 4)
+            .borderedCard()
+            .entrance(.rest(1))
 
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Preferences")
-                        .font(.title2.bold())
-                    LabeledContent("Minimum pay", value: "$15")
-                    LabeledContent("Travel radius", value: "5 miles")
-                    LabeledContent("Availability", value: "Evenings")
-                    LabeledContent("Work type", value: "Remote + nearby")
-                }
-                .bountyPanel()
-            }
-            .padding()
-        }
-        .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle("Twin")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Edit", action: {})
-            }
+            PillButton(title: "Add a skill", icon: .plus, style: .secondary) {}
+                .entrance(.rest(2))
         }
     }
 }
 
 private struct TwinSkill: Identifiable {
-    let id = UUID()
+    var id: String { name }
     let name: String
-    let confidence: Double
+    let evidence: String
     let source: String
+    let confidence: Double
+}
+
+private struct TwinStat: View {
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(value).bountyType(.moneyM)
+            Text(label).bountyType(.footnote)
+        }
+        .accessibilityElement(children: .combine)
+    }
 }
 
 private struct SkillRow: View {
     let skill: TwinSkill
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
                 Text(skill.name)
-                    .font(.headline)
-                Spacer()
-                Text(skill.confidence, format: .percent.precision(.fractionLength(0)))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .bountyType(.bodyStrong)
+                    .foregroundStyle(BountyColor.inkPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Chip(label: skill.source, tone: skill.source == "LinkedIn" ? .lavender : .sky)
             }
-            ProgressView(value: skill.confidence)
-                .tint(BountyTheme.accent)
-            Text("From \(skill.source)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(skill.evidence)
+                .bountyType(.footnote)
+                .foregroundStyle(BountyColor.inkSecondary)
+            HStack(spacing: 10) {
+                Meter(value: skill.confidence)
+                Text(skill.confidence, format: .percent.precision(.fractionLength(0)))
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.inkSecondary)
+            }
         }
+        .padding(.vertical, 12)
     }
 }
 
 #Preview {
-    NavigationStack {
-        TwinView()
-    }
+    TwinView()
 }
