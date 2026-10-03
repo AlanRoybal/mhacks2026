@@ -33,17 +33,35 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
   const missingUploads: string[] = [];
   const warnings: string[] = [];
 
+  // 1. Uploads exist and fit, and get a fingerprint (MD5 ETag). One photo may cover several items of
+  //    the same job, but a photo already used as proof for another job is rejected.
+  for (const e of items) {
+    if (!e.blobKey) continue;
+    const info = await deps.blobs.head(e.blobKey);
+    const limit = e.kind === "photo" ? MAX_PHOTO_BYTES : MAX_FILE_BYTES;
+    if (!info || info.size > limit) {
+      missingUploads.push(e.checklistItemId);
+      continue;
+    }
+    e.etag = info.etag;
+    e.contentType = info.contentType ?? e.contentType;
+    const usedBy = await deps.store.kvGet<{ jobId: string }>(`etag:${info.etag}`);
+    if (usedBy && usedBy.jobId !== job.jobId) duplicates.push(e.checklistItemId);
+  }
+
+  // 2. Coverage, counting distinct uploaded images: the same image can't fill two photo slots or be
+  //    both the "before" and the "after".
   for (const item of job.checklist) {
     const evidence = items.filter((e) => e.checklistItemId === item.id);
-    const photos = evidence.filter((e) => e.kind === "photo");
+    const uploadedPhotos = evidence.filter((e) => e.kind === "photo" && e.etag);
+    const before = new Set(uploadedPhotos.filter((p) => p.phase === "before").map((p) => p.etag));
+    const after = new Set(uploadedPhotos.filter((p) => p.phase !== "before").map((p) => p.etag));
     let covered: boolean;
     switch (item.evidenceType) {
-      case "PHOTO": {
-        const after = photos.filter((p) => p.phase !== "before").length;
-        const before = photos.filter((p) => p.phase === "before").length;
-        covered = after >= (item.photoCount ?? 1) && (!item.beforeAfter || before >= 1);
+      case "PHOTO":
+        covered = after.size >= (item.photoCount ?? 1) && (!item.beforeAfter || before.size >= 1);
+        if ([...before].some((etag) => after.has(etag))) duplicates.push(item.id);
         break;
-      }
       case "CHECK_IN":
         covered = evidence.some((e) => e.kind === "location");
         break;
@@ -51,12 +69,13 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
         covered = evidence.some((e) => e.kind === "link" && Boolean(e.url));
         break;
       case "FILE":
-        covered = evidence.some((e) => e.kind === "file" || e.kind === "photo");
+        covered = evidence.some((e) => (e.kind === "file" || e.kind === "photo") && e.etag);
         break;
     }
     if (item.required && !covered) missingRequired.push(item.id);
   }
 
+  // 3. Time and place: photos and check-ins after the one-time code was issued, at the job.
   const issuedAt = Date.parse(job.challenge?.issuedAt ?? "");
   for (const e of items) {
     if (e.kind === "photo" || e.kind === "location") {
@@ -75,19 +94,6 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
           outsideGeofence.push(e.checklistItemId);
         }
       }
-    }
-    if (e.blobKey) {
-      const info = await deps.blobs.head(e.blobKey);
-      const limit = e.kind === "photo" ? MAX_PHOTO_BYTES : MAX_FILE_BYTES;
-      if (!info || info.size > limit) {
-        missingUploads.push(e.checklistItemId);
-        continue;
-      }
-      e.etag = info.etag;
-      e.contentType = info.contentType ?? e.contentType;
-      // One photo may cover several items of the same job; reuse across jobs is not allowed.
-      const usedBy = await deps.store.kvGet<{ jobId: string }>(`etag:${info.etag}`);
-      if (usedBy && usedBy.jobId !== job.jobId) duplicates.push(e.checklistItemId);
     }
   }
 
@@ -123,6 +129,9 @@ export async function submitProof(deps: Deps, user: User, jobId: string, items: 
     createdAt: deps.now().toISOString(),
   };
   if (!checks.ok) return { job, proof, checks };
+  // A double tap must not submit twice (it would use up a retry or leave an orphan proof).
+  const claimed = await deps.store.kvPut(`submit:${jobId}:${job.failedAttempts}`, proof.proofId, { ifAbsent: true, ttlSeconds: 30 });
+  if (!claimed) throw conflict("already_submitted", "This proof is already being submitted");
   await deps.store.putProof(proof);
   // Photos become unusable as proof for any other job.
   for (const e of items) if (e.etag) await deps.store.kvPut(`etag:${e.etag}`, { jobId, proofId: proof.proofId }, { ifAbsent: true });

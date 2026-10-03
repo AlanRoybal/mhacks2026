@@ -136,3 +136,37 @@ test("decision rules: confident fails fail, unsure or missing code goes to the p
   const away = { ...proof, checks: { outsideGeofence: ["c1"] } } as unknown as Proof;
   assert.equal(decide(job, away, v("pass", 0.95), true).decision, "unclear");
 });
+
+test("one image can't fill two photo slots or be both before and after", async () => {
+  const deps = testDeps();
+  const { api, worker, job } = await startedJob(deps);
+  const photoItem = (job.checklist as Json[]).find((i) => i.evidenceType === "PHOTO");
+  // Make the item need two photos and a before shot.
+  const current = await getJobOrThrow(deps, job.id);
+  await deps.store.saveJob(current.version, {
+    ...current,
+    checklist: current.checklist.map((i) => (i.id === photoItem?.id ? { ...i, photoCount: 2, beforeAfter: true } : i)),
+    version: current.version + 1,
+  });
+  const now = deps.now().toISOString();
+  const same = await uploadPhoto(deps, api, worker.token, [42]);
+  const photo = (phase: string) => ({ fileURL: same, capturedAt: now, latitude: SITE.lat, longitude: SITE.lng, phase });
+  const pre = await api.call("POST", `/jobs/${job.id}/proof/precheck`, worker.token, {
+    items: [{ checklistItemId: photoItem?.id, photos: [photo("before"), photo("after"), photo("after")] }],
+  });
+  assert.ok(pre.body.checks.missingRequired.includes(photoItem?.id), "two copies of one image count once");
+  assert.ok(pre.body.checks.duplicates.includes(photoItem?.id), "before and after can't be the same image");
+});
+
+test("a double-tapped submit goes through once", async () => {
+  const deps = testDeps();
+  const { api, worker, job } = await startedJob(deps);
+  const items = await fullProof(deps, api, worker.token, job, 3);
+  const [a, b] = await Promise.all([
+    api.call("POST", `/jobs/${job.id}/proof`, worker.token, { items }),
+    api.call("POST", `/jobs/${job.id}/proof`, worker.token, { items }),
+  ]);
+  assert.deepEqual([a.status, b.status].sort(), [200, 409]);
+  await deps.settle();
+  assert.equal((await deps.store.listProofs(job.id)).length, 1);
+});
