@@ -26,7 +26,7 @@ struct EarningsView: View {
                     Text("Recent")
                         .font(.title2.bold())
 
-                    ForEach(SampleJobs.jobs.filter { $0.status == .paid || $0.status == .inReview }) { job in
+                    ForEach(SampleJobs.jobs.filter { $0.status == .released || $0.status == .inReview }) { job in
                         JobRow(job: job)
                     }
                 }

@@ -1,16 +1,17 @@
 import SwiftUI
 
 struct JobsView: View {
+    @Environment(PosterStore.self) private var posterStore
     @State private var selection = JobCollection.working
 
-    var filteredJobs: [Job] {
+    private var workerJobs: [Job] {
         switch selection {
         case .working:
-            SampleJobs.jobs.filter { [.accepted, .inProgress, .inReview].contains($0.status) }
+            SampleJobs.jobs.filter { $0.status.isActiveForWorker }
+        case .completed:
+            SampleJobs.jobs.filter { $0.status == .released }
         case .posted:
             []
-        case .completed:
-            SampleJobs.jobs.filter { $0.status == .paid }
         }
     }
 
@@ -24,14 +25,16 @@ struct JobsView: View {
             .pickerStyle(.segmented)
             .padding()
 
-            if filteredJobs.isEmpty {
+            if selection == .posted {
+                PostedJobsList()
+            } else if workerJobs.isEmpty {
                 ContentUnavailableView(
-                    "No posted jobs",
+                    "No jobs here yet",
                     systemImage: "tray",
-                    description: Text("Jobs you post will appear here after funding.")
+                    description: Text("Jobs you accept will appear here.")
                 )
             } else {
-                List(filteredJobs) { job in
+                List(workerJobs) { job in
                     NavigationLink(value: job) {
                         JobListRow(job: job)
                     }
@@ -42,6 +45,9 @@ struct JobsView: View {
         .navigationTitle("Jobs")
         .navigationDestination(for: Job.self) { job in
             JobDetailView(job: job)
+        }
+        .navigationDestination(for: PostedJobRoute.self) { route in
+            PostedJobDetailView(jobId: route.jobId)
         }
     }
 }
@@ -54,7 +60,7 @@ private enum JobCollection: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-private struct JobListRow: View {
+struct JobListRow: View {
     let job: Job
 
     var body: some View {
@@ -63,14 +69,14 @@ private struct JobListRow: View {
                 Text(job.title)
                     .font(.headline)
                 Spacer()
-                Text(job.pay, format: .currency(code: "USD"))
+                Text(job.payText)
                     .font(.headline)
             }
             HStack {
-                Text(job.status.rawValue)
+                Text(job.status.displayName)
                     .foregroundStyle(BountyTheme.accent)
                 Spacer()
-                Text(job.deadline)
+                Text(job.deadlineText)
                     .foregroundStyle(.secondary)
             }
             .font(.subheadline)
@@ -86,28 +92,36 @@ struct JobDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(job.pay, format: .currency(code: "USD"))
+                    Text(job.payText)
                         .font(.system(size: 42, weight: .bold, design: .rounded))
                     Text(job.title)
                         .font(.title2.bold())
-                    Label(job.status.rawValue, systemImage: "clock.fill")
+                    Label(job.status.displayName, systemImage: "clock.fill")
                         .foregroundStyle(BountyTheme.accent)
                 }
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Why it matched")
-                        .font(.headline)
-                    Text(job.matchReason)
-                        .foregroundStyle(.secondary)
+                if let matchReason = job.matchReason {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Why it matched")
+                            .font(.headline)
+                        Text(matchReason)
+                            .foregroundStyle(.secondary)
+                    }
+                    .bountyPanel()
                 }
-                .bountyPanel()
 
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Proof checklist")
                         .font(.headline)
-                    Label("Show the finished work clearly", systemImage: "checkmark.circle")
-                    Label("Include the one-time code", systemImage: "checkmark.circle")
-                    Label("Submit before \(job.deadline)", systemImage: "checkmark.circle")
+                    if job.checklist.isEmpty {
+                        Label("Show the finished work clearly", systemImage: "checkmark.circle")
+                        Label("Include the one-time code", systemImage: "checkmark.circle")
+                    } else {
+                        ForEach(job.checklist) { item in
+                            Label(item.text, systemImage: "checkmark.circle")
+                        }
+                    }
+                    Label("Submit before \(job.deadlineText)", systemImage: "checkmark.circle")
                 }
                 .bountyPanel()
 
@@ -130,4 +144,5 @@ struct JobDetailView: View {
     NavigationStack {
         JobsView()
     }
+    .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))
 }

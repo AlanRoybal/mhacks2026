@@ -80,18 +80,20 @@ private struct ActiveOfferCard: View {
                     .foregroundStyle(BountyTheme.warning)
             }
 
-            Text(job.pay, format: .currency(code: "USD"))
+            Text(job.payText)
                 .font(.system(size: 44, weight: .bold, design: .rounded))
 
             VStack(alignment: .leading, spacing: 7) {
                 Text(job.title)
                     .font(.title3.bold())
-                Label("\(job.distance) · Due \(job.deadline)", systemImage: "location.fill")
+                Label("\(job.distanceText) · Due \(job.deadlineText)", systemImage: "location.fill")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Text(job.matchReason)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                if let matchReason = job.matchReason {
+                    Text(matchReason)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             HStack(spacing: 12) {
@@ -114,23 +116,23 @@ struct JobRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: job.status == .paid ? "checkmark.circle.fill" : "briefcase.fill")
+            Image(systemName: job.status == .released ? "checkmark.circle.fill" : "briefcase.fill")
                 .font(.title2)
-                .foregroundStyle(job.status == .paid ? BountyTheme.success : BountyTheme.accent)
+                .foregroundStyle(job.status == .released ? BountyTheme.success : BountyTheme.accent)
                 .frame(width: 38, height: 38)
                 .background(.quaternary, in: Circle())
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(job.title)
                     .font(.headline)
-                Text(job.status.rawValue)
+                Text(job.status.displayName)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            Text(job.pay, format: .currency(code: "USD"))
+            Text(job.payText)
                 .font(.headline)
         }
         .bountyPanel()

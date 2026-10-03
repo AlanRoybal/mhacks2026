@@ -70,4 +70,5 @@ private enum AppTab: Hashable {
 
 #Preview {
     RootTabView()
+        .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))
 }
