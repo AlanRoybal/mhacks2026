@@ -9,6 +9,7 @@ import { timerName, type TimerPayload } from "../scheduler/index.js";
 import { gradeProof } from "./grading.js";
 import { runMatch, sendNextOffer } from "./matching.js";
 import { sendJobPush } from "./notify.js";
+import { runPayout, runRefund } from "./payments.js";
 import { bumpStats } from "./users.js";
 
 // Effects that are not naturally idempotent run at most once per ledger row: a retry of the row
@@ -76,8 +77,10 @@ async function runEffect(deps: Deps, ledger: LedgerEvent, effect: Effect): Promi
       await sendNextOffer(deps, ledger.jobId);
       return;
     case "payout":
+      await runPayout(deps, ledger.jobId);
+      return;
     case "refund":
-      deps.log.warn("Effect has no handler yet", { jobId: ledger.jobId, effect: effect.kind });
+      await runRefund(deps, ledger.jobId);
       return;
   }
 }

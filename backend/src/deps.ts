@@ -5,6 +5,7 @@ import { createAi, createEmbedder, type Ai, type Embedder } from "./ai/index.js"
 import { createBlobs, type Blobs } from "./blobs/index.js";
 import { loadConfig, type Config } from "./config.js";
 import { createLogger, type Logger } from "./lib/log.js";
+import { createPayments, type Payments } from "./payments/index.js";
 import { createPushSender, type PushSender } from "./push/index.js";
 import { createScheduler, type Scheduler } from "./scheduler/index.js";
 import { InlineEffectQueue } from "./services/effectQueue.js";
@@ -23,6 +24,7 @@ export interface Deps {
   ai: Ai;
   embedder: Embedder;
   blobs: Blobs;
+  payments: Payments;
   tasks: TaskRunner;
   // Present when effects run in this process (local dev, tests) instead of from the ledger stream.
   inlineEffects?: InlineEffectQueue;
@@ -39,6 +41,7 @@ export function createDeps(config: Config = loadConfig(), overrides: Partial<Dep
     ai: overrides.ai ?? createAi(config, log),
     embedder: overrides.embedder ?? createEmbedder(config),
     blobs: overrides.blobs ?? createBlobs(config),
+    payments: overrides.payments ?? createPayments(config),
     // Replaced below; the scheduler and task runner call back into the finished deps object.
     scheduler: overrides.scheduler ?? { schedule: async () => {} },
     tasks: overrides.tasks ?? { run: async () => {} },

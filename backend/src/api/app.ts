@@ -10,6 +10,7 @@ import { jobRoutes } from "./routes/jobs.js";
 import { localBlobRoutes } from "./routes/localBlobs.js";
 import { meRoutes } from "./routes/me.js";
 import { offerRoutes } from "./routes/offers.js";
+import { fundingRoutes, publicPaymentRoutes, walletRoutes } from "./routes/payments.js";
 import { proofRoutes } from "./routes/proof.js";
 import { twinRoutes } from "./routes/twin.js";
 import { fileRoutes, uploadRoutes } from "./routes/uploads.js";
@@ -26,6 +27,8 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   if (deps.blobs instanceof LocalBlobs) app.route("/local-blobs", localBlobRoutes(deps.blobs));
   // Stable, signed links to uploaded files (redirect to a short-lived download URL).
   app.route("/files", fileRoutes(deps));
+  // Stripe webhooks and Connect redirects.
+  app.route("/", publicPaymentRoutes(deps));
 
   // Everything below needs a session token.
   const authed = new Hono<AppEnv>();
@@ -36,6 +39,8 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   authed.route("/jobs", jobRoutes(deps));
   authed.route("/jobs", proofRoutes(deps));
   authed.route("/offers", offerRoutes(deps));
+  authed.route("/jobs", fundingRoutes(deps));
+  authed.route("/wallet", walletRoutes(deps));
   app.route("/", authed);
 
   return app;
