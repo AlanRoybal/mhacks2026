@@ -127,7 +127,7 @@ struct HomeJobRow: View {
             StickerTile(sticker: job.sticker, background: job.tileColor)
             TitleSubtitle(title: job.title, subtitle: detail)
                 .multilineTextAlignment(.leading)
-            Text(job.payShort)
+            Text("$\(job.pay)")
                 .bountyType(.moneyM)
                 .foregroundStyle(BountyColor.inkPrimary)
         }
