@@ -3,6 +3,7 @@
 
 import { loadConfig, type Config } from "./config.js";
 import { createLogger, type Logger } from "./lib/log.js";
+import { createPushSender, type PushSender } from "./push/index.js";
 import { InlineEffectQueue } from "./services/effectQueue.js";
 import { createStore, type Store } from "./store/index.js";
 
@@ -11,6 +12,7 @@ export interface Deps {
   store: Store;
   log: Logger;
   now: () => Date;
+  push: PushSender;
   // Present when effects run in this process (local dev, tests) instead of from the ledger stream.
   inlineEffects?: InlineEffectQueue;
 }
@@ -22,6 +24,7 @@ export function createDeps(config: Config = loadConfig(), overrides: Partial<Dep
     store: createStore(config),
     log,
     now: () => new Date(),
+    push: overrides.push ?? createPushSender(config, log),
     inlineEffects: config.EFFECTS_MODE === "inline" ? new InlineEffectQueue(log) : undefined,
     ...overrides,
   };

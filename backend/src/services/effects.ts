@@ -5,6 +5,7 @@
 import type { Deps } from "../deps.js";
 import type { Effect, LedgerEvent } from "../domain/events.js";
 import { TransitionError } from "../domain/jobMachine.js";
+import { sendJobPush } from "./notify.js";
 import { bumpStats } from "./users.js";
 
 export async function runEffects(deps: Deps, ledger: LedgerEvent): Promise<void> {
@@ -37,9 +38,11 @@ async function runEffect(deps: Deps, ledger: LedgerEvent, effect: Effect): Promi
     case "stats":
       await bumpStats(deps, effect.userId, effect.delta);
       return;
+    case "push":
+      await sendJobPush(deps, ledger.jobId, effect);
+      return;
     case "match":
     case "offer.next":
-    case "push":
     case "schedule":
     case "grade":
     case "payout":

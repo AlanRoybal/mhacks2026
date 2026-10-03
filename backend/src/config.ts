@@ -37,6 +37,13 @@ const schema = z.object({
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
   // Comma-separated user IDs allowed to resolve disputes.
   ADMIN_USER_IDS: z.string().default(""),
+
+  // console: log pushes (local dev). apns: send through Apple with the .p8 key below.
+  PUSH_PROVIDER: z.enum(["console", "apns"]).default("console"),
+  APNS_KEY_ID: z.string().optional(),
+  APNS_TEAM_ID: z.string().optional(),
+  // Contents of the AuthKey_XXXX.p8 file. Literal "\n" sequences are accepted.
+  APNS_KEY_P8: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;
