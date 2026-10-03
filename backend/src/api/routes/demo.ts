@@ -8,7 +8,7 @@ import type { Job } from "../../domain/types.js";
 import { conflict, forbidden, notFound } from "../../lib/errors.js";
 import { applyEvent, getJobOrThrow } from "../../services/jobs.js";
 import { ineligibleReason, rerankCandidate } from "../../services/matching.js";
-import { briefOf } from "../../services/postings.js";
+import { briefOf, hasRequiredEvidence } from "../../services/postings.js";
 import { fireTimer } from "../../services/timers.js";
 import type { TimerPayload } from "../../scheduler/index.js";
 import { VersionConflictError } from "../../store/index.js";
@@ -90,6 +90,7 @@ export function demoRoutes(deps: Deps): Hono<AppEnv> {
     const job = await getJobOrThrow(deps, c.req.param("id"));
     if (job.posterId !== user.userId) throw forbidden("Only the poster can fund this job");
     if (job.state !== "DRAFT") throw conflict("already_funded", `The job is already ${job.state}`);
+    if (!hasRequiredEvidence(job.checklist)) throw conflict("checklist_incomplete", "Add at least one required photo, link or file item before funding");
     await deps.store.saveJob(job.version, { ...job, rail: "fake", version: job.version + 1, updatedAt: deps.now().toISOString() });
     await applyEvent(deps, job.jobId, { type: "FUND_CONFIRMED", amountCents: job.totalCents }, SYSTEM);
     return c.json(await wire(job.jobId, user));

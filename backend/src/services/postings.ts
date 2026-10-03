@@ -2,6 +2,7 @@
 // (US-14, product rule 1: neither side can quietly change the agreement).
 
 import { clamp, type ChecklistDraft, type JobBrief } from "../ai/index.js";
+import { templateChecklist } from "../ai/fake.js";
 import type { Deps } from "../deps.js";
 import { newId } from "../domain/ids.js";
 import { quote } from "../domain/money.js";
@@ -76,13 +77,20 @@ function withCheckIn(checklist: ChecklistItem[], remote: boolean): ChecklistItem
   return [...checklist, ...buildChecklist([...checklist, { text: "Checked in at the job location", evidenceType: "CHECK_IN" }]).slice(-1)];
 }
 
-function fromDraft(draft: ChecklistDraft, remote: boolean): { checklist: ChecklistItem[]; estMinutes: number; flags: string[] } {
-  const items = draft.items
-    .filter((i) => i.text.trim())
-    .slice(0, MAX_CHECKLIST_ITEMS)
-    .map((i) => ({ ...i, angleHint: i.angleHint || undefined }));
+// A job can only be graded fairly if some photo, link or file item must pass (a check-in alone proves
+// nothing about the work). Used for AI drafts, poster edits, and before funding.
+export function hasRequiredEvidence(checklist: ChecklistItem[]): boolean {
+  return checklist.some((i) => i.required && i.evidenceType !== "CHECK_IN");
+}
+
+function fromDraft(draft: ChecklistDraft, job: JobBrief): { checklist: ChecklistItem[]; estMinutes: number; flags: string[] } {
+  let source = draft.items.filter((i) => i.text.trim() && i.evidenceType !== "CHECK_IN");
+  if (source.length === 0) source = templateChecklist(job).items.filter((i) => i.evidenceType !== "CHECK_IN");
+  const items = source.slice(0, MAX_CHECKLIST_ITEMS).map((i) => ({ ...i, angleHint: i.angleHint || undefined }));
+  const first = items[0];
+  if (first && !items.some((i) => i.required)) first.required = true;
   return {
-    checklist: withCheckIn(buildChecklist(items), remote),
+    checklist: withCheckIn(buildChecklist(items), job.remote),
     estMinutes: Math.round(clamp(draft.estMinutes, 5, 600)),
     flags: draft.flags.map((f) => f.trim()).filter(Boolean).slice(0, 5),
   };
@@ -113,7 +121,7 @@ export async function createDraft(deps: Deps, poster: User, input: DraftInput): 
   const amounts = quote(input.bountyCents);
   const remote = input.location === null;
   const base = { title: input.title.trim(), description: input.description.trim(), category: input.category, remote, bountyCents: amounts.bountyCents, estMinutes: 0 };
-  const generated = fromDraft(await deps.ai.generateChecklist(briefOf(base)), remote);
+  const generated = fromDraft(await deps.ai.generateChecklist(briefOf(base)), briefOf(base));
   const now = deps.now().toISOString();
   const job: Job = {
     jobId: newId(deps.now().getTime()),
@@ -190,14 +198,15 @@ export async function setChecklist(deps: Deps, user: User, jobId: string, items:
   if (items.length === 0 || items.length > MAX_CHECKLIST_ITEMS) throw badRequest(`A checklist needs 1 to ${MAX_CHECKLIST_ITEMS} items`);
   return editDraft(deps, user, jobId, (job) => {
     const checklist = withCheckIn(buildChecklist(items, job.checklist), job.remote);
-    if (!checklist.some((i) => i.required)) throw badRequest("Mark at least one item as required");
+    if (!hasRequiredEvidence(checklist)) throw badRequest("Mark at least one photo, link or file item as required");
     return { ...job, checklist };
   });
 }
 
 export async function regenerateChecklist(deps: Deps, user: User, jobId: string): Promise<Job> {
   const job = await getJobOrThrow(deps, jobId);
-  const generated = fromDraft(await deps.ai.generateChecklist(briefOf(job)), job.remote);
+  if (job.posterId !== user.userId) throw forbidden("Only the poster can edit this job");
+  const generated = fromDraft(await deps.ai.generateChecklist(briefOf(job)), briefOf(job));
   return editDraft(deps, user, jobId, (j) => ({ ...j, checklist: generated.checklist, estMinutes: generated.estMinutes, flags: generated.flags }));
 }
 

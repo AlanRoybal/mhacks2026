@@ -51,7 +51,9 @@ function checkInVerdict(deps: Deps, job: Job, proof: Proof, itemId: string): Ite
 }
 
 export function decide(job: Job, proof: Proof, verdicts: ItemVerdict[], codeVisible: boolean): { decision: GradeDecision; because: string } {
-  const required = job.checklist.filter((i) => i.required);
+  // If no photo/link/file item is marked required (older drafts), all of them must pass.
+  const evidence = job.checklist.filter((i) => i.evidenceType !== "CHECK_IN");
+  const required = [...job.checklist.filter((i) => i.required), ...(evidence.some((i) => i.required) ? [] : evidence)];
   const byId = new Map(verdicts.map((v) => [v.itemId, v]));
   const failed = required.filter((i) => byId.get(i.id)?.verdict === "fail" && (byId.get(i.id)?.confidence ?? 0) >= CONFIDENT);
   if (failed.length > 0) return { decision: "fail", because: `Failed: ${failed.map((i) => i.id).join(", ")}` };

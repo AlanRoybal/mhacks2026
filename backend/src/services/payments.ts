@@ -9,6 +9,7 @@ import { AppError, conflict, forbidden } from "../lib/errors.js";
 import { RailUnavailableError, type FundingSession } from "../payments/index.js";
 import { VersionConflictError } from "../store/index.js";
 import { applyEvent, getJobOrThrow } from "./jobs.js";
+import { hasRequiredEvidence } from "./postings.js";
 import { updateUser } from "./users.js";
 
 const SYSTEM = (source: string) => ({ kind: "system" as const, source });
@@ -18,6 +19,7 @@ export async function startFunding(deps: Deps, user: User, jobId: string): Promi
   const job = await getJobOrThrow(deps, jobId);
   if (job.posterId !== user.userId) throw forbidden("Only the poster can fund this job");
   if (job.state !== "DRAFT") throw conflict("already_funded", `The job is already ${job.state}`);
+  if (!hasRequiredEvidence(job.checklist)) throw conflict("checklist_incomplete", "Add at least one required photo, link or file item before funding");
   let session: FundingSession;
   try {
     session = await deps.payments.railFor(job).startFunding(job, user);
