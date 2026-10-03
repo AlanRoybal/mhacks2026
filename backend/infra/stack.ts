@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 // variables, which is fine for a hackathon; move them to Secrets Manager before real users.
 const PASSTHROUGH = [
   "DEMO_MODE",
+  "DEMO_LOGIN_KEY",
   "JWT_SECRET",
   "AI_PROVIDER",
   "AI_MODEL",

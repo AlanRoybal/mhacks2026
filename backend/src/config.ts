@@ -10,7 +10,10 @@ const bool = z
 
 const schema = z.object({
   STAGE: z.string().default("local"),
+  // Short timers (30 s offers, 2 min review window) for rehearsals and judging.
   DEMO_MODE: bool,
+  // Outside local dev, demo login and /demo routes also require the header x-demo-key: <this value>.
+  DEMO_LOGIN_KEY: z.string().min(8).optional(),
   STORE: z.enum(["memory", "dynamo"]).default("memory"),
   // inline: effects run in this process after each commit (local dev).
   // stream: the worker Lambda runs them from the ledger table's DynamoDB Stream (deployed).

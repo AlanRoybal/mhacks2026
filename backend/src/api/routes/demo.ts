@@ -1,4 +1,5 @@
-// Demo and debugging tools. Mounted only when DEMO_MODE=true or STAGE=local.
+// Demo and debugging tools. Mounted only when DEMO_MODE=true or STAGE=local; on deployed stages every
+// request also needs the x-demo-key header (see demoAccess in api/auth.ts).
 
 import { Hono } from "hono";
 import { z } from "zod";
@@ -11,7 +12,7 @@ import { briefOf } from "../../services/postings.js";
 import { fireTimer } from "../../services/timers.js";
 import type { TimerPayload } from "../../scheduler/index.js";
 import { VersionConflictError } from "../../store/index.js";
-import { isAdmin } from "../auth.js";
+import { demoAccess, isAdmin } from "../auth.js";
 import { parseBody, type AppEnv } from "../http.js";
 import { jobWire, wireDate, WireContext } from "../wire.js";
 
@@ -77,6 +78,10 @@ async function ownJob(deps: Deps, user: Parameters<typeof isAdmin>[1], jobId: st
 
 export function demoRoutes(deps: Deps): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
+  app.use("*", async (c, next) => {
+    if (!demoAccess(deps, c.req.header("x-demo-key"))) throw forbidden("Demo tools are disabled");
+    await next();
+  });
   const wire = async (jobId: string, viewer: Parameters<typeof jobWire>[2]) => jobWire(new WireContext(deps), await getJobOrThrow(deps, jobId), viewer);
 
   // Fund a draft without Stripe (switches it to the fake rail). For seed data and rehearsals.

@@ -3,7 +3,7 @@
 
 import { Hono, type MiddlewareHandler } from "hono";
 import { createRemoteJWKSet, jwtVerify, SignJWT } from "jose";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import type { Deps } from "../deps.js";
 import type { User } from "../domain/types.js";
@@ -48,6 +48,17 @@ export function requireAuth(deps: Deps): MiddlewareHandler<AppEnv> {
   };
 }
 
+// Demo login and /demo routes: always on in local dev. On a deployed stage they need DEMO_MODE, a
+// DEMO_LOGIN_KEY, and that key in the x-demo-key header, so strangers can't sign in as anyone.
+export function demoAccess(deps: Deps, key: string | undefined): boolean {
+  if (deps.config.STAGE === "local") return true;
+  const expected = deps.config.DEMO_LOGIN_KEY;
+  if (!deps.config.DEMO_MODE || !expected || !key) return false;
+  const a = Buffer.from(key);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export function isAdmin(deps: Deps, user: User): boolean {
   return Boolean(user.isAdmin) || deps.config.adminUserIds.has(user.userId);
 }
@@ -87,13 +98,14 @@ export function authRoutes(deps: Deps): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const linkedinRedirectUri = `${deps.config.PUBLIC_BASE_URL}/auth/linkedin/callback`;
 
-  // Demo login: stable personas by handle ("judge", "poster", "worker1"). Handle "admin" is an admin.
+  // Demo login: stable personas by handle ("judge", "poster", "worker1"). Handle "admin" is an admin
+  // in local dev only; on deployed stages use ADMIN_USER_IDS.
   app.post("/demo", async (c) => {
-    if (!deps.config.DEMO_MODE && deps.config.STAGE !== "local") throw forbidden("Demo login is disabled");
+    if (!demoAccess(deps, c.req.header("x-demo-key"))) throw forbidden("Demo login is disabled");
     const body = await parseBody(c, z.object({ handle: z.string().regex(/^[a-z0-9_-]{2,32}$/), displayName: z.string().min(1).max(60).optional() }));
     const user = await upsertIdentity(deps, "demo", body.handle, {
       displayName: body.displayName ?? body.handle,
-      isAdmin: body.handle === "admin",
+      isAdmin: body.handle === "admin" && deps.config.STAGE === "local",
     });
     return c.json({ token: await signSession(deps, user.userId), userId: user.userId });
   });

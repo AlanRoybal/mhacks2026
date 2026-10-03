@@ -1,8 +1,8 @@
 // Seeds a running backend through its public API, so it works against local dev or a deployed stage
-// (which must have DEMO_MODE=true for demo login and fake funding).
+// (which must have DEMO_MODE=true and a DEMO_LOGIN_KEY for demo login and fake funding).
 //
 //   npm run seed                                  # http://localhost:8787
-//   BASE_URL=https://xxxx.execute-api.us-east-1.amazonaws.com npm run seed
+//   BASE_URL=https://xxxx.execute-api.us-east-1.amazonaws.com DEMO_LOGIN_KEY=... npm run seed
 //
 // Creates four seed posters with twelve funded jobs around Ann Arbor, plus a "demo-designer" worker
 // whose twin comes from a LinkedIn export, so the twin screen shows LinkedIn-sourced skills.
@@ -17,7 +17,11 @@ type Json = Record<string, any>;
 async function call(method: string, path: string, token?: string, body?: unknown): Promise<Json> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
-    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(process.env.DEMO_LOGIN_KEY ? { "x-demo-key": process.env.DEMO_LOGIN_KEY } : {}),
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text();

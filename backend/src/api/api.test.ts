@@ -67,3 +67,25 @@ test("local blob URLs accept a signed upload and reject a tampered one", async (
   const download = await app.request((await deps.blobs.presignGet("proofs/j1/p1/c1-after.jpg")).replace(deps.config.PUBLIC_BASE_URL, ""));
   assert.equal(download.headers.get("content-type"), "image/jpeg");
 });
+
+test("on a deployed stage, demo login needs the demo key and never grants admin", async () => {
+  const deps = testDeps({ STAGE: "dev", JWT_SECRET: "x".repeat(40), DEMO_MODE: "true", DEMO_LOGIN_KEY: "team-secret-123" });
+  const app = createApp(deps);
+  const post = (headers: Record<string, string>) =>
+    app.request("/auth/demo", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ handle: "admin" }) });
+  assert.equal((await post({})).status, 403);
+  assert.equal((await post({ "x-demo-key": "wrong-key-0000" })).status, 403);
+  const ok = await post({ "x-demo-key": "team-secret-123" });
+  assert.equal(ok.status, 200);
+  const { token } = (await ok.json()) as { token: string };
+  const me = await call(app, "GET", "/me", undefined, token);
+  assert.equal(me.body.isAdmin, false);
+  const demo = await app.request("/demo/jobs/x/explain", { headers: { authorization: `Bearer ${token}` } });
+  assert.equal(demo.status, 403, "demo tools need the key too");
+});
+
+test("without a demo key configured, demo login is off on deployed stages even in DEMO_MODE", async () => {
+  const app = createApp(testDeps({ STAGE: "dev", JWT_SECRET: "x".repeat(40), DEMO_MODE: "true" }));
+  const res = await app.request("/auth/demo", { method: "POST", headers: { "content-type": "application/json", "x-demo-key": "anything-at-all" }, body: JSON.stringify({ handle: "judge" }) });
+  assert.equal(res.status, 403);
+});
