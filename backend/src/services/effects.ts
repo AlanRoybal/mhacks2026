@@ -5,6 +5,7 @@
 import type { Deps } from "../deps.js";
 import type { Effect, LedgerEvent } from "../domain/events.js";
 import { TransitionError } from "../domain/jobMachine.js";
+import { timerName, type TimerPayload } from "../scheduler/index.js";
 import { sendJobPush } from "./notify.js";
 import { bumpStats } from "./users.js";
 
@@ -41,9 +42,13 @@ async function runEffect(deps: Deps, ledger: LedgerEvent, effect: Effect): Promi
     case "push":
       await sendJobPush(deps, ledger.jobId, effect);
       return;
+    case "schedule": {
+      const payload: TimerPayload = { kind: "timer", jobId: ledger.jobId, timer: effect.timer, at: effect.at, offerId: effect.offerId, round: effect.round };
+      await deps.scheduler.schedule(timerName(payload, ledger.seq), payload);
+      return;
+    }
     case "match":
     case "offer.next":
-    case "schedule":
     case "grade":
     case "payout":
     case "refund":

@@ -4,7 +4,9 @@
 import { loadConfig, type Config } from "./config.js";
 import { createLogger, type Logger } from "./lib/log.js";
 import { createPushSender, type PushSender } from "./push/index.js";
+import { createScheduler, type Scheduler } from "./scheduler/index.js";
 import { InlineEffectQueue } from "./services/effectQueue.js";
+import { fireTimer } from "./services/timers.js";
 import { createStore, type Store } from "./store/index.js";
 
 export interface Deps {
@@ -13,21 +15,26 @@ export interface Deps {
   log: Logger;
   now: () => Date;
   push: PushSender;
+  scheduler: Scheduler;
   // Present when effects run in this process (local dev, tests) instead of from the ledger stream.
   inlineEffects?: InlineEffectQueue;
 }
 
 export function createDeps(config: Config = loadConfig(), overrides: Partial<Deps> = {}): Deps {
   const log = overrides.log ?? createLogger();
-  return {
+  const deps: Deps = {
     config,
-    store: createStore(config),
+    store: overrides.store ?? createStore(config),
     log,
     now: () => new Date(),
     push: overrides.push ?? createPushSender(config, log),
+    // Replaced below; the scheduler's fire callback needs the finished deps object.
+    scheduler: overrides.scheduler ?? { schedule: async () => {} },
     inlineEffects: config.EFFECTS_MODE === "inline" ? new InlineEffectQueue(log) : undefined,
     ...overrides,
   };
+  if (!overrides.scheduler) deps.scheduler = createScheduler(config, log, (payload) => fireTimer(deps, payload));
+  return deps;
 }
 
 let shared: Deps | undefined;

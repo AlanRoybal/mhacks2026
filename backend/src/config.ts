@@ -44,12 +44,20 @@ const schema = z.object({
   APNS_TEAM_ID: z.string().optional(),
   // Contents of the AuthKey_XXXX.p8 file. Literal "\n" sequences are accepted.
   APNS_KEY_P8: z.string().optional(),
+
+  // local: in-process timers saved to DATA_DIR. eventbridge: one-shot EventBridge Scheduler schedules.
+  SCHEDULER: z.enum(["local", "eventbridge"]).default("local"),
+  SCHEDULER_GROUP: z.string().optional(),
+  SCHEDULER_ROLE_ARN: z.string().optional(),
+  // The worker Lambda that timers invoke.
+  WORKER_FUNCTION_ARN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;
 
-export interface Config extends Omit<Env, "JWT_SECRET"> {
+export interface Config extends Omit<Env, "JWT_SECRET" | "SCHEDULER_GROUP"> {
   JWT_SECRET: string;
+  SCHEDULER_GROUP: string;
   rules: Rules;
   tables: { jobs: string; users: string; offers: string; proofs: string; ledger: string; kv: string };
   adminUserIds: Set<string>;
@@ -69,6 +77,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     ...e,
     JWT_SECRET: e.JWT_SECRET ?? LOCAL_JWT_SECRET,
+    SCHEDULER_GROUP: e.SCHEDULER_GROUP ?? `bounty-${e.STAGE}`,
     adminUserIds: new Set(e.ADMIN_USER_IDS.split(",").map((s) => s.trim()).filter(Boolean)),
     rules: rulesFor(e.DEMO_MODE),
     tables: {
