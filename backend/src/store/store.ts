@@ -31,6 +31,9 @@ export interface Store {
   listJobsByPoster(userId: string): Promise<Job[]>;
   listJobsByWorker(userId: string): Promise<Job[]>;
   listLedger(jobId: string): Promise<LedgerEvent[]>;
+  // Jobs that still have work to do: not DRAFT, and not closed with their money movement recorded.
+  // A full scan; fine at hackathon scale (add a state index before real traffic).
+  listJobsNeedingAttention(): Promise<Job[]>;
 
   getUser(userId: string): Promise<User | null>;
   createUser(user: User): Promise<void>;
@@ -52,6 +55,15 @@ export interface Store {
   kvGet<T>(key: string): Promise<T | null>;
   // Returns false when ifAbsent is set and a live value already exists.
   kvPut(key: string, value: unknown, opts?: { ifAbsent?: boolean; ttlSeconds?: number }): Promise<boolean>;
+}
+
+const OPEN_STATES = new Set(["FUNDED", "OFFERED", "ACCEPTED", "IN_PROGRESS", "SUBMITTED", "IN_REVIEW", "DISPUTED"]);
+
+export function needsAttention(job: Job): boolean {
+  if (OPEN_STATES.has(job.state)) return true;
+  if (job.state === "RELEASED") return !job.payment.transferId;
+  if (job.state === "REFUNDED") return !job.payment.refundId;
+  return false;
 }
 
 export const byCreatedDesc = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);

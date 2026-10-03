@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname } from "node:path";
 import type { LedgerEvent } from "../domain/events.js";
 import type { Job, Offer, Proof, User } from "../domain/types.js";
-import { AlreadyExistsError, byCreatedDesc, VersionConflictError, type Store } from "./store.js";
+import { AlreadyExistsError, byCreatedDesc, needsAttention, VersionConflictError, type Store } from "./store.js";
 
 interface Snapshot {
   jobs: Record<string, Job>;
@@ -86,6 +86,10 @@ export class MemoryStore implements Store {
       .filter((j) => j.workerId === userId)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .map(copy);
+  }
+
+  async listJobsNeedingAttention() {
+    return Object.values(this.data.jobs).filter(needsAttention).map(copy);
   }
 
   async listLedger(jobId: string) {

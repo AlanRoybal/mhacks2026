@@ -2,6 +2,7 @@
 //   1. DynamoDB Stream batches from the ledger table: run each new row's effects (the outbox).
 //   2. Timer payloads from EventBridge Scheduler.
 //   3. Background tasks invoked asynchronously by the API (see services/tasks.ts).
+//   4. { kind: "sweep" } every minute from an EventBridge rule (see services/sweeper.ts).
 
 import type { AttributeValue } from "@aws-sdk/client-dynamodb";
 import { unmarshall } from "@aws-sdk/util-dynamodb";
@@ -10,6 +11,7 @@ import { getDeps } from "../deps.js";
 import type { LedgerEvent } from "../domain/events.js";
 import type { TimerPayload } from "../scheduler/index.js";
 import { runEffects } from "../services/effects.js";
+import { sweep } from "../services/sweeper.js";
 import { runTask } from "../services/tasks.js";
 import { fireTimer } from "../services/timers.js";
 import type { Task } from "../tasks/tasks.js";
@@ -41,6 +43,11 @@ export async function handler(event: WorkerEvent): Promise<DynamoDBBatchResponse
 
   if (event.kind === "timer") {
     await fireTimer(deps, event as TimerPayload);
+    return;
+  }
+
+  if (event.kind === "sweep") {
+    await sweep(deps);
     return;
   }
 

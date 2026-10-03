@@ -23,7 +23,7 @@ import {
 import type { Config } from "../config.js";
 import type { LedgerEvent } from "../domain/events.js";
 import type { Job, Offer, Proof, User } from "../domain/types.js";
-import { AlreadyExistsError, VersionConflictError, type Store } from "./store.js";
+import { AlreadyExistsError, needsAttention, VersionConflictError, type Store } from "./store.js";
 
 const isConditionFailure = (e: unknown) =>
   e instanceof ConditionalCheckFailedException ||
@@ -154,6 +154,27 @@ export class DynamoStore implements Store {
       ExpressionAttributeValues: { ":u": userId },
       ScanIndexForward: false,
     });
+  }
+
+  async listJobsNeedingAttention() {
+    const items: Job[] = [];
+    let ExclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const page = await this.db.send(
+        new ScanCommand({
+          TableName: this.t.jobs,
+          ExclusiveStartKey,
+          FilterExpression:
+            "#s <> :draft AND ((NOT #s IN (:released, :refunded)) OR (#s = :released AND attribute_not_exists(#p.#tr)) OR (#s = :refunded AND attribute_not_exists(#p.#rf)))",
+          ExpressionAttributeNames: { "#s": "state", "#p": "payment", "#tr": "transferId", "#rf": "refundId" },
+          ExpressionAttributeValues: { ":draft": "DRAFT", ":released": "RELEASED", ":refunded": "REFUNDED" },
+        }),
+      );
+      items.push(...((page.Items ?? []) as Job[]));
+      ExclusiveStartKey = page.LastEvaluatedKey;
+    } while (ExclusiveStartKey);
+    // The filter above is an optimization; the shared predicate is the source of truth.
+    return items.filter(needsAttention);
   }
 
   listLedger(jobId: string) {
