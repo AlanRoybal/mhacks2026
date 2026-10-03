@@ -4,5 +4,7 @@
 BOUNTY_API_BASE_URL = http:/$()/192.168.1.100:8787
 // Payments test server: `cd payments-server && npm run dev` serves port 4242.
 BOUNTY_PAYMENTS_BASE_URL = http:/$()/192.168.1.100:4242
-// Set only after adding the matching Apple Pay capability and Stripe certificate.
+// After registering your merchant ID and installing its Stripe certificate,
+// set the ID and uncomment the entitlement selection below.
 BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER =
+// BOUNTY_CODE_SIGN_ENTITLEMENTS = Config/ApplePay.entitlements

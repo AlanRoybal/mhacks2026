@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootTabView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(\.scenePhase) private var scenePhase
     // Jobs funded through Stripe checkout (payments branch), shown under Jobs > Posted.
     @StateObject private var postedJobs = PostedJobsStore()
     // The job being posted, shared by Post a job → Proof checklist → Fund.
@@ -29,7 +30,10 @@ struct RootTabView: View {
         .preferredColorScheme(router.route?.usesDarkStatusBar == true ? .dark : .light)
         .environmentObject(postedJobs)
         .environment(postDraft)
-        .task { await postedJobs.refresh() }
+        // Re-check pending checkouts whenever the app comes back to the foreground.
+        .task(id: scenePhase) {
+            if scenePhase == .active { await postedJobs.refresh() }
+        }
         .onAppear(perform: consumePendingPushRoute)
         .onReceive(NotificationCenter.default.publisher(for: .pushRouteChanged)) { _ in
             consumePendingPushRoute()

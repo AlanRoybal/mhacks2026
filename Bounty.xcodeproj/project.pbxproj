@@ -30,10 +30,11 @@
 		F60EC55A8E92B9A8A66F0C4D /* TwinKit in Frameworks */ = {isa = PBXBuildFile; productRef = 58A11A2658EE3AFE68C27C79 /* TwinKit */; };
 		A10000000000000000000001 /* PaymentCheckoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* PaymentCheckoutView.swift */; };
 		A10000000000000000000003 /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000004 /* StripePaymentSheet */; };
-		A1000000000000000000000B /* PostDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000C /* PostDraft.swift */; };
+		BD0000000000000000000001 /* PostDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0000000000000000000002 /* PostDraft.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A1000000000000000000000B /* ApplePay.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ApplePay.entitlements; sourceTree = "<group>"; };
 		00653F176E5F56A7F9330976 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0B7E2F09CDF905685D922897 /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
 		0CC90A7ACD84995DB726CAAA /* JobsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsView.swift; sourceTree = "<group>"; };
@@ -61,7 +62,7 @@
 		A10000000000000000000002 /* PaymentCheckoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentCheckoutView.swift; sourceTree = "<group>"; };
 		A10000000000000000000008 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000009 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
-		A1000000000000000000000C /* PostDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDraft.swift; sourceTree = "<group>"; };
+		BD0000000000000000000002 /* PostDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDraft.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -225,7 +226,7 @@
 			children = (
 				7F611717A4A9F0276C3E9675 /* CreateJobView.swift */,
 				A10000000000000000000002 /* PaymentCheckoutView.swift */,
-				A1000000000000000000000C /* PostDraft.swift */,
+				BD0000000000000000000002 /* PostDraft.swift */,
 			);
 			path = Post;
 			sourceTree = "<group>";
@@ -243,6 +244,7 @@
 			children = (
 				A10000000000000000000008 /* Debug.xcconfig */,
 				A10000000000000000000009 /* Release.xcconfig */,
+				A1000000000000000000000B /* ApplePay.entitlements */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -327,7 +329,7 @@
 			files = (
 				85B63159010D69B7AE220FF5 /* AppRouter.swift in Sources */,
 				A10000000000000000000001 /* PaymentCheckoutView.swift in Sources */,
-				A1000000000000000000000B /* PostDraft.swift in Sources */,
+				BD0000000000000000000001 /* PostDraft.swift in Sources */,
 				D2935B4C128BA8403A9A6F7A /* AppServices.swift in Sources */,
 				27A55C706B72D4F97913F92B /* BountyApp.swift in Sources */,
 				E77F4702B825C686E26EE94D /* BountyScreen.swift in Sources */,
@@ -375,7 +377,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Bounty/Bounty.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "$(BOUNTY_CODE_SIGN_ENTITLEMENTS)";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Bounty/Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alanroybal.BountyTwin;
@@ -405,7 +407,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Bounty/Bounty.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "$(BOUNTY_CODE_SIGN_ENTITLEMENTS)";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Bounty/Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alanroybal.BountyTwin;

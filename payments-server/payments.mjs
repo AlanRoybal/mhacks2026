@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { randomUUID } from 'node:crypto';
 
 export class PaymentError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -36,16 +37,62 @@ export function validateDraft(input) {
 export class JobStore {
   constructor(path = ':memory:') {
     this.db = new DatabaseSync(path);
-    this.db.exec('PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, record TEXT NOT NULL)');
+    this.db.exec(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA foreign_keys = ON;
+      PRAGMA busy_timeout = 5000;
+      CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, record TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS LedgerEvents (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL REFERENCES jobs(id),
+        type TEXT NOT NULL,
+        payment_intent_id TEXT NOT NULL,
+        stripe_event_id TEXT,
+        record TEXT NOT NULL,
+        UNIQUE (job_id, type),
+        UNIQUE (payment_intent_id, type)
+      );
+      CREATE TRIGGER IF NOT EXISTS ledger_events_no_update BEFORE UPDATE ON LedgerEvents
+        BEGIN SELECT RAISE(ABORT, 'LedgerEvents is append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS ledger_events_no_delete BEFORE DELETE ON LedgerEvents
+        BEGIN SELECT RAISE(ABORT, 'LedgerEvents is append-only'); END;
+    `);
   }
   get(id) {
     const row = this.db.prepare('SELECT record FROM jobs WHERE id = ?').get(id);
     return row ? JSON.parse(row.record) : null;
   }
   save(job) {
-    this.db.prepare('INSERT INTO jobs VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET record = excluded.record')
+    this.db.prepare('INSERT INTO jobs (id, record) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET record = excluded.record')
       .run(job.id, JSON.stringify(job));
     return job;
+  }
+  transaction(operation) {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const result = operation();
+      this.db.exec('COMMIT');
+      return result;
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+  appendFunding(job, { source, stripeEventID }) {
+    const event = {
+      id: randomUUID(), jobID: job.id, type: 'JOB_FUNDED',
+      fromStatus: 'draft', toStatus: 'funded',
+      paymentIntentID: job.paymentIntentID, stripeEventID, source,
+      amountCents: job.amountCents, feeCents: job.feeCents, totalCents: job.totalCents,
+      currency: job.currency, createdAt: new Date().toISOString(),
+    };
+    this.db.prepare(`INSERT INTO LedgerEvents
+      (id, job_id, type, payment_intent_id, stripe_event_id, record) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(event.id, event.jobID, event.type, event.paymentIntentID, stripeEventID, JSON.stringify(event));
+  }
+  ledgerEvents(id) {
+    return this.db.prepare('SELECT record FROM LedgerEvents WHERE job_id = ? ORDER BY rowid')
+      .all(id).map(row => JSON.parse(row.record));
   }
   close() { this.db.close(); }
 }
@@ -87,27 +134,41 @@ export class Payments {
           description: `Bounty: ${job.title}`,
           metadata: { job_id: job.id }, transfer_group: `job_${job.id}`,
         }, { idempotencyKey: `bounty-funding-${job.id}` });
-    job.paymentIntentID = intent.id;
-    this.store.save(job);
+    // A webhook may have funded the job while the Stripe request was in flight.
+    // Read the latest row before binding the intent, rather than saving stale status.
+    job = this.store.transaction(() => {
+      const current = this.store.get(draft.id);
+      if (current.paymentIntentID && current.paymentIntentID !== intent.id) {
+        throw new PaymentError(409, 'This checkout already has a payment.');
+      }
+      current.paymentIntentID = intent.id;
+      return this.store.save(current);
+    });
     job = this.applyIntent(intent);
     if (intent.status === 'canceled') throw new PaymentError(409, 'This payment expired. Start a new checkout.');
     return { job: this.publicJob(job), paymentIntentClientSecret: intent.client_secret,
       publishableKey: this.publishableKey };
   }
 
-  applyIntent(intent) {
+  applyIntent(intent, { source = 'reconciliation', stripeEventID = null } = {}) {
     if (typeof intent.metadata?.job_id !== 'string') return null;
-    const job = this.store.get(intent.metadata?.job_id);
-    if (!job || job.paymentIntentID !== intent.id) return null;
-    if (intent.livemode || intent.amount !== job.totalCents || intent.currency !== job.currency) {
-      throw new PaymentError(409, 'Payment details do not match this job.');
-    }
-    if (intent.status === 'succeeded') {
-      if (intent.amount_received !== job.totalCents) throw new PaymentError(409, 'The full job payment has not been received.');
-      job.status = 'funded';
-    }
-    // Failure/processing events delivered out of order must never undo a successful charge.
-    return this.store.save(job);
+    return this.store.transaction(() => {
+      const job = this.store.get(intent.metadata.job_id);
+      if (!job || job.paymentIntentID !== intent.id) return null;
+      if (intent.livemode !== false || intent.amount !== job.totalCents || intent.currency !== job.currency) {
+        throw new PaymentError(409, 'Payment details do not match this job.');
+      }
+      if (intent.status === 'succeeded') {
+        if (intent.amount_received !== job.totalCents) throw new PaymentError(409, 'The full job payment has not been received.');
+        if (job.status === 'draft') {
+          this.store.appendFunding(job, { source, stripeEventID });
+          job.status = 'funded';
+          return this.store.save(job);
+        }
+      }
+      // Duplicates and older failure/processing events never undo a transition.
+      return job;
+    });
   }
 
   async status(id) {

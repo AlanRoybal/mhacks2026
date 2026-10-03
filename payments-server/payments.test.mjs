@@ -82,21 +82,100 @@ test('only a matching, fully received succeeded charge funds a job', async t => 
   assert.equal(payments.applyIntent({ ...intent, id: 'pi_unrelated' }), null);
   assert.equal(payments.applyIntent({ ...intent, metadata: {} }), null);
   assert.equal((await payments.status(input.id)).status, 'funded');
+  assert.equal(store.ledgerEvents(input.id).length, 1);
+  assert.equal(store.ledgerEvents(input.id)[0].source, 'reconciliation');
   payments.applyIntent({ ...intent, status: 'requires_payment_method' });
   assert.equal(store.get(input.id).status, 'funded');
+  assert.equal(store.ledgerEvents(input.id).length, 1);
 });
 
-test('job ledger survives a backend restart', async t => {
+test('funding and its append-only ledger survive a backend restart', async t => {
   const directory = mkdtempSync(join(tmpdir(), 'bounty-payments-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const path = join(directory, 'jobs.sqlite');
   const original = new JobStore(path);
   const input = draft();
-  original.save({ ...input, status: 'funded' });
+  const feeCents = Math.round(input.amountCents * 0.10);
+  const saved = original.save({ ...input, feeCents, totalCents: input.amountCents + feeCents,
+    currency: 'usd', status: 'draft', paymentIntentID: 'pi_restart' });
+  const intent = { id: saved.paymentIntentID, metadata: { job_id: input.id }, status: 'succeeded',
+    livemode: false, currency: saved.currency, amount: saved.totalCents, amount_received: saved.totalCents };
+  const payments = new Payments({ store: original });
+  payments.applyIntent(intent, { source: 'webhook', stripeEventID: 'evt_restart' });
   original.close();
   const reopened = new JobStore(path);
-  assert.equal(reopened.get(input.id).status, 'funded');
-  reopened.close();
+  try {
+    const restarted = new Payments({ store: reopened });
+    restarted.applyIntent(intent, { source: 'webhook', stripeEventID: 'evt_restart' });
+    assert.equal(reopened.get(input.id).status, 'funded');
+    const events = reopened.ledgerEvents(input.id);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].stripeEventID, 'evt_restart');
+    assert.throws(() => reopened.db.prepare('DELETE FROM LedgerEvents WHERE job_id = ?').run(input.id), /append-only/);
+    assert.throws(() => reopened.db.prepare("UPDATE LedgerEvents SET type = 'OTHER' WHERE job_id = ?").run(input.id), /append-only/);
+  } finally { reopened.close(); }
+});
+
+test('a failed database update rolls back funding and the ledger together', async t => {
+  const { payments, store, intents } = fixture(t);
+  const input = draft({ amountCents: 1500 });
+  await payments.prepare(input);
+  const intent = intents.get(store.get(input.id).paymentIntentID);
+  intent.status = 'succeeded'; intent.amount_received = intent.amount;
+  const save = store.save;
+  store.save = () => { throw new Error('Simulated database write failure'); };
+  assert.throws(() => payments.applyIntent(intent, { source: 'webhook', stripeEventID: 'evt_atomic' }), /write failure/);
+  assert.equal(store.get(input.id).status, 'draft');
+  assert.deepEqual(store.ledgerEvents(input.id), []);
+  store.save = save;
+  payments.applyIntent(intent, { source: 'webhook', stripeEventID: 'evt_atomic' });
+  assert.equal(store.get(input.id).status, 'funded');
+  assert.equal(store.ledgerEvents(input.id).length, 1);
+});
+
+test('a checkout retry cannot overwrite funding delivered during a Stripe request', async t => {
+  const { payments, stripe, store, intents } = fixture(t);
+  const input = draft();
+  await payments.prepare(input);
+  const intent = intents.get(store.get(input.id).paymentIntentID);
+  const stale = { ...intent };
+  let release;
+  stripe.paymentIntents.retrieve = () => new Promise(resolve => { release = () => resolve(stale); });
+  const retry = payments.prepare(input);
+  payments.applyIntent({ ...intent, status: 'succeeded', amount_received: intent.amount },
+    { source: 'webhook', stripeEventID: 'evt_race' });
+  release();
+  assert.equal((await retry).job.status, 'funded');
+  assert.equal(store.get(input.id).status, 'funded');
+  assert.equal(store.ledgerEvents(input.id).length, 1);
+});
+
+test('created, failed, canceled, processing, and authorization-only payments stay unfunded', async t => {
+  const { payments, store, intents } = fixture(t);
+  const input = draft({ amountCents: 1500 });
+  const prepared = await payments.prepare(input);
+  assert.equal(prepared.job.totalCents, 1650);
+  const intent = intents.get(store.get(input.id).paymentIntentID);
+  for (const status of ['requires_payment_method', 'requires_action', 'requires_capture', 'processing', 'canceled']) {
+    payments.applyIntent({ ...intent, status });
+    assert.equal(store.get(input.id).status, 'draft');
+    assert.deepEqual(store.ledgerEvents(input.id), []);
+  }
+  intent.status = 'canceled';
+  await assert.rejects(payments.prepare(input), { status: 409 });
+});
+
+test('duplicate success cannot rewind a later job state', async t => {
+  const { payments, store, intents } = fixture(t);
+  const input = draft();
+  await payments.prepare(input);
+  const intent = intents.get(store.get(input.id).paymentIntentID);
+  intent.status = 'succeeded'; intent.amount_received = intent.amount;
+  payments.applyIntent(intent);
+  store.save({ ...store.get(input.id), status: 'in_review' });
+  payments.applyIntent(intent, { source: 'webhook', stripeEventID: 'evt_late' });
+  assert.equal(store.get(input.id).status, 'in_review');
+  assert.equal(store.ledgerEvents(input.id).length, 1);
 });
 
 test('webhook rejects forgery and accepts signed, duplicate success events', async t => {
@@ -107,12 +186,27 @@ test('webhook rejects forgery and accepts signed, duplicate success events', asy
   await new Promise(resolve => server.once('listening', resolve));
   t.after(() => new Promise(resolve => server.close(resolve)));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const input = draft();
+  const input = draft({ amountCents: 1500 });
   const prepared = await fetch(`${base}/payment-sheet`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
   });
   assert.equal(prepared.status, 200);
   const intent = intents.get(store.get(input.id).paymentIntentID);
+  const other = draft();
+  await payments.prepare(other);
+  const deliver = async (type, object, id = `evt_${randomUUID()}`) => {
+    const payload = JSON.stringify({ id, type, data: { object } });
+    return fetch(`${base}/stripe/webhook`, { method: 'POST', headers: {
+      'Content-Type': 'application/json',
+      'Stripe-Signature': stripe.webhooks.generateTestHeaderString({ payload, secret }),
+    }, body: payload });
+  };
+  for (const [type, status] of [['payment_intent.payment_failed', 'requires_payment_method'],
+    ['payment_intent.processing', 'processing'], ['payment_intent.canceled', 'canceled']]) {
+    assert.equal((await deliver(type, { ...intent, status })).status, 200);
+    assert.equal(store.get(input.id).status, 'draft');
+    assert.deepEqual(store.ledgerEvents(input.id), []);
+  }
   intent.status = 'succeeded'; intent.amount_received = intent.amount;
   const body = JSON.stringify({ id: 'evt_test', type: 'payment_intent.succeeded', data: { object: intent } });
   const forged = await fetch(`${base}/stripe/webhook`, {
@@ -120,6 +214,14 @@ test('webhook rejects forgery and accepts signed, duplicate success events', asy
   });
   assert.equal(forged.status, 400);
   assert.equal(store.get(input.id).status, 'draft');
+  assert.deepEqual(store.ledgerEvents(input.id), []);
+  for (const changes of [{ amount: 1 }, { currency: 'eur' }, { amount_received: 1 }, { livemode: true }]) {
+    assert.equal((await deliver('payment_intent.succeeded', { ...intent, ...changes })).status, 409);
+    assert.equal(store.get(input.id).status, 'draft');
+    assert.deepEqual(store.ledgerEvents(input.id), []);
+  }
+  assert.equal((await deliver('payment_intent.succeeded', { ...intent, metadata: { job_id: other.id } })).status, 200);
+  assert.equal(store.get(other.id).status, 'draft');
   const signature = stripe.webhooks.generateTestHeaderString({ payload: body, secret });
   for (let i = 0; i < 2; i++) {
     const accepted = await fetch(`${base}/stripe/webhook`, {
@@ -128,6 +230,20 @@ test('webhook rejects forgery and accepts signed, duplicate success events', asy
     assert.equal(accepted.status, 200);
   }
   assert.equal(store.get(input.id).status, 'funded');
+  const events = store.ledgerEvents(input.id);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, 'JOB_FUNDED');
+  assert.equal(events[0].jobID, input.id);
+  assert.equal(events[0].paymentIntentID, intent.id);
+  assert.equal(events[0].stripeEventID, 'evt_test');
+  assert.equal(events[0].source, 'webhook');
+  assert.equal(events[0].totalCents, 1650);
+  assert.equal((await deliver('payment_intent.succeeded', intent)).status, 200);
+  assert.equal((await deliver('payment_intent.payment_failed', { ...intent, status: 'requires_payment_method' })).status, 200);
+  assert.equal(store.get(input.id).status, 'funded');
+  assert.equal(store.ledgerEvents(input.id).length, 1);
+  assert.equal(store.get(other.id).status, 'draft');
+  assert.deepEqual(store.ledgerEvents(other.id), []);
   const unrelatedBody = JSON.stringify({ id: 'evt_other', type: 'payment_intent.succeeded', data: { object: { ...intent, metadata: {} } } });
   const unrelatedSignature = stripe.webhooks.generateTestHeaderString({ payload: unrelatedBody, secret });
   const unrelated = await fetch(`${base}/stripe/webhook`, {
