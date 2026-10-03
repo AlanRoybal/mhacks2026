@@ -47,7 +47,7 @@ npm run typecheck
 npm test
 ```
 
-About 100 tests run in a few seconds with no network. They cover:
+About 130 tests run in a few seconds with no network. They cover:
 - the state machine, including a 10,000-run randomized test that money moves at most once per job
 - the store
 - every API flow: posting, matching, offers, proof, grading, payments, review, disputes and the sweeper
