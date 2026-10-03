@@ -59,6 +59,9 @@ const schema = z.object({
   // hash: offline feature hashing. titan: Titan Text Embeddings v2 on Bedrock.
   EMBED_PROVIDER: z.enum(["hash", "titan"]).default("hash"),
 
+  // fake: funding confirms instantly, payouts are simulated. stripe: PaymentIntents + Connect transfers.
+  PAYMENTS_PROVIDER: z.enum(["fake", "stripe"]).default("fake"),
+
   // local: files under DATA_DIR/blobs served by this API. s3: presigned S3 URLs.
   BLOBS: z.enum(["local", "s3"]).default("local"),
   BUCKET: z.string().optional(),

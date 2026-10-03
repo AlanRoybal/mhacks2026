@@ -8,8 +8,10 @@ import { createLogger, type Logger } from "./lib/log.js";
 import { createPushSender, type PushSender } from "./push/index.js";
 import { createScheduler, type Scheduler } from "./scheduler/index.js";
 import { InlineEffectQueue } from "./services/effectQueue.js";
+import { runTask } from "./services/tasks.js";
 import { fireTimer } from "./services/timers.js";
 import { createStore, type Store } from "./store/index.js";
+import { InlineTaskRunner, LambdaTaskRunner, type TaskRunner } from "./tasks/tasks.js";
 
 export interface Deps {
   config: Config;
@@ -21,6 +23,7 @@ export interface Deps {
   ai: Ai;
   embedder: Embedder;
   blobs: Blobs;
+  tasks: TaskRunner;
   // Present when effects run in this process (local dev, tests) instead of from the ledger stream.
   inlineEffects?: InlineEffectQueue;
 }
@@ -36,13 +39,21 @@ export function createDeps(config: Config = loadConfig(), overrides: Partial<Dep
     ai: overrides.ai ?? createAi(config, log),
     embedder: overrides.embedder ?? createEmbedder(config),
     blobs: overrides.blobs ?? createBlobs(config),
-    // Replaced below; the scheduler's fire callback needs the finished deps object.
+    // Replaced below; the scheduler and task runner call back into the finished deps object.
     scheduler: overrides.scheduler ?? { schedule: async () => {} },
+    tasks: overrides.tasks ?? { run: async () => {} },
     inlineEffects: config.EFFECTS_MODE === "inline" ? new InlineEffectQueue(log) : undefined,
     ...overrides,
   };
   if (!overrides.scheduler) deps.scheduler = createScheduler(config, log, (payload) => fireTimer(deps, payload));
+  if (!overrides.tasks) deps.tasks = createTaskRunner(deps);
   return deps;
+}
+
+function createTaskRunner(deps: Deps): TaskRunner {
+  if (deps.inlineEffects) return new InlineTaskRunner(deps.inlineEffects, (task) => runTask(deps, task));
+  if (!deps.config.WORKER_FUNCTION_ARN) throw new Error("EFFECTS_MODE=stream needs WORKER_FUNCTION_ARN for background tasks");
+  return new LambdaTaskRunner(deps.config.AWS_REGION, deps.config.WORKER_FUNCTION_ARN);
 }
 
 let shared: Deps | undefined;

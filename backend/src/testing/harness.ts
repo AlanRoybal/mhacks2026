@@ -6,8 +6,10 @@ import { silentLogger } from "../lib/log.js";
 import { RecordingPushSender } from "../push/index.js";
 import { ManualScheduler } from "../scheduler/localScheduler.js";
 import { InlineEffectQueue } from "../services/effectQueue.js";
+import { runTask } from "../services/tasks.js";
 import { fireTimer } from "../services/timers.js";
 import { MemoryStore } from "../store/memoryStore.js";
+import { InlineTaskRunner } from "../tasks/tasks.js";
 
 export interface TestDeps extends Deps {
   inlineEffects: InlineEffectQueue;
@@ -49,5 +51,6 @@ export function testDeps(env: Record<string, string> = {}): TestDeps {
     },
   };
   scheduler.start((payload) => fireTimer(test, payload));
+  test.tasks = new InlineTaskRunner(inlineEffects, (task) => runTask(test, task));
   return test;
 }

@@ -10,7 +10,9 @@ import { getDeps } from "../deps.js";
 import type { LedgerEvent } from "../domain/events.js";
 import type { TimerPayload } from "../scheduler/index.js";
 import { runEffects } from "../services/effects.js";
+import { runTask } from "../services/tasks.js";
 import { fireTimer } from "../services/timers.js";
+import type { Task } from "../tasks/tasks.js";
 
 type WorkerEvent = DynamoDBStreamEvent | TimerPayload | { kind: string };
 
@@ -39,6 +41,11 @@ export async function handler(event: WorkerEvent): Promise<DynamoDBBatchResponse
 
   if (event.kind === "timer") {
     await fireTimer(deps, event as TimerPayload);
+    return;
+  }
+
+  if (event.kind === "task") {
+    await runTask(deps, event as Task);
     return;
   }
 

@@ -8,6 +8,7 @@ import { authRoutes, requireAuth } from "./auth.js";
 import { toErrorResponse, type AppEnv } from "./http.js";
 import { localBlobRoutes } from "./routes/localBlobs.js";
 import { meRoutes } from "./routes/me.js";
+import { twinRoutes } from "./routes/twin.js";
 
 export function createApp(deps: Deps): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
@@ -24,6 +25,7 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   const authed = new Hono<AppEnv>();
   authed.use("*", requireAuth(deps));
   authed.route("/me", meRoutes(deps));
+  authed.route("/twin", twinRoutes(deps));
   app.route("/", authed);
 
   return app;
