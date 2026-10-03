@@ -119,3 +119,34 @@ test("a signed Stripe webhook funds the job once", async () => {
   assert.equal(job.payment.chargeId, "ch_1");
   assert.equal((await deps.store.listLedger(draft.id)).filter((e) => e.type === "FUND_CONFIRMED").length, 1);
 });
+
+test("overlapping deliveries of one payment fund the job and never refund it", async () => {
+  const deps = testDeps({ STRIPE_SECRET_KEY: "sk_test_123", STRIPE_PUBLISHABLE_KEY: "pk_test_123", STRIPE_WEBHOOK_SECRET: "whsec_test" });
+  const api = apiClient(deps);
+  const poster = await api.login("poster");
+  const { body: draft } = await api.call("POST", "/jobs", poster.token, draftBody(deps));
+  const stripe = deps.payments.stripe;
+  assert.ok(stripe);
+  const refunded: string[] = [];
+  stripe.refundOrphan = async (id: string) => {
+    refunded.push(id);
+  };
+  const payload = (eventId: string) =>
+    JSON.stringify({
+      id: eventId,
+      object: "event",
+      type: "payment_intent.succeeded",
+      data: { object: { id: "pi_2", object: "payment_intent", amount_received: 2200, latest_charge: "ch_2", metadata: { jobId: draft.id } } },
+    });
+  const send = (body: string) =>
+    api.app.request("/webhooks/stripe", {
+      method: "POST",
+      headers: { "content-type": "application/json", "stripe-signature": stripe.stripe.webhooks.generateTestHeaderString({ payload: body, secret: "whsec_test" }) },
+      body,
+    });
+  // Stripe can deliver the same event twice, or two events for one payment, at the same time.
+  const results = await Promise.all([send(payload("evt_a")), send(payload("evt_a")), send(payload("evt_b"))]);
+  assert.deepEqual(results.map((r) => r.status), [200, 200, 200]);
+  assert.equal((await getJobOrThrow(deps, draft.id)).state, "FUNDED");
+  assert.deepEqual(refunded, []);
+});

@@ -79,6 +79,9 @@ async function onPaymentSucceeded(deps: Deps, intent: Stripe.PaymentIntent): Pro
     await applyEvent(deps, jobId, { type: "FUND_CONFIRMED", amountCents: intent.amount_received, paymentIntentId: intent.id, chargeId }, SYSTEM("stripe"));
   } catch (e) {
     if (!(e instanceof TransitionError) && !(e instanceof AppError)) throw e;
+    // A concurrent delivery of this same payment may have funded the job a moment ago.
+    const latest = await deps.store.getJob(jobId);
+    if (latest && latest.state !== "DRAFT" && latest.payment.paymentIntentId === intent.id) return;
     // Money arrived for a job that can't take it (deleted draft, second checkout, wrong amount): give it back.
     deps.log.warn("Refunding a payment the job could not accept", { jobId, paymentIntentId: intent.id, reason: e.message });
     await deps.payments.stripe?.refundOrphan(intent.id);
