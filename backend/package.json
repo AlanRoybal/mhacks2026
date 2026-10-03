@@ -15,6 +15,9 @@
     "deploy": "cdk deploy --require-approval never"
   },
   "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.34.2",
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1146.0",
     "@aws-sdk/client-dynamodb": "^3.1146.0",
     "@aws-sdk/client-scheduler": "^3.1146.0",
     "@aws-sdk/lib-dynamodb": "^3.1146.0",

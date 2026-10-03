@@ -51,6 +51,13 @@ const schema = z.object({
   SCHEDULER_ROLE_ARN: z.string().optional(),
   // The worker Lambda that timers invoke.
   WORKER_FUNCTION_ARN: z.string().optional(),
+
+  // fake: offline heuristics. anthropic: Claude API (ANTHROPIC_API_KEY). bedrock: Claude on Amazon Bedrock.
+  AI_PROVIDER: z.enum(["fake", "anthropic", "bedrock"]).default("fake"),
+  // Defaults to claude-opus-5-5 (anthropic.claude-opus-5-5 on Bedrock).
+  AI_MODEL: z.string().optional(),
+  // hash: offline feature hashing. titan: Titan Text Embeddings v2 on Bedrock.
+  EMBED_PROVIDER: z.enum(["hash", "titan"]).default("hash"),
 });
 
 export type Env = z.infer<typeof schema>;

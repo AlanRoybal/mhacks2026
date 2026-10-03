@@ -1,6 +1,7 @@
 // The services a request or worker needs, built once per process from config.
 // Tests build their own with fakes via createDeps(config, overrides).
 
+import { createAi, createEmbedder, type Ai, type Embedder } from "./ai/index.js";
 import { loadConfig, type Config } from "./config.js";
 import { createLogger, type Logger } from "./lib/log.js";
 import { createPushSender, type PushSender } from "./push/index.js";
@@ -16,6 +17,8 @@ export interface Deps {
   now: () => Date;
   push: PushSender;
   scheduler: Scheduler;
+  ai: Ai;
+  embedder: Embedder;
   // Present when effects run in this process (local dev, tests) instead of from the ledger stream.
   inlineEffects?: InlineEffectQueue;
 }
@@ -28,6 +31,8 @@ export function createDeps(config: Config = loadConfig(), overrides: Partial<Dep
     log,
     now: () => new Date(),
     push: overrides.push ?? createPushSender(config, log),
+    ai: overrides.ai ?? createAi(config, log),
+    embedder: overrides.embedder ?? createEmbedder(config),
     // Replaced below; the scheduler's fire callback needs the finished deps object.
     scheduler: overrides.scheduler ?? { schedule: async () => {} },
     inlineEffects: config.EFFECTS_MODE === "inline" ? new InlineEffectQueue(log) : undefined,
