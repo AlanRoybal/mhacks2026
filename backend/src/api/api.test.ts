@@ -95,3 +95,24 @@ test("errors use TwinKit's envelope: { error: { code, message } }", async () => 
   const res = await app.request("/me");
   assert.deepEqual(await res.json(), { error: { code: "unauthorized", message: "Sign in first" } });
 });
+
+test("sign-in responses also carry TwinKit's session fields", async () => {
+  const app = createApp(testDeps());
+  const res = await app.request("/auth/demo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ handle: "judge" }) });
+  const body = (await res.json()) as Record<string, unknown>;
+  assert.equal(body.access_token, body.token);
+  assert.equal(body.user_id, body.userId);
+  assert.equal(body.expires_in, 30 * 24 * 3600);
+  assert.equal(body.refresh_token, null);
+});
+
+test("TwinKit's LinkedIn code exchange reports missing configuration clearly", async () => {
+  const app = createApp(testDeps());
+  const res = await app.request("/auth/linkedin-callback", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ code: "abc", code_verifier: "x".repeat(43), redirect_uri: "bounty://oauth/linkedin" }),
+  });
+  assert.equal(res.status, 400);
+  assert.equal(((await res.json()) as { error: { code: string } }).error.code, "not_configured");
+});
