@@ -10,7 +10,7 @@
 
 import type { Effect, JobEvent, PushTemplate } from "./events.js";
 import { haversineKm } from "./geo.js";
-import type { Rules } from "./rules.js";
+import { rematchDelaySec, type Rules } from "./rules.js";
 import type { Actor, GradeDecision, Job, JobState } from "./types.js";
 
 export type TransitionErrorCode =
@@ -201,8 +201,8 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
       requireState(job, ev, "FUNDED");
       if (ev.round !== job.matchRounds || job.exhaustedRound === ev.round) fail("invalid_transition", "This matching round was already handled");
       const effects: Effect[] = [];
-      const retryAt = addSeconds(ctx.now, ctx.rules.rematchDelaySec);
-      if (job.matchRounds < ctx.rules.maxMatchRounds && Date.parse(retryAt) < Date.parse(job.deadline)) {
+      const retryAt = addSeconds(ctx.now, rematchDelaySec(ctx.rules, job.matchRounds));
+      if (Date.parse(retryAt) < Date.parse(job.deadline)) {
         effects.push({ kind: "schedule", timer: "rematch", at: retryAt, round: job.matchRounds });
       }
       if (job.matchRounds === 1) effects.push(push(job.posterId, "no_match_yet"));

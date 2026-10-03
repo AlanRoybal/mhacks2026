@@ -5,8 +5,10 @@ export interface Rules {
   reviewWindowSec: number;
   // Window for the poster to decide on an unclear or repeatedly failed grade. Escalates to a dispute.
   posterDecisionWindowSec: number;
+  // Rematch after a round with no takers: rematchDelaySec, doubling each round up to maxRematchDelaySec,
+  // until the deadline. Matching never gives up early: a worker who becomes ready later still gets offers.
   rematchDelaySec: number;
-  maxMatchRounds: number;
+  maxRematchDelaySec: number;
   // If grading has not finished by then, the poster decides instead.
   gradeTimeoutSec: number;
   // If no admin resolves a dispute by then, the AI's assessment stands (fail refunds, otherwise release).
@@ -16,6 +18,10 @@ export interface Rules {
   checkInRadiusM: number;
 }
 
+export function rematchDelaySec(rules: Rules, round: number): number {
+  return Math.min(rules.rematchDelaySec * 2 ** Math.max(0, round - 1), rules.maxRematchDelaySec);
+}
+
 export function rulesFor(demoMode: boolean): Rules {
   return demoMode
     ? {
@@ -23,7 +29,7 @@ export function rulesFor(demoMode: boolean): Rules {
         reviewWindowSec: 120,
         posterDecisionWindowSec: 300,
         rematchDelaySec: 60,
-        maxMatchRounds: 10,
+        maxRematchDelaySec: 300,
         gradeTimeoutSec: 180,
         disputeWindowSec: 600,
         maxRetries: 2,
@@ -34,7 +40,7 @@ export function rulesFor(demoMode: boolean): Rules {
         reviewWindowSec: 24 * 3600,
         posterDecisionWindowSec: 48 * 3600,
         rematchDelaySec: 600,
-        maxMatchRounds: 12,
+        maxRematchDelaySec: 3600,
         gradeTimeoutSec: 15 * 60,
         disputeWindowSec: 72 * 3600,
         maxRetries: 2,

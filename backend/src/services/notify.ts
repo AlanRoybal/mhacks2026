@@ -11,6 +11,8 @@ export async function sendJobPush(deps: Deps, jobId: string, effect: Extract<Eff
     effect.offerId ? deps.store.getOffer(effect.offerId) : Promise.resolve(null),
   ]);
   if (!job || !user) return;
+  // An offer push that runs late (retries, a slow stream) must not advertise an offer that moved on.
+  if (effect.template === "offer" && job.currentOffer?.offerId !== effect.offerId) return;
   const { deadTokens } = await deps.push.send(user, renderPush(effect.template, job, offer));
   if (deadTokens.length > 0) {
     await updateUser(deps, user.userId, (u) => {

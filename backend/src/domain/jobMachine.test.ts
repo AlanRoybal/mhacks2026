@@ -135,10 +135,15 @@ describe("offers", () => {
     assert.deepEqual(kinds(later.effects), ["schedule:rematch"]);
   });
 
-  test("no rematch is scheduled past the deadline or the round limit", () => {
+  test("rematches back off but never stop before the deadline", () => {
     assert.deepEqual(apply({ ...funded(), deadline: iso(5) }, { type: "CANDIDATES_EXHAUSTED", round: 1 }, SYSTEM).effects.filter((e) => e.kind === "schedule"), []);
-    const many = { ...funded(), matchRounds: rules.maxMatchRounds };
-    assert.deepEqual(apply(many, { type: "CANDIDATES_EXHAUSTED", round: rules.maxMatchRounds }, SYSTEM).effects, []);
+    const delayAfter = (round: number) => {
+      const effect = apply({ ...funded(), matchRounds: round }, { type: "CANDIDATES_EXHAUSTED", round }, SYSTEM, at(0)).effects.find((e) => e.kind === "schedule");
+      return effect?.kind === "schedule" ? (Date.parse(effect.at) - at(0).getTime()) / 1000 : null;
+    };
+    assert.equal(delayAfter(1), rules.rematchDelaySec);
+    assert.equal(delayAfter(2), rules.rematchDelaySec * 2);
+    assert.equal(delayAfter(50), rules.maxRematchDelaySec);
   });
 
   test("a stale rematch timer is rejected", () => {

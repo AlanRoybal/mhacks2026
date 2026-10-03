@@ -119,18 +119,22 @@ async function rankCandidates(deps: Deps, job: Job): Promise<Offer[]> {
 export async function runMatch(deps: Deps, jobId: string): Promise<void> {
   const job = await deps.store.getJob(jobId);
   if (!job || job.state !== "FUNDED") return;
-  const existing = (await deps.store.listOffersForJob(jobId)).filter((o) => o.round === job.matchRounds);
-  if (existing.length === 0) await deps.store.createOffers(await rankCandidates(deps, job));
-  await sendNextOffer(deps, jobId);
+  let offers = (await deps.store.listOffersForJob(jobId)).filter((o) => o.round === job.matchRounds);
+  if (offers.length === 0) {
+    offers = await rankCandidates(deps, job);
+    await deps.store.createOffers(offers);
+  }
+  // Pass the offers along: the byJob index is eventually consistent and may not show them yet.
+  await sendNextOffer(deps, jobId, offers);
 }
 
 // The "offer.next" effect: offer the job to the best queued worker who can take it right now.
-export async function sendNextOffer(deps: Deps, jobId: string): Promise<void> {
+export async function sendNextOffer(deps: Deps, jobId: string, known?: Offer[]): Promise<void> {
   const job = await deps.store.getJob(jobId);
   if (!job || job.state !== "FUNDED") return;
   const now = deps.now();
   if (now.getTime() + job.estMinutes * 60_000 > Date.parse(job.deadline)) return; // the deadline timer refunds it
-  const queued = (await deps.store.listOffersForJob(jobId)).filter(
+  const queued = (known ?? (await deps.store.listOffersForJob(jobId))).filter(
     (o) => o.round === job.matchRounds && o.status === "queued" && !job.excludedWorkerIds.includes(o.workerId),
   );
   for (const offer of queued) {

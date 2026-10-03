@@ -45,8 +45,15 @@ export function offerRoutes(deps: Deps): Hono<AppEnv> {
     return c.json({ offer: null, job: null });
   });
 
-  // US-26: what happened to an offer (accepted, declined, expired, or still live).
-  app.get("/:id", async (c) => c.json({ offer: offerWire(await myOffer(deps, c.get("user"), c.req.param("id"))) }));
+  // US-26: what happened to an offer (accepted, declined, expired, or still live). Open this from the
+  // push (it carries offerId): unlike /offers/current it never lags behind the notification.
+  app.get("/:id", async (c) => {
+    const user = c.get("user");
+    const offer = await myOffer(deps, user, c.req.param("id"));
+    const job = await deps.store.getJob(offer.jobId);
+    const visible = job && (job.currentOffer?.offerId === offer.offerId || job.workerId === user.userId);
+    return c.json({ offer: offerWire(offer), job: visible ? await jobWire(new WireContext(deps), job, user) : null });
+  });
 
   const respond = (type: "ACCEPT" | "OFFER_DECLINED") => async (c: Context<AppEnv>) => {
     const user = c.get("user");

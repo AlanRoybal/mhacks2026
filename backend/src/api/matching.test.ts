@@ -96,3 +96,18 @@ test("when every candidate passes, the poster hears once and matching retries la
   assert.equal(deps.push.sent.filter((p) => p.message.type === "no_match_yet").length, 1);
   assert.ok([...deps.scheduler.pending.values()].some((t) => t.timer === "rematch"));
 });
+
+test("GET /offers/:id (opened from the push) shows the job while the offer is live", async () => {
+  const { deps, api, designer, illustrator, jobId } = await fundedLogoJob();
+  const live = (await getJobOrThrow(deps, jobId)).currentOffer;
+  assert.ok(live);
+  const holder = live.workerId === designer.userId ? designer : illustrator;
+  const fromPush = await api.call("GET", `/offers/${live.offerId}`, holder.token);
+  assert.equal(fromPush.body.offer.status, "sent");
+  assert.equal(fromPush.body.job.id, jobId);
+  await api.call("POST", `/offers/${live.offerId}/decline`, holder.token);
+  await deps.settle();
+  const after = await api.call("GET", `/offers/${live.offerId}`, holder.token);
+  assert.equal(after.body.offer.status, "declined");
+  assert.equal(after.body.job, null);
+});

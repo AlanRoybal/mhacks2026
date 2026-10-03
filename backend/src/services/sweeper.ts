@@ -4,6 +4,7 @@
 // timer or effect is harmless.
 
 import type { Deps } from "../deps.js";
+import { rematchDelaySec } from "../domain/rules.js";
 import type { Job } from "../domain/types.js";
 import type { TimerPayload } from "../scheduler/index.js";
 import { sendNextOffer } from "./matching.js";
@@ -25,8 +26,8 @@ function overdueTimers(deps: Deps, job: Job, now: number): TimerPayload[] {
     due.push(...timer("grade_timeout", Date.parse(job.submittedAt) + rules.gradeTimeoutSec * 1000, { proofId: job.latestProofId }));
   }
   if (job.state === "DISPUTED" && job.dispute) due.push(...timer("dispute_timeout", Date.parse(job.dispute.openedAt) + rules.disputeWindowSec * 1000));
-  if (job.state === "FUNDED" && job.exhaustedRound === job.matchRounds && job.matchRounds < rules.maxMatchRounds) {
-    due.push(...timer("rematch", Date.parse(job.updatedAt) + rules.rematchDelaySec * 1000 + GRACE_MS, { round: job.matchRounds }));
+  if (job.state === "FUNDED" && job.exhaustedRound === job.matchRounds) {
+    due.push(...timer("rematch", Date.parse(job.updatedAt) + rematchDelaySec(rules, job.matchRounds) * 1000 + GRACE_MS, { round: job.matchRounds }));
   }
   return due;
 }
