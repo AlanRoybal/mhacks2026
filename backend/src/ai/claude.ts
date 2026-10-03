@@ -146,7 +146,15 @@ export class ClaudeAi implements Ai {
     const content: BetaContentBlockParam[] = [{ type: "text", text: jobText(input.job) }];
     content.push({
       type: "text",
-      text: tag("checklist", input.checklist.map((i) => `${i.id} [${i.evidence}${i.required ? ", required" : ""}]: ${i.text}`).join("\n")),
+      text: tag(
+        "checklist",
+        input.checklist
+          .map((i) => {
+            const kind = i.evidenceType === "PHOTO" ? `PHOTO x${i.photoCount ?? 1}${i.beforeAfter ? ", before/after" : ""}` : i.evidenceType;
+            return `${i.id} [${kind}${i.required ? ", required" : ""}]: ${i.text}`;
+          })
+          .join("\n"),
+      ),
     });
     for (const e of input.evidence) {
       const header = `Evidence for item ${e.itemId} (${e.phase}, ${e.kind})${e.note ? ` — ${e.note}` : ""}:`;

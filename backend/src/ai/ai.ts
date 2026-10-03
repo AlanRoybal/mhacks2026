@@ -26,7 +26,9 @@ export const ChecklistDraft = z.object({
   items: z.array(
     z.object({
       text: z.string(),
-      evidence: z.enum(["photo", "photo_pair", "location", "link", "file", "text"]),
+      evidenceType: z.enum(["PHOTO", "CHECK_IN", "LINK", "FILE"]),
+      photoCount: z.number(),
+      beforeAfter: z.boolean(),
       required: z.boolean(),
       angleHint: z.string(),
     }),
@@ -83,7 +85,7 @@ export interface RerankCandidate {
 export interface GradeEvidence {
   itemId: string;
   phase: EvidencePhase;
-  kind: "photo" | "link" | "file" | "text" | "location";
+  kind: "photo" | "link" | "file" | "location";
   // The app uploads JPEG; Claude does not read HEIC.
   image?: { mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif"; base64: string };
   url?: string;

@@ -7,7 +7,7 @@ Return:
 - skills: up to 25 concrete, hireable skills a person could be paid for in a small job, such as "Logo design", "Calculus tutoring", "Lawn mowing", "Product photography" or "React development". No soft skills like "teamwork". Merge duplicates.
   - level: 1 (beginner) to 5 (expert), judged from the document.
   - confidence: 0 to 1, how strongly the document supports the skill.
-  - category: one of design, home, tutoring, photography, technology, errands, other.
+  - category: one of design, home, yard work, moving, tutoring, photography, technology, errands, other.
   - evidence: a short phrase saying where it came from, e.g. "Designer at Acme, 2 years".
 - summary: two sentences in the third person.
 - roles, education, certifications, and yearsExperience (total professional years, 0 if none). Use "" for unknown fields.
@@ -18,12 +18,13 @@ export const CHECKLIST = `You write acceptance checklists for small paid jobs. T
 
 Rules:
 - 2 to 6 items. Each item must be objective and checkable from the evidence alone. Avoid taste ("looks good"); prefer observable facts ("all grass is cut to an even height").
-- Evidence types: photo, photo_pair (before and after from the same angle), location (on-site check-in), link, file, text.
-- In-person physical jobs: use photo or photo_pair with an angleHint ("from the sidewalk, whole lawn in frame") and include one location item.
-- Remote or digital jobs: use link, file or text. No location item.
+- evidenceType: PHOTO (photoCount photos), CHECK_IN (the worker checks in on site), LINK (a URL to delivered work), or FILE (an uploaded file such as a PDF or export).
+- PHOTO items: photoCount 1 to 4. Set beforeAfter true when a "before" photo at the start and an "after" photo from the same angle prove the change (mowing, cleaning, repairs). Give an angleHint ("from the sidewalk, whole lawn in frame").
+- Non-photo items: photoCount 0, beforeAfter false, angleHint "".
+- In-person physical jobs: PHOTO items plus exactly one CHECK_IN item.
+- Remote or digital jobs: LINK or FILE items. No CHECK_IN.
 - Do not add an item for the one-time code; the app adds that automatically.
 - required: true for items that define the job; false for nice-to-haves.
-- angleHint: "" when not a photo item.
 - estMinutes: realistic minutes of work for a typical worker, excluding travel.
 - flags: short reasons if the job looks illegal, dangerous, sexual, asks for personal or financial data, or is not a real task. Empty list if it is fine.
 

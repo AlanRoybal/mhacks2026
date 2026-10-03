@@ -6,57 +6,76 @@ import type { Ai, ChecklistDraft, GradeInput, GradeResult, JobBrief, ProfileExtr
 
 type DraftItem = ChecklistDraft["items"][number];
 
+const photo = (text: string, angleHint: string, opts: { photoCount?: number; beforeAfter?: boolean; required?: boolean } = {}): DraftItem => ({
+  text,
+  evidenceType: "PHOTO",
+  photoCount: opts.photoCount ?? 1,
+  beforeAfter: opts.beforeAfter ?? false,
+  required: opts.required ?? true,
+  angleHint,
+});
+const other = (evidenceType: "CHECK_IN" | "LINK" | "FILE", text: string, required = true): DraftItem => ({
+  text,
+  evidenceType,
+  photoCount: 0,
+  beforeAfter: false,
+  required,
+  angleHint: "",
+});
+const CHECK_IN = other("CHECK_IN", "Checked in at the job location");
+
 const TEMPLATES: Record<Category, { minutes: number; items: DraftItem[] }> = {
-  design: {
+  DESIGN: {
     minutes: 30,
     items: [
-      { text: "The finished design is fully visible and legible", evidence: "photo", required: true, angleHint: "Straight on, whole design in frame" },
-      { text: "The design follows the brief in the job description", evidence: "photo", required: true, angleHint: "" },
-      { text: "A digital copy of the design is attached", evidence: "file", required: false, angleHint: "" },
+      photo("The finished design is fully visible and legible", "Straight on, whole design in frame"),
+      photo("The design follows the brief in the job description", "Close enough to read any text"),
+      other("FILE", "A digital copy of the design is attached", false),
     ],
   },
-  home: {
+  HOME: {
     minutes: 60,
     items: [
-      { text: "Before and after photos of the work area from the same angle", evidence: "photo_pair", required: true, angleHint: "Whole work area in frame" },
-      { text: "Close-up showing the finished result", evidence: "photo", required: true, angleHint: "Close enough to see detail" },
-      { text: "Checked in at the job location", evidence: "location", required: true, angleHint: "" },
+      photo("The work area is visibly finished compared to before", "Whole work area in frame", { beforeAfter: true }),
+      photo("Close-up showing the finished result", "Close enough to see detail"),
+      CHECK_IN,
     ],
   },
-  tutoring: {
+  YARD_WORK: {
     minutes: 60,
     items: [
-      { text: "Summary of the topics covered in the session", evidence: "text", required: true, angleHint: "" },
-      { text: "Worksheet, notes or solutions from the session", evidence: "file", required: false, angleHint: "" },
+      photo("The whole area is done to an even standard", "From the edge of the yard, whole area in frame", { photoCount: 2, beforeAfter: true }),
+      photo("Clippings and debris are cleared from paths and driveway", "Show the paths and driveway"),
+      CHECK_IN,
     ],
   },
-  photography: {
+  MOVING: {
     minutes: 60,
     items: [
-      { text: "Delivered photos at full resolution", evidence: "file", required: true, angleHint: "" },
-      { text: "A photo taken at the shoot location", evidence: "photo", required: false, angleHint: "Show the subject and setting" },
+      photo("The items are in their new location", "Show the items in the destination room", { photoCount: 2 }),
+      photo("Nothing is visibly damaged", "Close-up of the moved items"),
+      CHECK_IN,
     ],
   },
-  technology: {
+  TUTORING: {
+    minutes: 60,
+    items: [other("LINK", "Session notes or a recording link"), other("FILE", "Worksheet or solutions from the session", false)],
+  },
+  PHOTOGRAPHY: {
+    minutes: 60,
+    items: [other("FILE", "Delivered photos at full resolution"), photo("A photo taken at the shoot location", "Show the subject and setting", { required: false })],
+  },
+  TECHNOLOGY: {
     minutes: 90,
-    items: [
-      { text: "Link to the delivered work (repository, site or shared file)", evidence: "link", required: true, angleHint: "" },
-      { text: "Short description of what was done and how to check it", evidence: "text", required: true, angleHint: "" },
-    ],
+    items: [other("LINK", "Link to the delivered work (repository, site or shared file)"), other("FILE", "Short write-up of what was done and how to check it")],
   },
-  errands: {
+  ERRANDS: {
     minutes: 30,
-    items: [
-      { text: "Photo showing the errand completed (item delivered or task done)", evidence: "photo", required: true, angleHint: "Show the item and where it was left" },
-      { text: "Checked in at the job location", evidence: "location", required: true, angleHint: "" },
-    ],
+    items: [photo("The errand is complete (item delivered or task done)", "Show the item and where it was left"), CHECK_IN],
   },
-  other: {
+  OTHER: {
     minutes: 45,
-    items: [
-      { text: "Photo showing the finished task", evidence: "photo", required: true, angleHint: "Whole result in frame" },
-      { text: "Short note describing what was done", evidence: "text", required: false, angleHint: "" },
-    ],
+    items: [photo("Photo showing the finished task", "Whole result in frame"), other("FILE", "Anything else that shows the work was done", false)],
   },
 };
 
@@ -68,9 +87,9 @@ export function templateChecklist(job: JobBrief): ChecklistDraft {
   const template = TEMPLATES[job.category];
   let items = template.items;
   if (job.remote) {
-    items = items.filter((i) => i.evidence !== "location").map((i) => (i.evidence === "photo_pair" ? { ...i, evidence: "photo" as const } : i));
-  } else if (!items.some((i) => i.evidence === "location")) {
-    items = [...items, { text: "Checked in at the job location", evidence: "location", required: true, angleHint: "" }];
+    items = items.filter((i) => i.evidenceType !== "CHECK_IN").map((i) => ({ ...i, beforeAfter: false }));
+  } else if (!items.some((i) => i.evidenceType === "CHECK_IN")) {
+    items = [...items, CHECK_IN];
   }
   const flags = RISKY.test(`${job.title} ${job.description}`) ? ["Mentions restricted items or personal data; review before posting"] : [];
   return { items, estMinutes: template.minutes, flags };

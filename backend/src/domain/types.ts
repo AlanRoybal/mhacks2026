@@ -20,8 +20,8 @@ export type JobState = z.infer<typeof JobState>;
 
 export const TERMINAL_STATES: ReadonlySet<JobState> = new Set(["RELEASED", "REFUNDED"]);
 
-// Matches the categories in the iOS create-job picker, plus a catch-all.
-export const CATEGORIES = ["design", "home", "tutoring", "photography", "technology", "errands", "other"] as const;
+// Must match JobCategory in the iOS app (Bounty/Models/Job.swift). Swift fails to decode unknown values.
+export const CATEGORIES = ["DESIGN", "HOME", "YARD_WORK", "MOVING", "TUTORING", "PHOTOGRAPHY", "TECHNOLOGY", "ERRANDS", "OTHER"] as const;
 export const Category = z.enum(CATEGORIES);
 export type Category = z.infer<typeof Category>;
 
@@ -34,20 +34,29 @@ export type LatLng = z.infer<typeof LatLng>;
 export const Place = LatLng.extend({ address: z.string().max(200).optional() });
 export type Place = z.infer<typeof Place>;
 
-export const EvidenceType = z.enum(["photo", "photo_pair", "location", "link", "file", "text"]);
+// Must match EvidenceType in the iOS app.
+export const EvidenceType = z.enum(["PHOTO", "CHECK_IN", "LINK", "FILE"]);
 export type EvidenceType = z.infer<typeof EvidenceType>;
 
 export const ChecklistItem = z.object({
   id: z.string().min(1).max(40),
   text: z.string().min(1).max(300),
-  evidence: EvidenceType,
+  evidenceType: EvidenceType,
+  // PHOTO only: how many photos are required.
+  photoCount: z.number().int().min(1).max(10).optional(),
+  // PHOTO only: a "before" shot at the start and an "after" shot from the same angle (ghost overlay).
+  beforeAfter: z.boolean().optional(),
   required: z.boolean(),
   angleHint: z.string().max(200).optional(),
 });
 export type ChecklistItem = z.infer<typeof ChecklistItem>;
 
+// Must match PayCurrency in the iOS app.
+export type Currency = "USD" | "USDC";
+
 // How a job is paid. "fake" settles instantly and is used for local dev and seed data.
-export type Rail = "stripe" | "fake";
+// "usdc" (Base Sepolia escrow) belongs to the payments workstream and is not wired up here yet.
+export type Rail = "stripe" | "fake" | "usdc";
 
 export type GradeDecision = "pass" | "fail" | "unclear";
 
@@ -73,11 +82,14 @@ export interface Job {
   bountyCents: number;
   feeCents: number;
   totalCents: number;
+  currency: Currency;
   rail: Rail;
   state: JobState;
   // Incremented on every transition. Writes are conditional on it (optimistic locking).
   version: number;
   checklist: ChecklistItem[];
+  // Moderation warnings from checklist generation (illegal, dangerous, personal data). Shown to the poster.
+  flags: string[];
   // Present exactly when state is OFFERED.
   currentOffer?: { offerId: string; workerId: string; expiresAt: string };
   // Workers who declined, let an offer expire, or withdrew. Never re-offered this job.
@@ -135,7 +147,7 @@ export interface Offer {
 }
 
 export type EvidencePhase = "before" | "after" | "single";
-export type EvidenceKind = "photo" | "link" | "file" | "text" | "location";
+export type EvidenceKind = "photo" | "link" | "file" | "location";
 
 export interface EvidenceItem {
   checklistItemId: string;
@@ -143,7 +155,8 @@ export interface EvidenceItem {
   kind: EvidenceKind;
   blobKey?: string;
   url?: string;
-  text?: string;
+  // Optional note from the worker about this item.
+  note?: string;
   contentType?: string;
   capturedAt?: string;
   lat?: number;
