@@ -17,7 +17,12 @@ export interface ApnsConfig {
   teamId: string;
   keyP8: string;
   bundleId: string;
+  // Tests point these at a local HTTP/2 server.
+  hosts?: Record<Device["env"], string>;
+  timeoutMs?: number;
 }
+
+class ApnsTimeout extends Error {}
 
 export class ApnsSender implements PushSender {
   private token?: { value: string; at: number };
@@ -38,15 +43,25 @@ export class ApnsSender implements PushSender {
     return this.token.value;
   }
 
+  private evict(env: Device["env"], session: ClientHttp2Session): void {
+    if (this.sessions.get(env) === session) this.sessions.delete(env);
+    if (!session.destroyed) session.destroy();
+  }
+
+  // Sessions are reused across pushes (and across warm Lambda invocations). One that went bad while
+  // the Lambda was frozen is evicted on its first timeout or GOAWAY, and the push is retried.
   private session(env: Device["env"]): ClientHttp2Session {
     const existing = this.sessions.get(env);
     if (existing && !existing.closed && !existing.destroyed) return existing;
-    const session = connect(HOSTS[env]);
+    const session = connect((this.cfg.hosts ?? HOSTS)[env]);
     session.on("error", (error) => {
       this.log.warn("APNs connection error", { env, error });
-      this.sessions.delete(env);
+      this.evict(env, session);
     });
-    session.on("close", () => this.sessions.delete(env));
+    session.on("goaway", () => this.evict(env, session));
+    session.on("close", () => {
+      if (this.sessions.get(env) === session) this.sessions.delete(env);
+    });
     this.sessions.set(env, session);
     return session;
   }
@@ -54,8 +69,9 @@ export class ApnsSender implements PushSender {
   private async sendOne(device: Device, message: PushMessage): Promise<{ status: number; reason?: string }> {
     const token = await this.providerToken();
     const expiration = message.expiresAt ? Math.floor(Date.parse(message.expiresAt) / 1000) : 0;
+    const session = this.session(device.env);
     return new Promise((resolve, reject) => {
-      const req = this.session(device.env).request({
+      const req = session.request({
         ":method": "POST",
         ":path": `/3/device/${device.token}`,
         authorization: `bearer ${token}`,
@@ -83,7 +99,11 @@ export class ApnsSender implements PushSender {
         resolve({ status, reason });
       });
       req.on("error", reject);
-      req.setTimeout(10_000, () => req.close());
+      req.setTimeout(this.cfg.timeoutMs ?? 5_000, () => {
+        req.close();
+        this.evict(device.env, session);
+        reject(new ApnsTimeout("APNs did not answer"));
+      });
       req.end(JSON.stringify(apsPayload(message)));
     });
   }
@@ -92,13 +112,17 @@ export class ApnsSender implements PushSender {
     const deadTokens: string[] = [];
     await Promise.all(
       user.devices.map(async (device) => {
-        try {
-          const { status, reason } = await this.sendOne(device, message);
-          if (status === 200) return;
-          if (status === 410 || (reason && DEAD_REASONS.has(reason))) deadTokens.push(device.token);
-          this.log.warn("APNs rejected push", { userId: user.userId, env: device.env, status, reason });
-        } catch (error) {
-          this.log.warn("APNs send failed", { userId: user.userId, error });
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const { status, reason } = await this.sendOne(device, message);
+            if (status === 200) return;
+            if (status === 410 || (reason && DEAD_REASONS.has(reason))) deadTokens.push(device.token);
+            this.log.warn("APNs rejected push", { userId: user.userId, env: device.env, status, reason });
+            return;
+          } catch (error) {
+            // A dead connection: the session was evicted, so the retry opens a fresh one.
+            if (attempt === 2) this.log.warn("APNs send failed", { userId: user.userId, error });
+          }
         }
       }),
     );
