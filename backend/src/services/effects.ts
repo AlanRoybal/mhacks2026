@@ -43,7 +43,15 @@ async function runEffect(deps: Deps, ledger: LedgerEvent, effect: Effect): Promi
       await sendJobPush(deps, ledger.jobId, effect);
       return;
     case "schedule": {
-      const payload: TimerPayload = { kind: "timer", jobId: ledger.jobId, timer: effect.timer, at: effect.at, offerId: effect.offerId, round: effect.round };
+      const payload: TimerPayload = {
+        kind: "timer",
+        jobId: ledger.jobId,
+        timer: effect.timer,
+        at: effect.at,
+        offerId: effect.offerId,
+        proofId: effect.proofId,
+        round: effect.round,
+      };
       await deps.scheduler.schedule(timerName(payload, ledger.seq), payload);
       return;
     }

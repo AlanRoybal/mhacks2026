@@ -8,6 +8,7 @@ export interface TimerPayload {
   // When it was meant to fire.
   at: string;
   offerId?: string;
+  proofId?: string;
   round?: number;
 }
 

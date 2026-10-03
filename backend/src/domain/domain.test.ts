@@ -63,3 +63,22 @@ test("quiet hours wrap past midnight", () => {
   assert.equal(isQuietTime(prefs, new Date("2026-10-06T16:00:00Z")), false); // 12:00 local
   assert.equal(isQuietTime({ tz: NY }, new Date()), false);
 });
+
+test("free windows are never overstated", () => {
+  // Free Monday 18:00-20:00 local (22:00-00:00 UTC).
+  const weekly = Array.from({ length: 168 }, (_, i) => (i === 18 || i === 19 ? "1" : "0")).join("");
+  const av: Availability = { tz: NY, weekly, busy: [], updatedAt: "" };
+  const tuesday = new Date("2026-10-06T16:00:00Z");
+  // Starting at 18:07 leaves 113 minutes, not 120.
+  assert.equal(hasFreeWindow(av, new Date("2026-10-05T22:07:00Z"), tuesday, 120), false);
+  // A window that ends at 19:50 is 110 minutes.
+  assert.equal(hasFreeWindow(av, new Date("2026-10-05T16:00:00Z"), new Date("2026-10-05T23:50:00Z"), 120), false);
+  // A 13-minute meeting inside the window breaks it.
+  const meeting = { ...av, busy: [{ start: "2026-10-05T23:01:00Z", end: "2026-10-05T23:14:00Z" }] };
+  assert.equal(hasFreeWindow(meeting, new Date("2026-10-05T16:00:00Z"), tuesday, 120), false);
+});
+
+test("money formatting handles negatives and bad durations", () => {
+  assert.equal(formatUsd(-150), "-$1.50");
+  assert.equal(hourlyCents(1500, Number.NaN), 90000);
+});

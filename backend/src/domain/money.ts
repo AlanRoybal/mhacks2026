@@ -1,7 +1,8 @@
 // All amounts are integer cents. The poster pays bounty + fee; the worker receives the bounty.
 
 export const PLATFORM_FEE_BPS = 1000; // 10%
-export const MIN_BOUNTY_CENTS = 100;
+// $5 minimum: below that, card processing fees (kept by Stripe even on refunds) exceed the platform fee.
+export const MIN_BOUNTY_CENTS = 500;
 export const MAX_BOUNTY_CENTS = 100_000;
 
 export interface Quote {
@@ -20,11 +21,13 @@ export function quote(bountyCents: number): Quote {
 }
 
 export function hourlyCents(bountyCents: number, minutes: number): number {
-  return Math.round((bountyCents * 60) / Math.max(minutes, 1));
+  const m = Number.isFinite(minutes) && minutes > 0 ? minutes : 1;
+  return Math.round((bountyCents * 60) / m);
 }
 
-// "$15" for whole dollars, "$15.50" otherwise.
+// "$15" for whole dollars, "$15.50" otherwise, "-$1.50" for negatives.
 export function formatUsd(cents: number): string {
-  const dollars = cents / 100;
-  return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
+  const sign = cents < 0 ? "-" : "";
+  const dollars = Math.abs(cents) / 100;
+  return `${sign}$${Number.isInteger(dollars) ? dollars : dollars.toFixed(2)}`;
 }

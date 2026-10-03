@@ -3,22 +3,26 @@
 //
 // Invariants:
 // - OFFERED  <=> currentOffer is set. Declines and expiries go back to FUNDED and ask for the next offer.
-// - Money only moves through the "payout" and "refund" effects, which only these transitions emit.
-// - Timer events re-check that they are still due, so a stale timer is rejected instead of acting.
+// - Money only moves through the "payout" and "refund" effects, which only these transitions emit,
+//   and every non-terminal state has a timer or a user action that leads out of it.
+// - Timer events re-check that they are due, so a stale timer is rejected instead of acting.
+//   A timer that fires early is rejected as "too_early" and rescheduled by the caller.
 
 import type { Effect, JobEvent, PushTemplate } from "./events.js";
 import { haversineKm } from "./geo.js";
 import type { Rules } from "./rules.js";
-import type { Actor, Job, JobState } from "./types.js";
+import type { Actor, GradeDecision, Job, JobState } from "./types.js";
 
 export type TransitionErrorCode =
   | "invalid_transition"
   | "forbidden"
   | "offer_not_current"
   | "offer_expired"
+  | "not_enough_time"
   | "location_required"
   | "too_far"
   | "deadline_passed"
+  | "window_closed"
   | "too_early"
   | "already_done"
   | "bad_request";
@@ -62,8 +66,9 @@ function requireSystem(ctx: TransitionContext, ev: JobEvent): void {
   if (ctx.actor.kind !== "system") fail("forbidden", `${ev.type} can only come from the platform`);
 }
 
-function requireDue(ctx: TransitionContext, dueIso: string, what: string): void {
-  if (ctx.now.getTime() < Date.parse(dueIso) - ctx.rules.timerToleranceMs) fail("too_early", `${what} is not due yet`);
+function requireDue(ctx: TransitionContext, dueMs: number, what: string): void {
+  if (!Number.isFinite(dueMs)) fail("invalid_transition", `${what} has no due time`);
+  if (ctx.now.getTime() < dueMs) fail("too_early", `${what} is not due yet`);
 }
 
 function currentOffer(job: Job, offerId: string): NonNullable<Job["currentOffer"]> {
@@ -78,7 +83,13 @@ function pastDeadline(job: Job, now: Date): boolean {
   return now.getTime() >= Date.parse(job.deadline);
 }
 
+// Enough time left before the deadline to actually do the work.
+function hasTimeLeft(job: Job, now: Date): boolean {
+  return now.getTime() + job.estMinutes * 60_000 <= Date.parse(job.deadline);
+}
+
 const addSeconds = (d: Date, s: number) => new Date(d.getTime() + s * 1000).toISOString();
+const isFiniteLatLng = (p: { lat: number; lng: number }) => Number.isFinite(p.lat) && Number.isFinite(p.lng);
 
 function push(to: string, template: PushTemplate, offerId?: string): Effect {
   return offerId ? { kind: "push", to, template, offerId } : { kind: "push", to, template };
@@ -90,6 +101,35 @@ function release(job: Job, patch: Partial<Job>, now: string, extra: Effect[] = [
   return { to: "RELEASED", patch: { ...patch, closedAt: now }, effects };
 }
 
+function refundFailedWork(job: Job, patch: Partial<Job>, now: string, extra: Effect[] = []): TransitionResult {
+  const effects: Effect[] = [{ kind: "refund" }, ...extra];
+  if (job.workerId) effects.push({ kind: "stats", userId: job.workerId, delta: { jobsFailed: 1 } });
+  return { to: "REFUNDED", patch: { ...patch, closedAt: now }, effects };
+}
+
+// A person has to decide: the AI was unsure, retries ran out, or grading never finished.
+function needsPosterDecision(job: Job, ctx: TransitionContext, proofId: string, decision: GradeDecision, summary: string, failedAttempts: number): TransitionResult {
+  const windowEndsAt = addSeconds(ctx.now, ctx.rules.posterDecisionWindowSec);
+  const effects: Effect[] = [push(job.posterId, "proof_needs_decision"), { kind: "schedule", timer: "review_window", at: windowEndsAt }];
+  if (job.workerId) effects.push(push(job.workerId, "proof_escalated"));
+  return {
+    to: "IN_REVIEW",
+    patch: { failedAttempts, review: { proofId, decision, summary, requiresPosterAction: true, windowEndsAt } },
+    effects,
+  };
+}
+
+function openDispute(job: Job, ctx: TransitionContext, dispute: NonNullable<Job["dispute"]>, notify: string[]): TransitionResult {
+  return {
+    to: "DISPUTED",
+    patch: { dispute },
+    effects: [
+      ...notify.map((userId) => push(userId, "disputed")),
+      { kind: "schedule", timer: "dispute_timeout", at: addSeconds(ctx.now, ctx.rules.disputeWindowSec) },
+    ],
+  };
+}
+
 export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): TransitionResult {
   const now = ctx.now.toISOString();
 
@@ -97,6 +137,10 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
     case "FUND_CONFIRMED": {
       requireSystem(ctx, ev);
       requireState(job, ev, "DRAFT");
+      if (ev.amountCents !== job.totalCents) fail("bad_request", `Payment of ${ev.amountCents} does not match the job total ${job.totalCents}`);
+      if (job.payment.paymentIntentId && ev.paymentIntentId && ev.paymentIntentId !== job.payment.paymentIntentId) {
+        fail("bad_request", "This payment does not belong to the job's checkout");
+      }
       return {
         to: "FUNDED",
         patch: {
@@ -118,6 +162,7 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
       if (ev.workerId === job.posterId || job.excludedWorkerIds.includes(ev.workerId)) {
         fail("bad_request", "This worker cannot be offered this job");
       }
+      if (!hasTimeLeft(job, ctx.now)) fail("not_enough_time", "Not enough time left before the deadline");
       return {
         to: "OFFERED",
         patch: { currentOffer: { offerId: ev.offerId, workerId: ev.workerId, expiresAt: ev.expiresAt } },
@@ -138,7 +183,7 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
         requireUser(ctx, offer.workerId, "offered worker");
       } else {
         requireSystem(ctx, ev);
-        requireDue(ctx, offer.expiresAt, "The offer expiry");
+        requireDue(ctx, Date.parse(offer.expiresAt), "The offer expiry");
       }
       return {
         to: "FUNDED",
@@ -154,13 +199,14 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
     case "CANDIDATES_EXHAUSTED": {
       requireSystem(ctx, ev);
       requireState(job, ev, "FUNDED");
+      if (ev.round !== job.matchRounds || job.exhaustedRound === ev.round) fail("invalid_transition", "This matching round was already handled");
       const effects: Effect[] = [];
       const retryAt = addSeconds(ctx.now, ctx.rules.rematchDelaySec);
       if (job.matchRounds < ctx.rules.maxMatchRounds && Date.parse(retryAt) < Date.parse(job.deadline)) {
         effects.push({ kind: "schedule", timer: "rematch", at: retryAt, round: job.matchRounds });
       }
       if (job.matchRounds === 1) effects.push(push(job.posterId, "no_match_yet"));
-      return { to: "FUNDED", patch: {}, effects };
+      return { to: "FUNDED", patch: { exhaustedRound: ev.round }, effects };
     }
 
     case "REMATCH": {
@@ -171,10 +217,14 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
     }
 
     case "ACCEPT": {
+      // A second tap by the worker who already won is not "taken by someone else".
+      if (job.state !== "OFFERED" && job.acceptedAt && ctx.actor.kind === "user" && ctx.actor.userId === job.workerId) {
+        fail("already_done", "You already accepted this job");
+      }
       const offer = currentOffer(job, ev.offerId);
       const workerId = requireUser(ctx, offer.workerId, "offered worker");
       if (ctx.now.getTime() >= Date.parse(offer.expiresAt)) fail("offer_expired", "This offer has expired");
-      if (pastDeadline(job, ctx.now)) fail("deadline_passed", "The job deadline has passed");
+      if (!hasTimeLeft(job, ctx.now)) fail("not_enough_time", "Not enough time left before the deadline");
       return {
         to: "ACCEPTED",
         patch: { workerId, currentOffer: undefined, acceptedAt: now },
@@ -187,14 +237,14 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
     }
 
     case "CANCEL": {
+      // US-18: only before a worker accepts. After that the worker can withdraw, or the deadline refunds.
       requireUser(ctx, job.posterId, "poster");
-      requireState(job, ev, "FUNDED", "OFFERED", "ACCEPTED");
+      requireState(job, ev, "FUNDED", "OFFERED");
       const effects: Effect[] = [{ kind: "refund" }];
       if (job.currentOffer) {
         effects.push({ kind: "offer.status", offerId: job.currentOffer.offerId, status: "canceled" });
         effects.push(push(job.currentOffer.workerId, "job_canceled"));
       }
-      if (job.workerId) effects.push(push(job.workerId, "job_canceled"));
       return { to: "REFUNDED", patch: { currentOffer: undefined, closedAt: now }, effects };
     }
 
@@ -205,12 +255,14 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
       const patch: Partial<Job> = { matchRounds: job.matchRounds + 1 };
       const effects: Effect[] = [{ kind: "match" }];
       if (ev.deadline !== undefined) {
-        if (Date.parse(ev.deadline) <= ctx.now.getTime()) fail("bad_request", "The new deadline must be in the future");
-        patch.deadline = ev.deadline;
-        effects.push({ kind: "schedule", timer: "deadline", at: ev.deadline });
+        const deadline = Date.parse(ev.deadline);
+        if (!Number.isFinite(deadline) || deadline <= ctx.now.getTime()) fail("bad_request", "The new deadline must be a future date");
+        patch.deadline = new Date(deadline).toISOString();
+        effects.push({ kind: "schedule", timer: "deadline", at: patch.deadline });
       }
       if (ev.radiusKm !== undefined) {
         if (job.remote) fail("bad_request", "Remote jobs have no radius");
+        if (!Number.isFinite(ev.radiusKm) || ev.radiusKm <= 0 || ev.radiusKm > 100) fail("bad_request", "Radius must be between 0 and 100 km");
         patch.radiusKm = ev.radiusKm;
       }
       return { to: "FUNDED", patch, effects };
@@ -220,8 +272,9 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
       requireUser(ctx, job.workerId, "assigned worker");
       requireState(job, ev, "ACCEPTED");
       if (pastDeadline(job, ctx.now)) fail("deadline_passed", "The job deadline has passed");
+      if (!ev.code.trim()) fail("bad_request", "Missing one-time code");
       if (!job.remote) {
-        if (!ev.at || !job.location) fail("location_required", "Check in with your current location to start");
+        if (!ev.at || !isFiniteLatLng(ev.at) || !job.location) fail("location_required", "Check in with your current location to start");
         const meters = Math.round(haversineKm(ev.at, job.location) * 1000);
         if (meters > ctx.rules.checkInRadiusM) {
           fail("too_far", `You are ${meters} m from the job. Check in within ${ctx.rules.checkInRadiusM} m.`);
@@ -258,10 +311,14 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
       requireUser(ctx, job.workerId, "assigned worker");
       requireState(job, ev, "IN_PROGRESS");
       if (pastDeadline(job, ctx.now)) fail("deadline_passed", "The job deadline has passed");
+      if (ev.proofId === job.latestProofId) fail("already_done", "This proof was already submitted");
       return {
         to: "SUBMITTED",
         patch: { latestProofId: ev.proofId, submittedAt: now },
-        effects: [{ kind: "grade", proofId: ev.proofId }],
+        effects: [
+          { kind: "grade", proofId: ev.proofId },
+          { kind: "schedule", timer: "grade_timeout", at: addSeconds(ctx.now, ctx.rules.gradeTimeoutSec), proofId: ev.proofId },
+        ],
       };
     }
 
@@ -269,46 +326,52 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
       requireSystem(ctx, ev);
       requireState(job, ev, "SUBMITTED");
       if (ev.proofId !== job.latestProofId) fail("invalid_transition", "This grade is for an older submission");
-      const workerId = job.workerId ?? "";
 
       if (ev.decision === "pass") {
         const windowEndsAt = addSeconds(ctx.now, ctx.rules.reviewWindowSec);
+        const effects: Effect[] = [push(job.posterId, "proof_ready"), { kind: "schedule", timer: "review_window", at: windowEndsAt }];
+        if (job.workerId) effects.push(push(job.workerId, "proof_passed"));
         return {
           to: "IN_REVIEW",
           patch: { review: { proofId: ev.proofId, decision: "pass", summary: ev.summary, requiresPosterAction: false, windowEndsAt } },
-          effects: [
-            push(job.posterId, "proof_ready"),
-            push(workerId, "proof_passed"),
-            { kind: "schedule", timer: "review_window", at: windowEndsAt },
-          ],
+          effects,
         };
       }
 
       const failedAttempts = ev.decision === "fail" ? job.failedAttempts + 1 : job.failedAttempts;
       if (ev.decision === "fail" && failedAttempts <= ctx.rules.maxRetries && !pastDeadline(job, ctx.now)) {
-        return { to: "IN_PROGRESS", patch: { failedAttempts }, effects: [push(workerId, "proof_failed")] };
+        const effects: Effect[] = [{ kind: "schedule", timer: "deadline", at: job.deadline }];
+        if (job.workerId) effects.unshift(push(job.workerId, "proof_failed"));
+        // The deadline timer may already have fired (and been ignored) while this proof was being graded.
+        return { to: "IN_PROGRESS", patch: { failedAttempts }, effects };
       }
+      return needsPosterDecision(job, ctx, ev.proofId, ev.decision, ev.summary, failedAttempts);
+    }
 
-      // Unclear, or out of retries: a person has to decide. No auto-release.
-      const windowEndsAt = addSeconds(ctx.now, ctx.rules.posterDecisionWindowSec);
-      return {
-        to: "IN_REVIEW",
-        patch: {
-          failedAttempts,
-          review: { proofId: ev.proofId, decision: ev.decision, summary: ev.summary, requiresPosterAction: true, windowEndsAt },
-        },
-        effects: [
-          push(job.posterId, "proof_needs_decision"),
-          push(workerId, "proof_escalated"),
-          { kind: "schedule", timer: "review_window", at: windowEndsAt },
-        ],
-      };
+    case "GRADE_TIMEOUT": {
+      requireSystem(ctx, ev);
+      requireState(job, ev, "SUBMITTED");
+      if (ev.proofId !== job.latestProofId) fail("invalid_transition", "This timeout is for an older submission");
+      requireDue(ctx, Date.parse(job.submittedAt ?? "") + ctx.rules.gradeTimeoutSec * 1000, "The grading timeout");
+      return needsPosterDecision(job, ctx, ev.proofId, "unclear", "Automatic review did not finish in time. Please check the evidence yourself.", job.failedAttempts);
     }
 
     case "APPROVE": {
       requireUser(ctx, job.posterId, "poster");
-      requireState(job, ev, "IN_REVIEW");
+      requireState(job, ev, "IN_REVIEW", "DISPUTED");
+      if (job.state === "DISPUTED") {
+        const resolution = { outcome: "release" as const, by: job.posterId, note: "The poster approved the work", at: now };
+        return release(job, { resolution }, now, job.workerId ? [push(job.workerId, "resolved")] : []);
+      }
       return release(job, {}, now);
+    }
+
+    case "REJECT": {
+      // Only when the AI also found the work failing after the worker's retries. Otherwise: dispute.
+      requireUser(ctx, job.posterId, "poster");
+      requireState(job, ev, "IN_REVIEW");
+      if (job.review?.decision !== "fail") fail("invalid_transition", "You can only reject work that failed review. Dispute it instead.");
+      return refundFailedWork(job, {}, now, job.workerId ? [push(job.workerId, "work_rejected")] : []);
     }
 
     case "REVIEW_WINDOW_EXPIRED": {
@@ -316,57 +379,59 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
       requireState(job, ev, "IN_REVIEW");
       const review = job.review;
       if (!review) fail("invalid_transition", "The job has no review");
-      requireDue(ctx, review.windowEndsAt, "The review window");
+      requireDue(ctx, Date.parse(review.windowEndsAt), "The review window");
       if (!review.requiresPosterAction) return release(job, {}, now);
-      const effects: Effect[] = [push(job.posterId, "disputed")];
-      if (job.workerId) effects.push(push(job.workerId, "disputed"));
-      return {
-        to: "DISPUTED",
-        patch: { dispute: { reason: "The poster did not decide before the review window ended", openedBy: "system", openedAt: now } },
-        effects,
-      };
+      const notify = [job.posterId, ...(job.workerId ? [job.workerId] : [])];
+      return openDispute(job, ctx, { reason: "The poster did not decide before the review window ended", openedBy: "system", openedAt: now }, notify);
     }
 
     case "DISPUTE": {
       requireUser(ctx, job.posterId, "poster");
       requireState(job, ev, "IN_REVIEW");
+      if (job.review && ctx.now.getTime() >= Date.parse(job.review.windowEndsAt)) fail("window_closed", "The review window has closed");
       if (!job.checklist.some((item) => item.id === ev.itemId)) fail("bad_request", "Pick a checklist item to dispute");
       if (!ev.reason.trim()) fail("bad_request", "Explain what is wrong with this item");
-      const effects: Effect[] = job.workerId ? [push(job.workerId, "disputed")] : [];
-      return {
-        to: "DISPUTED",
-        patch: { dispute: { itemId: ev.itemId, reason: ev.reason.trim(), openedBy: "poster", openedAt: now } },
-        effects,
-      };
+      return openDispute(job, ctx, { itemId: ev.itemId, reason: ev.reason.trim(), openedBy: "poster", openedAt: now }, job.workerId ? [job.workerId] : []);
     }
 
     case "RESOLVE": {
       if (ctx.actor.kind !== "admin") fail("forbidden", "Only an admin can resolve disputes");
+      if (ctx.actor.userId === job.posterId || ctx.actor.userId === job.workerId) fail("forbidden", "You can't resolve a dispute on your own job");
       requireState(job, ev, "DISPUTED");
       const resolution = { outcome: ev.outcome, by: ctx.actor.userId, note: ev.note, at: now };
       const notify: Effect[] = [push(job.posterId, "resolved")];
       if (job.workerId) notify.push(push(job.workerId, "resolved"));
-      if (ev.outcome === "release") return release(job, { resolution }, now, notify);
-      const effects: Effect[] = [{ kind: "refund" }, ...notify];
-      if (job.workerId) effects.push({ kind: "stats", userId: job.workerId, delta: { jobsFailed: 1 } });
-      return { to: "REFUNDED", patch: { resolution, closedAt: now }, effects };
+      return ev.outcome === "release" ? release(job, { resolution }, now, notify) : refundFailedWork(job, { resolution }, now, notify);
+    }
+
+    case "DISPUTE_TIMEOUT": {
+      // Nobody resolved it in time: the AI's assessment stands. Failed work is refunded; anything else is paid.
+      requireSystem(ctx, ev);
+      requireState(job, ev, "DISPUTED");
+      if (!job.dispute) fail("invalid_transition", "The job has no dispute");
+      requireDue(ctx, Date.parse(job.dispute.openedAt) + ctx.rules.disputeWindowSec * 1000, "The dispute window");
+      const outcome = job.review?.decision === "fail" ? ("refund" as const) : ("release" as const);
+      const resolution = { outcome, by: "system", note: "No decision before the dispute window ended; the AI assessment stands", at: now };
+      const notify: Effect[] = [push(job.posterId, "resolved")];
+      if (job.workerId) notify.push(push(job.workerId, "resolved"));
+      return outcome === "release" ? release(job, { resolution }, now, notify) : refundFailedWork(job, { resolution }, now, notify);
     }
 
     case "DEADLINE_PASSED": {
       requireSystem(ctx, ev);
-      requireDue(ctx, job.deadline, "The deadline");
+      requireDue(ctx, Date.parse(job.deadline), "The deadline");
       if (job.state === "FUNDED" || job.state === "OFFERED") {
         const effects: Effect[] = [{ kind: "refund" }, push(job.posterId, "unmatched_refund")];
-        if (job.currentOffer) effects.push({ kind: "offer.status", offerId: job.currentOffer.offerId, status: "canceled" });
+        if (job.currentOffer) {
+          effects.push({ kind: "offer.status", offerId: job.currentOffer.offerId, status: "canceled" });
+          effects.push(push(job.currentOffer.workerId, "offer_closed"));
+        }
         return { to: "REFUNDED", patch: { currentOffer: undefined, closedAt: now }, effects };
       }
       if (job.state === "ACCEPTED" || job.state === "IN_PROGRESS") {
-        const effects: Effect[] = [{ kind: "refund" }, push(job.posterId, "deadline_missed")];
-        if (job.workerId) {
-          effects.push(push(job.workerId, "deadline_missed"));
-          effects.push({ kind: "stats", userId: job.workerId, delta: { jobsFailed: 1 } });
-        }
-        return { to: "REFUNDED", patch: { closedAt: now }, effects };
+        const effects: Effect[] = [push(job.posterId, "deadline_missed")];
+        if (job.workerId) effects.push(push(job.workerId, "deadline_missed"));
+        return refundFailedWork(job, {}, now, effects);
       }
       // Submitted work is reviewed even if the deadline passes during grading or review.
       return fail("invalid_transition", `Deadline does not apply while the job is ${job.state}`);
@@ -432,6 +497,7 @@ export type JobAction =
   | "withdraw"
   | "submit_proof"
   | "approve"
+  | "reject"
   | "dispute"
   | "resolve"
   | "rate";
@@ -446,8 +512,13 @@ export function allowedActions(job: Job, viewer: { userId: string; isAdmin?: boo
   if (isPoster) {
     if (job.state === "DRAFT") actions.push("edit_checklist", "fund", "delete");
     if (job.state === "FUNDED") actions.push("update_terms");
-    if (job.state === "FUNDED" || job.state === "OFFERED" || job.state === "ACCEPTED") actions.push("cancel");
-    if (job.state === "IN_REVIEW") actions.push("approve", "dispute");
+    if (job.state === "FUNDED" || job.state === "OFFERED") actions.push("cancel");
+    if (job.state === "IN_REVIEW") {
+      actions.push("approve");
+      if (job.review?.decision === "fail") actions.push("reject");
+      if (job.review && now.getTime() < Date.parse(job.review.windowEndsAt)) actions.push("dispute");
+    }
+    if (job.state === "DISPUTED") actions.push("approve");
     if (closed && job.workerId && !job.ratings.byPoster) actions.push("rate");
   }
   if (job.state === "OFFERED" && job.currentOffer?.workerId === viewer.userId && now.getTime() < Date.parse(job.currentOffer.expiresAt)) {
@@ -458,6 +529,6 @@ export function allowedActions(job: Job, viewer: { userId: string; isAdmin?: boo
     if (job.state === "IN_PROGRESS") actions.push("submit_proof", "withdraw");
     if (closed && !job.ratings.byWorker) actions.push("rate");
   }
-  if (viewer.isAdmin && job.state === "DISPUTED") actions.push("resolve");
+  if (viewer.isAdmin && job.state === "DISPUTED" && !isPoster && !isWorker) actions.push("resolve");
   return actions;
 }

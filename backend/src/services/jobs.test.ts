@@ -40,7 +40,7 @@ function draft(now: Date): Job {
 test("applyEvent commits the job and a ledger row with the same seq", async () => {
   const deps = testDeps();
   await createJobRecord(deps, draft(deps.now()), { kind: "user", userId: "poster" });
-  const job = await applyEvent(deps, "job1", { type: "FUND_CONFIRMED" }, SYSTEM);
+  const job = await applyEvent(deps, "job1", { type: "FUND_CONFIRMED", amountCents: 1650 }, SYSTEM);
   assert.equal(job.state, "FUNDED");
   assert.equal(job.version, 2);
   const ledger = await deps.store.listLedger("job1");
@@ -58,7 +58,7 @@ test("two concurrent responses to one offer: exactly one wins", async () => {
   const deps = testDeps();
   const now = deps.now();
   await createJobRecord(deps, draft(now), { kind: "user", userId: "poster" });
-  await applyEvent(deps, "job1", { type: "FUND_CONFIRMED" }, SYSTEM);
+  await applyEvent(deps, "job1", { type: "FUND_CONFIRMED", amountCents: 1650 }, SYSTEM);
   const expiresAt = new Date(now.getTime() + 30_000).toISOString();
   await applyEvent(deps, "job1", { type: "OFFER_SENT", offerId: "o1", workerId: "worker", expiresAt }, SYSTEM);
   deps.clock.advance(31);
@@ -81,7 +81,7 @@ test("stats effects update the user after the commit", async () => {
   const now = deps.now();
   await deps.store.createUser(newUser({ userId: "worker", displayName: "W" }, now));
   await createJobRecord(deps, draft(now), { kind: "user", userId: "poster" });
-  await applyEvent(deps, "job1", { type: "FUND_CONFIRMED" }, SYSTEM);
+  await applyEvent(deps, "job1", { type: "FUND_CONFIRMED", amountCents: 1650 }, SYSTEM);
   const expiresAt = new Date(now.getTime() + 30_000).toISOString();
   await applyEvent(deps, "job1", { type: "OFFER_SENT", offerId: "o1", workerId: "worker", expiresAt }, SYSTEM);
   await applyEvent(deps, "job1", { type: "ACCEPT", offerId: "o1" }, { kind: "user", userId: "worker" });

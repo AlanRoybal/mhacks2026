@@ -100,6 +100,8 @@ export interface Job {
   payment: { paymentIntentId?: string; chargeId?: string; transferId?: string; refundId?: string };
   ratings: { byPoster?: Rating; byWorker?: Rating };
   matchRounds: number;
+  // Last round for which CANDIDATES_EXHAUSTED was applied (dedupes repeats).
+  exhaustedRound?: number;
   createdAt: string;
   updatedAt: string;
   fundedAt?: string;

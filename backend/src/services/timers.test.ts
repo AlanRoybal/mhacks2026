@@ -40,7 +40,7 @@ test("the deadline timer refunds an unmatched job and tells the poster", async (
   const deps = testDeps();
   await deps.store.createUser(newUser({ userId: "poster", displayName: "P" }, deps.now()));
   await createJobRecord(deps, draft(deps.now(), 60), { kind: "user", userId: "poster" });
-  await applyEvent(deps, "job1", { type: "FUND_CONFIRMED" }, SYSTEM);
+  await applyEvent(deps, "job1", { type: "FUND_CONFIRMED", amountCents: 2200 }, SYSTEM);
   await deps.settle();
   assert.equal((await getJobOrThrow(deps, "job1")).state, "FUNDED");
 
@@ -53,7 +53,7 @@ test("the deadline timer refunds an unmatched job and tells the poster", async (
 test("an offer expiry timer is ignored after the worker already answered", async () => {
   const deps = testDeps();
   await createJobRecord(deps, draft(deps.now(), 600), { kind: "user", userId: "poster" });
-  await applyEvent(deps, "job1", { type: "FUND_CONFIRMED" }, SYSTEM);
+  await applyEvent(deps, "job1", { type: "FUND_CONFIRMED", amountCents: 2200 }, SYSTEM);
   const expiresAt = new Date(deps.now().getTime() + 30_000).toISOString();
   await applyEvent(deps, "job1", { type: "OFFER_SENT", offerId: "o1", workerId: "w", expiresAt }, SYSTEM);
   await applyEvent(deps, "job1", { type: "ACCEPT", offerId: "o1" }, { kind: "user", userId: "w" });

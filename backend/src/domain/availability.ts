@@ -31,23 +31,24 @@ export function isValidTimeZone(tz: string): boolean {
   }
 }
 
-function isFreeAt(av: Availability, t: Date): boolean {
+// Is the 15-minute slot [start, end) free? Slots are grid-aligned, so each lies inside one clock hour.
+function isSlotFree(av: Availability, start: number, end: number): boolean {
   if (av.weekly) {
-    const { weekday, hour } = localTime(t, av.tz);
+    const { weekday, hour } = localTime(new Date(start), av.tz);
     if (av.weekly[weekday * 24 + hour] !== "1") return false;
   }
-  const ms = t.getTime();
-  return !av.busy.some((b) => ms >= Date.parse(b.start) && ms < Date.parse(b.end));
+  return !av.busy.some((b) => Date.parse(b.start) < end && Date.parse(b.end) > start);
 }
 
 // True if there is a continuous free stretch of `minutes` between `from` and `to` (capped at 14 days).
-// Workers who never shared availability are treated as always free.
+// Workers who never shared availability are treated as always free. Errs on the side of "busy".
 export function hasFreeWindow(av: Availability | undefined, from: Date, to: Date, minutes: number): boolean {
   if (!av) return true;
+  const step = STEP_MINUTES * 60_000;
   const end = Math.min(to.getTime(), from.getTime() + HORIZON_MS);
   let run = 0;
-  for (let t = from.getTime(); t < end; t += STEP_MINUTES * 60_000) {
-    run = isFreeAt(av, new Date(t)) ? run + STEP_MINUTES : 0;
+  for (let t = Math.ceil(from.getTime() / step) * step; t + step <= end; t += step) {
+    run = isSlotFree(av, t, t + step) ? run + STEP_MINUTES : 0;
     if (run >= minutes) return true;
   }
   return false;

@@ -27,6 +27,8 @@ export function renderPush(template: PushTemplate, job: Job, offer: Offer | null
         expiresAt: offer?.expiresAt,
       };
     }
+    case "offer_closed":
+      return { ...base, title: "Offer closed", body: `${t} is no longer available.` };
     case "offer_accepted":
       return { ...base, title: "Your job was accepted", body: `A worker accepted ${t}.` };
     case "job_canceled":
@@ -49,6 +51,8 @@ export function renderPush(template: PushTemplate, job: Job, offer: Offer | null
       return { ...base, title: "Job under review", body: `${t} is waiting for an admin decision.` };
     case "resolved":
       return { ...base, title: "Dispute resolved", body: `The dispute on ${t} was resolved. Open the job for details.` };
+    case "work_rejected":
+      return { ...base, title: "Work not accepted", body: `The poster rejected ${t} after it failed review. They were refunded.` };
     case "deadline_missed":
       return { ...base, title: "Deadline passed", body: `${t} wasn't finished before its deadline. The poster has been refunded.` };
     case "unmatched_refund":

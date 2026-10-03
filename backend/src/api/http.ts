@@ -17,6 +17,8 @@ const TRANSITION_STATUS: Record<TransitionErrorCode, ContentfulStatusCode> = {
   forbidden: 403,
   offer_not_current: 409,
   offer_expired: 409,
+  not_enough_time: 409,
+  window_closed: 409,
   location_required: 400,
   too_far: 422,
   deadline_passed: 409,

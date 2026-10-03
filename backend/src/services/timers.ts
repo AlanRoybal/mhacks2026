@@ -15,6 +15,10 @@ function eventFor(p: TimerPayload): JobEvent {
       return { type: "DEADLINE_PASSED" };
     case "rematch":
       return { type: "REMATCH", round: p.round ?? -1 };
+    case "grade_timeout":
+      return { type: "GRADE_TIMEOUT", proofId: p.proofId ?? "" };
+    case "dispute_timeout":
+      return { type: "DISPUTE_TIMEOUT" };
   }
 }
 
