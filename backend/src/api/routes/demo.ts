@@ -11,6 +11,7 @@ import { briefOf } from "../../services/postings.js";
 import { fireTimer } from "../../services/timers.js";
 import type { TimerPayload } from "../../scheduler/index.js";
 import { VersionConflictError } from "../../store/index.js";
+import { isAdmin } from "../auth.js";
 import { parseBody, type AppEnv } from "../http.js";
 import { jobWire, wireDate, WireContext } from "../wire.js";
 
@@ -67,6 +68,13 @@ async function fastForward(deps: Deps, job: Job): Promise<TimerPayload | null> {
   return payload;
 }
 
+// Demo tools act on jobs you are part of (or any job, for admins).
+async function ownJob(deps: Deps, user: Parameters<typeof isAdmin>[1], jobId: string): Promise<Job> {
+  const job = await getJobOrThrow(deps, jobId);
+  if (job.posterId !== user.userId && job.workerId !== user.userId && !isAdmin(deps, user)) throw forbidden("Not your job");
+  return job;
+}
+
 export function demoRoutes(deps: Deps): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const wire = async (jobId: string, viewer: Parameters<typeof jobWire>[2]) => jobWire(new WireContext(deps), await getJobOrThrow(deps, jobId), viewer);
@@ -87,7 +95,7 @@ export function demoRoutes(deps: Deps): Hono<AppEnv> {
     const body = await parseBody(c, z.object({ jobId: z.string(), userId: z.string().optional(), handle: z.string().optional() }));
     const workerId = body.userId ?? (body.handle ? await deps.store.kvGet<string>(`identity:demo:${body.handle}`) : null);
     if (!workerId) throw notFound("Worker");
-    const job = await getJobOrThrow(deps, body.jobId);
+    const job = await ownJob(deps, c.get("user"), body.jobId);
     if (job.state !== "FUNDED") throw conflict("invalid_transition", `The job must be FUNDED (it is ${job.state})`);
     const worker = await deps.store.getUser(workerId);
     if (!worker) throw notFound("Worker");
@@ -119,7 +127,7 @@ export function demoRoutes(deps: Deps): Hono<AppEnv> {
 
   // Jump to the job's next deadline: offer expiry, review window, grading timeout, dispute window or deadline.
   app.post("/jobs/:id/fast-forward", async (c) => {
-    const job = await getJobOrThrow(deps, c.req.param("id"));
+    const job = await ownJob(deps, c.get("user"), c.req.param("id"));
     const fired = await fastForward(deps, job);
     if (!fired) throw conflict("nothing_to_do", `Nothing to fast-forward while the job is ${job.state}`);
     if (deps.inlineEffects) await deps.inlineEffects.drain();
@@ -128,7 +136,7 @@ export function demoRoutes(deps: Deps): Hono<AppEnv> {
 
   // Why did (or didn't) each person get this job? Eligibility for every user.
   app.get("/jobs/:id/explain", async (c) => {
-    const job = await getJobOrThrow(deps, c.req.param("id"));
+    const job = await ownJob(deps, c.get("user"), c.req.param("id"));
     const now = deps.now();
     const users = await deps.store.listUsers();
     const offers = await deps.store.listOffersForJob(job.jobId);

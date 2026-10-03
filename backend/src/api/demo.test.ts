@@ -50,3 +50,22 @@ test("demo routes are absent outside demo mode", async () => {
   const res = await api.call("POST", "/demo/offer", await signSession(deps, user.userId), {});
   assert.equal(res.status, 404);
 });
+
+test("demo tools only act on your own jobs", async () => {
+  const deps = testDeps({ DEMO_MODE: "true" });
+  const api = apiClient(deps);
+  const poster = await api.login("poster");
+  const stranger = await api.login("stranger");
+  const { body: draft } = await api.call("POST", "/jobs", poster.token, {
+    title: "Proofread a cover letter",
+    description: "One page",
+    category: "OTHER",
+    location: null,
+    deadline: isoIn(deps, 3),
+    payAmount: 10,
+  });
+  await api.call("POST", `/demo/jobs/${draft.id}/fund`, poster.token);
+  assert.equal((await api.call("POST", `/demo/jobs/${draft.id}/fast-forward`, stranger.token)).status, 403);
+  assert.equal((await api.call("GET", `/demo/jobs/${draft.id}/explain`, stranger.token)).status, 403);
+  assert.equal((await api.call("POST", "/demo/offer", stranger.token, { jobId: draft.id, handle: "stranger" })).status, 403);
+});
