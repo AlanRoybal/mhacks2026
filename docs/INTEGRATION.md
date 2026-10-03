@@ -6,7 +6,7 @@ The `integration` branch merges the team's work into one app and one backend:
 - `payment` (Caleb's Stripe checkout)
 - `backend`
 
-`iOS-B` is not merged: its screens overlap iosA's. Its `Job.swift` JSON is still what the backend's job routes return, so iosA can adopt those models later.
+`iOS-B` (Vishnu, poster side) is merged additively on top of this integration; see [Poster screens from iOS-B](#poster-screens-from-ios-b).
 
 ## What came from where
 
@@ -22,6 +22,18 @@ Merge decisions:
 - **Checkout target.** The Debug build sends checkout to the main backend (port 8787), so a funded job becomes a real job that gets matched. To use Caleb's server instead, point `BOUNTY_PAYMENTS_BASE_URL` at port 4242.
 - **Job card.** iosA's `Job` model gained a `funded` status, shown with the grey "pending" chip.
 - **Project file.** `PostDraft.swift` uses object IDs starting `BD…`, so they don't collide with the `A1…` IDs the payment branch adds.
+
+## Poster screens from iOS-B
+
+Added on top of the integration without changing iosA's screens, `PostDraft` or the checkout:
+
+- **Jobs › Posted** lists the poster's real jobs from `GET /jobs/mine`, polling while open. `BackendJobsAPI` signs in as the demo handle `guest-poster`, the account checkout files jobs under when it sends no session, so funded jobs appear here.
+- **A posted job** opens its status timeline (route `postedJob`). One in review opens the live **Review proof**, with per-item AI grades, approve (`POST /jobs/{id}/approve`) and dispute (`POST /jobs/{id}/dispute`, which must name a checklist item). With no job selected, Review proof shows iosA's sample.
+- **Post a job:** the address field has a locate button (search or current location). The picked coordinates go to `/payment-sheet` as the optional `location`.
+- **No backend running:** `PosterStore` switches to `MockJobsAPI` sample jobs and says so under the Posted list.
+- **Models:** the backend-shaped model is `PostedJob` (`Bounty/Models/PostedJob.swift`); `Job` stays iosA's display model for the worker screens.
+
+Verified on the iPhone 17 simulator (build, Posted list, review, approve, locate) and against `npm run dev` with curl (checkout with location, `/jobs/mine`, dispute, approve).
 
 ## Run it
 
@@ -49,10 +61,10 @@ With fake payments, Fund shows "Job funded" right away. With `PAYMENTS_PROVIDER=
 
 1. **Push tokens are never registered.** TwinKit has no call for `POST /me/devices`, so workers can't receive offers. Add it after `registerForRemoteNotifications`.
 2. **The checkout sends no session.** That's fine locally, where jobs go to a guest poster. Deployed stages need `Authorization: Bearer <token>` from TwinKit's `SessionStore` on `PaymentAPI` requests.
-3. **No location for in-person jobs.** `FundingDraft` sends no coordinates, so the backend places in-person jobs at a campus default. Add `location { latitude, longitude, address }`, geocoded from the Post screen's address.
+3. **Location for in-person jobs.** Fixed when the poster uses the address field's locate button. A typed address with no pick still has no coordinates, so the backend uses its campus default; geocoding typed addresses would close this.
 4. **Offer accept/decline from a push.** `PushNotificationManager` should read `offerId` and call `OfferService.respond`. TwinKit's `JobOffer` DTO has no fetch endpoint; use `GET /offers/{id}`.
 5. **LinkedIn redirect.** TwinKit uses the custom-scheme redirect `bounty://oauth/linkedin`. If LinkedIn rejects custom schemes, use the server flow `/auth/linkedin/start`.
-6. **Sample-data screens.** Jobs, proof capture and review still use sample data. [API.md](API.md) has the routes, and `allowedActions` on each job says which buttons to show.
+6. **Sample-data screens.** The poster side (Posted list, posted job, review) now uses real data. Worker jobs, proof capture and the "What counts as done" step still use sample data; that step shows the lawn checklist for every job, because checkout creates the job (and its AI checklist) only at funding. [API.md](API.md) has the routes, and `allowedActions` on each job says which buttons to show.
 7. **Categories don't line up.** The Post screen's categories (Yard work, Errands, …) map onto the checkout's five (Design, Home, Tutoring, Photography, Technology). Yard work and Errands both become Home, for example.
 
 AWS is owned by someone else. [backend/infra/README.md](../backend/infra/README.md) has the deploy notes and what is still open.
