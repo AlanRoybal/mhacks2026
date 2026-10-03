@@ -138,3 +138,17 @@ test("preferences use the same units as jobs: dollars, miles, latitude/longitude
   const bad = await call(app, "PUT", "/twin/prefs", token, { quietHours: { start: "25:00", end: "07:00" } });
   assert.equal(bad.status, 400);
 });
+
+test("oversized entries in a LinkedIn ZIP are never expanded", async () => {
+  const deps = testDeps();
+  const app = createApp(deps);
+  const token = await login(app, "worker1");
+  // 50 MB of one repeated character compresses to a few dozen KB.
+  const bomb = zipSync({ "Skills.csv": new Uint8Array(50_000_000).fill(65) }, { level: 9 });
+  assert.ok(bomb.length < 200_000);
+  const blobKey = await upload(deps, app, token, "linkedin_zip", bomb);
+  await call(app, "POST", "/twin/ingest", token, { blobKey, kind: "linkedin_zip" });
+  await deps.settle();
+  const { body } = await call(app, "GET", "/twin", token);
+  assert.equal(body.ingest.status, "failed");
+});

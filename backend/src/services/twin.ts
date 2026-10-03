@@ -10,6 +10,8 @@ import { updateUser } from "./users.js";
 const MAX_SKILLS = 60;
 const LINKEDIN_FILES = new Set(["Skills.csv", "Positions.csv", "Education.csv", "Certifications.csv", "Profile.csv", "Projects.csv", "Courses.csv"]);
 const MAX_CSV_CHARS = 20_000;
+// Real LinkedIn CSVs are a few KB. The cap stops a small "zip bomb" from expanding to gigabytes.
+const MAX_CSV_BYTES = 1_000_000;
 
 export const SOURCE_FOR: Record<ProfileSourceKind, SkillSourceKind> = { resume_pdf: "resume", linkedin_pdf: "linkedin", linkedin_zip: "linkedin" };
 
@@ -144,7 +146,9 @@ export function readiness(user: User, opts: { payoutsRequired: boolean }) {
 export function linkedinZipText(bytes: Buffer): string {
   let files: Record<string, Uint8Array>;
   try {
-    files = unzipSync(new Uint8Array(bytes), { filter: (f) => LINKEDIN_FILES.has(f.name.split("/").pop() ?? "") });
+    files = unzipSync(new Uint8Array(bytes), {
+      filter: (f) => LINKEDIN_FILES.has(f.name.split("/").pop() ?? "") && f.originalSize <= MAX_CSV_BYTES,
+    });
   } catch {
     throw new IngestError("That file isn't a valid ZIP. Upload the ZIP LinkedIn emailed you.");
   }
