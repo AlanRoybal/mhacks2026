@@ -133,8 +133,9 @@ export class BountyStack extends cdk.Stack {
       // Claude through the Bedrock Mantle endpoint, and Titan embeddings.
       fn.addToRolePolicy(new iam.PolicyStatement({ actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream", "bedrock-mantle:*"], resources: ["*"] }));
     }
-    // The API starts background tasks (résumé import) by invoking the worker asynchronously.
-    api.addToRolePolicy(new iam.PolicyStatement({ actions: ["lambda:InvokeFunction"], resources: [workerArn] }));
+    // Background tasks are asynchronous invocations of the worker: the API starts résumé imports, and the
+    // worker itself starts matching and grading (from ledger effects and the sweeper).
+    for (const fn of [api, worker]) fn.addToRolePolicy(new iam.PolicyStatement({ actions: ["lambda:InvokeFunction"], resources: [workerArn] }));
 
     // Outbox: every new ledger row's effects. One record at a time per shard keeps each job's effects in order.
     const deadLetters = new sqs.Queue(this, "EffectsDlq", { retentionPeriod: cdk.Duration.days(14) });
