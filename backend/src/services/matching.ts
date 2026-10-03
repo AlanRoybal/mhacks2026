@@ -51,6 +51,20 @@ export function ineligibleReason(job: Job, user: User, now: Date): string | null
   return null;
 }
 
+// How a worker is described to the ranker: top skills with where each came from.
+export function rerankCandidate(user: User, score: number, distanceKm?: number): RerankCandidate {
+  return {
+    workerId: user.userId,
+    summary: user.twin.summary,
+    skills: activeSkills(user.twin)
+      .slice(0, 8)
+      .map((s) => `${s.name} (${s.sources.map((src) => SOURCE_LABEL[src.kind]).join(", ")})`),
+    distanceKm,
+    reliability: reliability(user.stats).score,
+    score,
+  };
+}
+
 async function rankCandidates(deps: Deps, job: Job): Promise<Offer[]> {
   const now = deps.now();
   const users = await deps.store.listUsers();
@@ -69,16 +83,7 @@ async function rankCandidates(deps: Deps, job: Job): Promise<Offer[]> {
   if (pool.length === 0) return [];
 
   const byId = new Map(pool.map((c) => [c.user.userId, c]));
-  const input: RerankCandidate[] = pool.map((c) => ({
-    workerId: c.user.userId,
-    summary: c.user.twin.summary,
-    skills: activeSkills(c.user.twin)
-      .slice(0, 8)
-      .map((s) => `${s.name} (${s.sources.map((src) => SOURCE_LABEL[src.kind]).join(", ")})`),
-    distanceKm: c.distanceKm,
-    reliability: reliability(c.user.stats).score,
-    score: c.score,
-  }));
+  const input = pool.map((c) => rerankCandidate(c.user, c.score, c.distanceKm));
   const picks = await deps.ai.rerank(briefOf(job), input);
 
   const seen = new Set<string>();

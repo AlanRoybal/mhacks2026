@@ -6,6 +6,7 @@ import type { Deps } from "../deps.js";
 import { notFound } from "../lib/errors.js";
 import { authRoutes, requireAuth } from "./auth.js";
 import { adminRoutes } from "./routes/admin.js";
+import { demoRoutes } from "./routes/demo.js";
 import { toErrorResponse, type AppEnv } from "./http.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { localBlobRoutes } from "./routes/localBlobs.js";
@@ -45,6 +46,7 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   authed.route("/jobs", fundingRoutes(deps));
   authed.route("/wallet", walletRoutes(deps));
   authed.route("/admin", adminRoutes(deps));
+  if (deps.config.DEMO_MODE || deps.config.STAGE === "local") authed.route("/demo", demoRoutes(deps));
   app.route("/", authed);
 
   return app;
