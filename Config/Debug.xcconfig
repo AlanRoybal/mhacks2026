@@ -1,3 +1,4 @@
 BOUNTY_PAYMENTS_BASE_URL = http:/$()/127.0.0.1:4242
 BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER =
+BOUNTY_CODE_SIGN_ENTITLEMENTS = Bounty/Bounty.entitlements
 #include? "Local.xcconfig"

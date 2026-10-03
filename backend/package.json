@@ -11,7 +11,8 @@
     "start": "node --env-file-if-exists=.env server.mjs",
     "test": "node --test payments.test.mjs",
     "test:sandbox": "node --env-file=.env smoke-test.mjs",
-    "webhooks": "stripe --config .stripe/config.toml listen --events payment_intent.succeeded,payment_intent.payment_failed,payment_intent.processing --forward-to http://127.0.0.1:4242/stripe/webhook"
+    "test:webhook": "node --env-file=.env smoke-test.mjs --webhook",
+    "webhooks": "stripe --config .stripe/config.toml listen --events payment_intent.succeeded,payment_intent.payment_failed,payment_intent.processing,payment_intent.canceled --forward-to http://127.0.0.1:4242/stripe/webhook"
   },
   "dependencies": {
     "express": "^5.2.1",

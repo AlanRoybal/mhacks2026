@@ -12,8 +12,8 @@ export function createApp({ payments, stripe, webhookSecret }) {
     try { event = stripe.webhooks.constructEvent(req.body, req.get('stripe-signature'), webhookSecret); }
     catch { return res.status(400).json({ error: 'Invalid webhook signature.' }); }
     try {
-      if (['payment_intent.succeeded', 'payment_intent.payment_failed', 'payment_intent.processing'].includes(event.type)) {
-        payments.applyIntent(event.data.object);
+      if (['payment_intent.succeeded', 'payment_intent.payment_failed', 'payment_intent.processing', 'payment_intent.canceled'].includes(event.type)) {
+        payments.applyIntent(event.data.object, { source: 'webhook', stripeEventID: event.id });
       }
       res.json({ received: true });
     } catch (error) { next(error); }

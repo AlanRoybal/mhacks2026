@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RootTabView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selection = AppTab.home
     @StateObject private var postedJobs = PostedJobsStore()
 
@@ -48,7 +49,9 @@ struct RootTabView: View {
         }
         .tint(BountyTheme.accent)
         .environmentObject(postedJobs)
-        .task { await postedJobs.refresh() }
+        .task(id: scenePhase) {
+            if scenePhase == .active { await postedJobs.refresh() }
+        }
         .onAppear(perform:consumePendingPushRoute)
         .onReceive(NotificationCenter.default.publisher(for: .pushRouteChanged)) { _ in
             consumePendingPushRoute()
