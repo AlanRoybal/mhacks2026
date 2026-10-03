@@ -47,6 +47,38 @@ final class PosterStore {
         }
     }
 
+    // MARK: Posting
+
+    /// Sends the form to `jobs/create` and returns the DRAFT job with its AI-generated checklist.
+    func createJob(_ draft: NewJobDraft) async throws -> Job {
+        let job = try await api.createJob(draft)
+        upsert(job)
+        return job
+    }
+
+    /// Saves the poster's checklist edits. Only allowed while the job is a draft.
+    func updateChecklist(jobId: String, checklist: [ChecklistItem]) async throws -> Job {
+        let job = try await api.updateChecklist(jobId: jobId, checklist: checklist)
+        upsert(job)
+        return job
+    }
+
+    /// Uploads one JPEG through a presigned S3 URL and returns the photo's permanent URL.
+    func uploadPhoto(jpegData: Data) async throws -> URL {
+        let upload = try await api.presignUpload(contentType: "image/jpeg")
+        // The mock hands out an unreachable upload URL; skip the PUT so it works offline.
+        guard upload.uploadURL.host() != "mock-uploads.invalid" else { return upload.fileURL }
+
+        var request = URLRequest(url: upload.uploadURL)
+        request.httpMethod = "PUT"
+        request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+        let (_, response) = try await URLSession.shared.upload(for: request, from: jpegData)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw JobsAPIError.server("The photo didn't upload. Try again.")
+        }
+        return upload.fileURL
+    }
+
     /// Jobs where the poster needs to act come first, then everything else by date.
     var sortedJobs: [Job] {
         jobs.sorted { lhs, rhs in
