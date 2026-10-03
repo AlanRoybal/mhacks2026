@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct JobsView: View {
-    @Environment(PosterStore.self) private var posterStore
     @State private var selection = JobCollection.working
 
     private var workerJobs: [Job] {

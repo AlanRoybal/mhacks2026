@@ -237,7 +237,7 @@ enum PosterFixtures {
 
     static func proof(for job: Job) -> Proof {
         Proof(
-            items: job.checklist.map { item in
+            items: job.checklist.map { item -> ProofItem in
                 switch item.evidenceType {
                 case .photo:
                     ProofItem(checklistItemId: item.id, photoURLs: (0..<(item.photoCount ?? 1)).map { photo("\(item.id)-after-\($0)") })
@@ -252,7 +252,7 @@ enum PosterFixtures {
     }
 
     static func verdicts(for job: Job) -> [Verdict] {
-        job.checklist.enumerated().map { index, item in
+        job.checklist.enumerated().map { index, item -> Verdict in
             // The last item is a low-confidence pass so the review screen shows both looks.
             let isLast = index == job.checklist.count - 1 && job.checklist.count > 1
             return Verdict(

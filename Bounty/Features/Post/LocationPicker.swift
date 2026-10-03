@@ -100,13 +100,21 @@ struct LocationPicker: View {
 }
 
 /// Location lookups that return plain `JobLocation` values, so no MapKit or CoreLocation
-/// objects cross between threads.
+/// objects cross between threads. Runs on the main actor because some MapKit types are
+/// main-actor only; the searches themselves are async and don't block the UI.
+@MainActor
 enum LocationLookup {
     enum LookupError: Error {
         case unavailable
     }
 
-    nonisolated static func search(_ query: String) async throws -> [JobLocation] {
+    /// A location fix as plain numbers, so it can safely leave the task that produced it.
+    private struct Fix: Sendable {
+        let latitude: Double
+        let longitude: Double
+    }
+
+    static func search(_ query: String) async throws -> [JobLocation] {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
         // Bias results toward Ann Arbor, where the demo's jobs live.
@@ -116,7 +124,7 @@ enum LocationLookup {
             longitudinalMeters: 30_000
         )
         let response = try await MKLocalSearch(request: request).start()
-        return response.mapItems.prefix(8).map { item in
+        return response.mapItems.prefix(8).map { item -> JobLocation in
             let coordinate = item.placemark.coordinate
             let name = item.name ?? ""
             let address = item.placemark.title ?? ""
@@ -126,11 +134,14 @@ enum LocationLookup {
     }
 
     /// Waits for the first location fix (up to 10 seconds) and turns it into a street address.
-    nonisolated static func current() async throws -> JobLocation {
-        let fix = try await withThrowingTaskGroup(of: CLLocation?.self) { group in
+    static func current() async throws -> JobLocation {
+        // CLLocation isn't Sendable, so each child task hands back plain numbers instead.
+        let fix = try await withThrowingTaskGroup(of: Fix?.self, returning: Fix?.self) { group in
             group.addTask {
                 for try await update in CLLocationUpdate.liveUpdates() {
-                    if let location = update.location { return location }
+                    if let location = update.location {
+                        return Fix(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
+                    }
                 }
                 return nil
             }
@@ -144,13 +155,14 @@ enum LocationLookup {
         }
         guard let fix else { throw LookupError.unavailable }
 
-        let placemark = try? await CLGeocoder().reverseGeocodeLocation(fix).first
+        let location = CLLocation(latitude: fix.latitude, longitude: fix.longitude)
+        let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first
         let address = [placemark?.subThoroughfare, placemark?.thoroughfare, placemark?.locality]
             .compactMap { $0 }
             .joined(separator: " ")
         return JobLocation(
-            latitude: fix.coordinate.latitude,
-            longitude: fix.coordinate.longitude,
+            latitude: fix.latitude,
+            longitude: fix.longitude,
             address: address.isEmpty ? "Current location" : address
         )
     }
