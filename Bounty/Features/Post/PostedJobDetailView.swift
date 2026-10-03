@@ -1,267 +1,230 @@
 import SwiftUI
 
-/// A job the poster posted, followed live (plan step 6, feature 11). Shows where the job is on
-/// the six-step timeline, who's doing it, and what the poster should do next. The screen polls
-/// while open, so status changes from the backend appear on their own.
+/// A job the poster posted, followed live (plan step 6, feature 11), in Alan's visual style.
+/// Shows where the job is on the six-step timeline, who's doing it, and what to do next.
+/// Polls while open, so status changes from the backend appear on their own.
 struct PostedJobDetailView: View {
+    @Environment(AppRouter.self) private var router
     @Environment(PosterStore.self) private var store
-    let jobId: String
 
-    @State private var isFunding = false
-    @State private var isReviewing = false
-
-    private var job: Job? { store.jobs.first { $0.id == jobId } }
+    private var job: Job? { store.job(router.posterJobId) }
 
     var body: some View {
-        List {
-            if let job {
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(job.payText)
-                            .font(.largeTitle.bold())
-                        Text(job.title)
-                            .font(.title3.weight(.semibold))
-                        Text("\(job.isRemote ? "Remote" : job.location?.address ?? "") · Due \(job.deadlineText)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 8, trailing: 4))
+        BountyScreen {
+            NavRow(leadingAction: router.back) {
+                if let job {
+                    Chip(label: job.status.displayName, tone: job.status.chipTone)
                 }
+            } trailing: {
+                EmptyView()
+            }
+            .entrance(.top)
 
-                NextActionSection(
-                    job: job,
-                    onFund: { isFunding = true },
-                    onReview: { isReviewing = true }
-                )
+            if let job {
+                HStack(spacing: 14) {
+                    StickerTile(sticker: job.sticker, background: job.tileColor, size: 64, stickerSize: 54, radius: 19)
+                    TitleSubtitle(
+                        title: job.title,
+                        subtitle: "\(job.payShort) · Due \(job.deadlineText)",
+                        titleType: .headline
+                    )
+                }
+                .entrance(.top)
 
-                if job.status != .draft {
-                    Section("Progress") {
-                        StatusTimeline(job: job)
+                if let note = statusNote(for: job) {
+                    HStack(spacing: 12) {
+                        StickerView(sticker: note.sticker, size: 40)
+                        Text(note.text)
+                            .bountyType(.subhead)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .foregroundStyle(note.ink)
+                    .padding(14)
+                    .tintedPanel(note.fill, radius: BountyRadius.row)
+                    .entrance(.top)
                 }
 
                 if let worker = job.worker {
-                    Section("Worker") {
-                        HStack {
-                            Label(worker.name, systemImage: "person.crop.circle.fill")
-                            Spacer()
-                            if let rating = worker.rating {
-                                Label(rating.formatted(.number.precision(.fractionLength(1))), systemImage: "star.fill")
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text("New worker")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                    HStack(spacing: 12) {
+                        InitialsAvatar(initials: initials(worker.name), background: BountyColor.lavenderSoft, foreground: BountyColor.lavenderInk)
+                        TitleSubtitle(
+                            title: worker.name,
+                            subtitle: worker.rating.map { "★ \($0.formatted(.number.precision(.fractionLength(1))))" } ?? "New worker"
+                        )
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .borderedCard(radius: BountyRadius.row)
+                    .entrance(.rest(0))
                 }
 
-                Section("What counts as done") {
+                if job.status != .draft {
+                    StatusTimeline(job: job)
+                        .padding(16)
+                        .borderedCard()
+                        .entrance(.rest(1))
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Text("What counts as done")
+                            .bountyType(.bodyStrong)
+                            .foregroundStyle(BountyColor.inkPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Chip(label: job.status == .draft ? "Editable" : "Locked", tone: .grey)
+                    }
                     ForEach(job.checklist) { item in
-                        ChecklistStatusRow(item: item, verdict: job.verdict(for: item))
+                        HStack(spacing: 12) {
+                            StatusBadge(status: badge(for: item, in: job))
+                            TitleSubtitle(
+                                title: item.text,
+                                subtitle: item.evidenceSummary,
+                                titleType: .subhead,
+                                subtitleType: .footnote
+                            )
+                        }
+                        .padding(.vertical, 6)
                     }
                 }
-            } else {
-                ContentUnavailableView("Job not found", systemImage: "questionmark.folder")
+                .padding(16)
+                .borderedCard()
+                .entrance(.rest(2))
             }
-        }
-        .navigationTitle(job?.status.displayName ?? "Job")
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $isFunding) {
+        } bottom: {
             if let job {
-                FundJobView(job: job) { _ in isFunding = false }
+                switch job.status {
+                case .draft:
+                    PillButton(title: "Fund the job", icon: .lock) {
+                        router.open(.fundJob, posterJob: job.id)
+                    }
+                case .inReview:
+                    PillButton(title: "Review the work", icon: .shieldCheck) {
+                        router.open(.reviewProof, posterJob: job.id)
+                    }
+                default:
+                    EmptyView()
+                }
             }
-        }
-        .navigationDestination(isPresented: $isReviewing) {
-            ReviewWorkView(jobId: jobId)
         }
         .task {
-            // Poll while the screen is open so status changes appear live. Fine for the demo;
-            // push notifications (step 7) take over once they're wired up.
+            guard let jobId = router.posterJobId else { return }
             while !Task.isCancelled {
                 await store.refresh(jobId: jobId)
                 try? await Task.sleep(for: .seconds(2))
             }
         }
     }
-}
 
-// MARK: - Next action
+    private struct StatusNote {
+        let text: String
+        let sticker: Sticker
+        let fill: Color
+        let ink: Color
+    }
 
-/// The one thing the poster should know or do right now, placed above the timeline.
-private struct NextActionSection: View {
-    let job: Job
-    let onFund: () -> Void
-    let onReview: () -> Void
-
-    var body: some View {
+    /// The one thing the poster should know right now.
+    private func statusNote(for job: Job) -> StatusNote? {
         switch job.status {
         case .draft:
-            Section {
-                Text("This job isn't live yet. Workers see it once it's funded.")
-                Button("Fund the job", systemImage: "lock.fill", action: onFund)
-                    .font(.headline)
-            }
-        case .inReview:
-            Section {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("The work is in. Your turn.")
-                        .font(.headline)
-                    if let deadline = job.reviewDeadline, deadline > .now {
-                        Text("Payment releases automatically in \(Text(deadline, style: .timer))")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Button("Review the work", systemImage: "checklist", action: onReview)
-                    .font(.headline)
-            }
-        case .disputed:
-            Section {
-                Label("You disputed this job. The AI takes a second look, then a person decides.", systemImage: "exclamationmark.bubble")
-            }
-        case .released:
-            Section {
-                Label("Done. \(job.worker?.name ?? "The worker") was paid \(job.payText).", systemImage: "checkmark.seal.fill")
-                    .foregroundStyle(BountyTheme.success)
-            }
-        case .refunded:
-            Section {
-                Label("Refunded. No one finished this job by the deadline, so your \(job.payText) came back to you.", systemImage: "arrow.uturn.backward.circle")
-            }
+            return StatusNote(text: "Not live yet. Workers see it once it’s funded.", sticker: .coins, fill: BountyColor.cream, ink: BountyColor.creamInk)
         case .funded, .offered, .accepted, .inProgress, .submitted:
-            EmptyView()
+            return StatusNote(text: "\(job.payShort) is held safely. It releases when the proof passes and you approve, or the review window closes.", sticker: .shield, fill: BountyColor.mint, ink: BountyColor.mintInk)
+        case .inReview:
+            return StatusNote(text: "The work is in. Your turn to review.", sticker: .check, fill: BountyColor.cream, ink: BountyColor.creamInk)
+        case .disputed:
+            return StatusNote(text: "You disputed this job. The AI takes a second look, then a person decides.", sticker: .shield, fill: BountyColor.cream, ink: BountyColor.creamInk)
+        case .released:
+            return StatusNote(text: "Done. \(job.worker?.name ?? "The worker") was paid \(job.payShort).", sticker: .coins, fill: BountyColor.mint, ink: BountyColor.mintInk)
+        case .refunded:
+            return StatusNote(text: "Refunded. No one finished by the deadline, so your \(job.payShort) came back.", sticker: .coins, fill: BountyColor.pill, ink: BountyColor.inkPill)
         }
+    }
+
+    private func badge(for item: ChecklistItem, in job: Job) -> StepStatus {
+        guard let verdict = job.verdict(for: item) else { return .todo }
+        return verdict.pass && verdict.confidence >= Verdict.reviewThreshold ? .done : .active
+    }
+
+    private func initials(_ name: String) -> String {
+        name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
     }
 }
 
-// MARK: - Timeline
-
-/// The six steps from plan feature 11, done ones checked and the current one highlighted.
+/// The six steps from plan feature 11, in the horizontal style of Alan's worker timeline:
+/// green for done, a wide yellow capsule for the current step.
 private struct StatusTimeline: View {
     let job: Job
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(TimelineStep.allCases, id: \.self) { step in
-                TimelineRow(
-                    step: step,
-                    state: state(of: step),
-                    detail: detail(for: step),
-                    isLast: step == TimelineStep.allCases.last
-                )
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 4) {
+                ForEach(TimelineStep.allCases, id: \.self) { step in
+                    let phase = status(of: step)
+                    VStack(spacing: 5) {
+                        Capsule()
+                            .fill(color(for: phase))
+                            .frame(width: phase == .active ? 34 : 14, height: 14)
+                        Text(shortTitle(step))
+                            .bountyType(.caption)
+                            .foregroundStyle(phase == .todo ? BountyColor.inkTertiary : BountyColor.inkPrimary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityValue(phase == .done ? "Done" : phase == .active ? "Current step" : "Not yet")
+                }
+            }
+            if let detail = currentDetail {
+                Text(detail)
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.inkSecondary)
             }
         }
-        .padding(.vertical, 4)
     }
 
-    private func state(of step: TimelineStep) -> TimelineRow.Phase {
-        guard let current = job.status.timelineStep else { return .upcoming }
+    private func status(of step: TimelineStep) -> StepStatus {
+        guard let current = job.status.timelineStep else { return .todo }
         if job.status == .released || step.rawValue < current.rawValue { return .done }
-        return step == current ? .current : .upcoming
+        return step == current ? .active : .todo
     }
 
-    /// A short line under the current step saying what's happening.
-    private func detail(for step: TimelineStep) -> String? {
-        guard state(of: step) == .current else { return nil }
+    private func shortTitle(_ step: TimelineStep) -> String {
+        switch step {
+        case .funded: "Funded"
+        case .offered: "Offered"
+        case .accepted: "Accepted"
+        case .inProgress: "Working"
+        case .submitted: "Review"
+        case .paid: "Paid"
+        }
+    }
+
+    private func color(for status: StepStatus) -> Color {
+        switch status {
+        case .done: BountyColor.green
+        case .active: BountyColor.yellow
+        case .todo: BountyColor.pill
+        }
+    }
+
+    /// A short line saying what's happening at the current step.
+    private var currentDetail: String? {
         switch job.status {
-        case .funded: return "Your payment is held in escrow."
-        case .offered: return "Twins are matching it with nearby workers."
-        case .accepted: return "\(job.worker?.name ?? "A worker") accepted the job."
-        case .inProgress: return "\(job.worker?.name ?? "The worker") is on it."
-        case .submitted: return "Proof is in. The AI is checking it."
-        case .inReview: return "The AI checked the proof. Waiting for you."
-        case .disputed: return "Under dispute."
-        case .draft, .released, .refunded: return nil
+        case .funded: "Your payment is held in escrow."
+        case .offered: "Twins are matching it with nearby workers."
+        case .accepted: "\(job.worker?.name ?? "A worker") accepted the job."
+        case .inProgress: "\(job.worker?.name ?? "The worker") is on it."
+        case .submitted: "Proof is in. The AI is checking it."
+        case .inReview: "The AI checked the proof. Waiting for you."
+        case .disputed: "Under dispute."
+        case .draft, .released, .refunded: nil
         }
-    }
-}
-
-private struct TimelineRow: View {
-    enum Phase { case done, current, upcoming }
-
-    let step: TimelineStep
-    let state: Phase
-    let detail: String?
-    let isLast: Bool
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(spacing: 0) {
-                marker
-                if !isLast {
-                    Rectangle()
-                        .fill(state == .done ? BountyTheme.accent : Color.secondary.opacity(0.3))
-                        .frame(width: 2)
-                        .frame(minHeight: 22)
-                }
-            }
-            .frame(width: 20)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(step.title)
-                    .font(.subheadline.weight(state == .current ? .semibold : .regular))
-                    .foregroundStyle(state == .upcoming ? .secondary : .primary)
-                if let detail {
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.bottom, isLast ? 0 : 10)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityValue(state == .done ? "Done" : state == .current ? "Current step" : "Not yet")
-    }
-
-    @ViewBuilder
-    private var marker: some View {
-        switch state {
-        case .done:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(BountyTheme.accent)
-        case .current:
-            Image(systemName: "circle.inset.filled")
-                .foregroundStyle(BountyTheme.accent)
-                .symbolEffect(.pulse)
-        case .upcoming:
-            Image(systemName: "circle")
-                .foregroundStyle(.tertiary)
-        }
-    }
-}
-
-// MARK: - Checklist
-
-/// One requirement with its AI grade once the proof is in.
-private struct ChecklistStatusRow: View {
-    let item: ChecklistItem
-    let verdict: Verdict?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(item.text)
-            if let verdict {
-                Label(
-                    "\(verdict.pass ? "Pass" : "Fail") · \(verdict.confidence.formatted(.percent.precision(.fractionLength(0)))) confident",
-                    systemImage: verdict.pass ? "checkmark.circle.fill" : "xmark.circle.fill"
-                )
-                .font(.caption)
-                .foregroundStyle(verdict.pass ? BountyTheme.success : BountyTheme.warning)
-            } else {
-                Label(item.evidenceSummary, systemImage: item.evidenceType.symbolName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 2)
     }
 }
 
 #Preview {
-    NavigationStack {
-        PostedJobDetailView(jobId: "job_lawn")
-    }
-    .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))
+    PostedJobDetailView()
+        .environment(AppRouter())
+        .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))
 }

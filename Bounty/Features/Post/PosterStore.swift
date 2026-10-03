@@ -10,6 +10,8 @@ final class PosterStore {
     var errorMessage: String?
 
     let api: any JobsAPI
+    /// The Post tab's form. Lives here so it survives moving between the posting screens.
+    let form = CreateJobModel()
 
     init(api: any JobsAPI) {
         self.api = api
@@ -37,6 +39,11 @@ final class PosterStore {
             errorMessage = error.localizedDescription
             return nil
         }
+    }
+
+    func job(_ id: String?) -> Job? {
+        guard let id else { return nil }
+        return jobs.first { $0.id == id }
     }
 
     func upsert(_ job: Job) {
@@ -121,5 +128,18 @@ final class PosterStore {
             }
             return lhs.createdAt > rhs.createdAt
         }
+    }
+}
+
+/// Where Payments plugs in Stripe. Replace the body of `collectPayment` with the PaymentSheet
+/// flow (configure with `session.publishableKey`, present with
+/// `session.paymentIntentClientSecret`, return true on `.completed`). Everything else in the
+/// poster flow already calls through here.
+enum PaymentHandoff {
+    @MainActor
+    static func collectPayment(session: FundingSession, job: Job) async throws -> Bool {
+        // Mock: pretend the sheet was shown and the poster paid.
+        try await Task.sleep(for: .seconds(1))
+        return true
     }
 }

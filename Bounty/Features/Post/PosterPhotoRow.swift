@@ -1,9 +1,10 @@
 import PhotosUI
 import SwiftUI
 
-/// The form's photo section. Posters may use the camera or their library here; the
-/// camera-only rule applies to the worker's proof, not to describing the job.
-struct PosterPhotosSection: View {
+/// The row of photo tiles at the top of "Post a job", ending in an "Add photo" tile, as in the
+/// design. Posters may use the camera or their library here; the camera-only rule applies to
+/// the worker's proof, not to describing the job. Photos upload as soon as they're added.
+struct PosterPhotoRow: View {
     @Environment(PosterStore.self) private var store
     let model: CreateJobModel
 
@@ -16,10 +17,17 @@ struct PosterPhotosSection: View {
     }
 
     var body: some View {
-        Section {
-            // A row of photo tiles ending in an "Add photo" tile, as in the design.
+        VStack(alignment: .leading, spacing: 6) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
+                    if model.photos.isEmpty {
+                        // The category's sticker stands in until there's a real photo.
+                        StickerTile(
+                            sticker: model.category?.sticker ?? .camera,
+                            background: model.category?.tileColor ?? BountyColor.pill,
+                            size: 84, stickerSize: 66, radius: 18
+                        )
+                    }
                     ForEach(model.photos) { photo in
                         PhotoThumbnail(
                             photo: photo,
@@ -38,13 +46,11 @@ struct PosterPhotosSection: View {
                         }
                     }
                 }
-                .padding(.vertical, 4)
             }
-        } footer: {
-            if model.category?.suggestsBeforePhotos == true {
-                Text("Add 2 to 4 photos showing the current state. Workers match these angles in their proof.")
-            } else {
-                Text("Optional. Photos help workers understand the job.")
+            if model.category?.suggestsBeforePhotos == true && model.photos.isEmpty {
+                Text("Add 2 to 4 photos of how it looks now. Workers match these angles in their proof.")
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.inkSecondary)
             }
         }
         .photosPicker(
@@ -76,20 +82,19 @@ struct PosterPhotosSection: View {
 
 private struct AddPhotoTile: View {
     var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: "photo.badge.plus")
-                .font(.title3)
+        VStack(spacing: 4) {
+            IconGlyph(icon: .images, size: 22)
             Text("Add photo")
-                .font(.caption.weight(.medium))
+                .bountyType(.caption)
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(BountyColor.inkSecondary)
         .frame(width: 84, height: 84)
+        .background(BountyColor.field, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                .foregroundStyle(.tertiary)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(BountyColor.inkTertiary, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
         }
-        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -104,27 +109,20 @@ private struct PhotoThumbnail: View {
                 .resizable()
                 .scaledToFill()
                 .frame(width: 84, height: 84)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .opacity(photo.state == .uploading ? 0.5 : 1)
 
             switch photo.state {
             case .uploading:
                 ProgressView()
             case .failed:
-                Button("Retry", systemImage: "arrow.clockwise", action: onRetry)
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderedProminent)
-                    .tint(BountyTheme.warning)
+                IconButton(icon: .refresh, label: "Retry upload", size: 36, iconSize: 18, background: BountyColor.coral, foreground: BountyColor.inkInverse, action: onRetry)
             case .uploaded:
                 EmptyView()
             }
         }
         .overlay(alignment: .topTrailing) {
-            Button("Remove photo", systemImage: "xmark.circle.fill", action: onRemove)
-                .labelStyle(.iconOnly)
-                .symbolRenderingMode(.palette)
-                .foregroundStyle(.white, .black.opacity(0.6))
-                .buttonStyle(.plain)
+            IconButton(icon: .x, label: "Remove photo", size: 24, iconSize: 12, background: BountyColor.inkPill, foreground: BountyColor.inkInverse, action: onRemove)
                 .padding(4)
         }
     }
