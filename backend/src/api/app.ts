@@ -16,6 +16,7 @@ import { fundingRoutes, publicPaymentRoutes, walletRoutes } from "./routes/payme
 import { proofRoutes } from "./routes/proof.js";
 import { reviewRoutes } from "./routes/review.js";
 import { twinRoutes } from "./routes/twin.js";
+import { twinKitRoutes } from "./routes/twinkit.js";
 import { fileRoutes, uploadRoutes } from "./routes/uploads.js";
 
 export function createApp(deps: Deps): Hono<AppEnv> {
@@ -46,6 +47,8 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   authed.route("/jobs", fundingRoutes(deps));
   authed.route("/wallet", walletRoutes(deps));
   authed.route("/admin", adminRoutes(deps));
+  // The same features in the shape TwinKit (iosA's networking package) expects.
+  authed.route("/", twinKitRoutes(deps));
   if (deps.config.DEMO_MODE || deps.config.STAGE === "local") authed.route("/demo", demoRoutes(deps));
   app.route("/", authed);
 

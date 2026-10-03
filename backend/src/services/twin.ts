@@ -95,6 +95,38 @@ export function upsertSkill(twin: Twin, input: { name: string; level?: number; c
   return { ...twin, skills, updatedAt: now };
 }
 
+// Makes the active skills exactly `skills` (TwinKit sends the whole edited list). Skills left out are
+// tombstoned; listed ones are kept with their sources, renamed or re-weighted as the user edited them.
+export function replaceSkills(twin: Twin, skills: { name: string; confidence?: number }[], now: string): Twin {
+  const wanted = new Map(skills.map((s) => [normName(s.name), s]));
+  const next = twin.skills.map((s) => structuredClone(s));
+  for (const skill of next) {
+    const edit = wanted.get(skill.normName);
+    if (!edit) {
+      if (!skill.deleted) Object.assign(skill, { deleted: true, userEdited: true });
+      continue;
+    }
+    const confidence = clamp(edit.confidence ?? skill.confidence, 0, 1);
+    if (skill.deleted || skill.name !== edit.name.trim() || skill.confidence !== confidence) {
+      Object.assign(skill, { name: edit.name.trim(), confidence, deleted: false, userEdited: true });
+    }
+    wanted.delete(skill.normName);
+  }
+  for (const [key, s] of wanted) {
+    if (!key) continue;
+    next.push({
+      normName: key,
+      name: s.name.trim(),
+      level: 3,
+      confidence: clamp(s.confidence ?? 1, 0, 1),
+      sources: [{ kind: "user", evidence: "Added by you" }],
+      userEdited: true,
+      deleted: false,
+    });
+  }
+  return { ...twin, skills: next, updatedAt: now };
+}
+
 export function deleteSkill(twin: Twin, key: string, now: string): Twin | null {
   const skills = twin.skills.map((s) => structuredClone(s));
   const skill = skills.find((s) => s.normName === key && !s.deleted);
