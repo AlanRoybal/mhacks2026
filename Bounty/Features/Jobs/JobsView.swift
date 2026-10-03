@@ -319,9 +319,9 @@ private struct ProofPhoto: View {
             .overlay(alignment: .topLeading) {
                 Chip(label: label, tone: .dark).padding(10)
             }
-        .clipShape(RoundedRectangle(cornerRadius: BountyRadius.row, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label) photo")
+            .clipShape(RoundedRectangle(cornerRadius: BountyRadius.row, style: .continuous))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(label) photo")
     }
 }
 
