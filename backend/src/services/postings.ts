@@ -23,6 +23,8 @@ export interface DraftInput {
   bountyCents: number;
   currency: Currency;
   photos: string[];
+  // Client-chosen ID (the payments checkout creates its own UUIDs). Defaults to a new ULID.
+  jobId?: string;
 }
 
 // A checklist item as the app sends it. Fields it leaves out keep their previous value (matched by id).
@@ -96,7 +98,8 @@ function fromDraft(draft: ChecklistDraft, job: JobBrief): { checklist: Checklist
   };
 }
 
-function validateDeadline(deps: Deps, deadline: string): string {
+// Deadlines are 30 minutes to 30 days away, when posting and when extending (UPDATE_TERMS).
+export function validateDeadline(deps: Deps, deadline: string): string {
   const ms = Date.parse(deadline);
   const now = deps.now().getTime();
   if (!Number.isFinite(ms)) throw badRequest("Invalid deadline");
@@ -124,7 +127,7 @@ export async function createDraft(deps: Deps, poster: User, input: DraftInput): 
   const generated = fromDraft(await deps.ai.generateChecklist(briefOf(base)), briefOf(base));
   const now = deps.now().toISOString();
   const job: Job = {
-    jobId: newId(deps.now().getTime()),
+    jobId: input.jobId ?? newId(deps.now().getTime()),
     posterId: poster.userId,
     ...base,
     photos: validatePhotos(poster, input.photos),

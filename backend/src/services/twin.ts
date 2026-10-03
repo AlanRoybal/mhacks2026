@@ -10,6 +10,8 @@ import { updateUser } from "./users.js";
 const MAX_SKILLS = 60;
 const LINKEDIN_FILES = new Set(["Skills.csv", "Positions.csv", "Education.csv", "Certifications.csv", "Profile.csv", "Projects.csv", "Courses.csv"]);
 const MAX_CSV_CHARS = 20_000;
+// Real LinkedIn CSVs are a few KB. The cap stops a small "zip bomb" from expanding to gigabytes.
+const MAX_CSV_BYTES = 1_000_000;
 
 export const SOURCE_FOR: Record<ProfileSourceKind, SkillSourceKind> = { resume_pdf: "resume", linkedin_pdf: "linkedin", linkedin_zip: "linkedin" };
 
@@ -93,6 +95,38 @@ export function upsertSkill(twin: Twin, input: { name: string; level?: number; c
   return { ...twin, skills, updatedAt: now };
 }
 
+// Makes the active skills exactly `skills` (TwinKit sends the whole edited list). Skills left out are
+// tombstoned; listed ones are kept with their sources, renamed or re-weighted as the user edited them.
+export function replaceSkills(twin: Twin, skills: { name: string; confidence?: number }[], now: string): Twin {
+  const wanted = new Map(skills.map((s) => [normName(s.name), s]));
+  const next = twin.skills.map((s) => structuredClone(s));
+  for (const skill of next) {
+    const edit = wanted.get(skill.normName);
+    if (!edit) {
+      if (!skill.deleted) Object.assign(skill, { deleted: true, userEdited: true });
+      continue;
+    }
+    const confidence = clamp(edit.confidence ?? skill.confidence, 0, 1);
+    if (skill.deleted || skill.name !== edit.name.trim() || skill.confidence !== confidence) {
+      Object.assign(skill, { name: edit.name.trim(), confidence, deleted: false, userEdited: true });
+    }
+    wanted.delete(skill.normName);
+  }
+  for (const [key, s] of wanted) {
+    if (!key) continue;
+    next.push({
+      normName: key,
+      name: s.name.trim(),
+      level: 3,
+      confidence: clamp(s.confidence ?? 1, 0, 1),
+      sources: [{ kind: "user", evidence: "Added by you" }],
+      userEdited: true,
+      deleted: false,
+    });
+  }
+  return { ...twin, skills: next, updatedAt: now };
+}
+
 export function deleteSkill(twin: Twin, key: string, now: string): Twin | null {
   const skills = twin.skills.map((s) => structuredClone(s));
   const skill = skills.find((s) => s.normName === key && !s.deleted);
@@ -144,7 +178,9 @@ export function readiness(user: User, opts: { payoutsRequired: boolean }) {
 export function linkedinZipText(bytes: Buffer): string {
   let files: Record<string, Uint8Array>;
   try {
-    files = unzipSync(new Uint8Array(bytes), { filter: (f) => LINKEDIN_FILES.has(f.name.split("/").pop() ?? "") });
+    files = unzipSync(new Uint8Array(bytes), {
+      filter: (f) => LINKEDIN_FILES.has(f.name.split("/").pop() ?? "") && f.originalSize <= MAX_CSV_BYTES,
+    });
   } catch {
     throw new IngestError("That file isn't a valid ZIP. Upload the ZIP LinkedIn emailed you.");
   }

@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import type { Deps } from "../../deps.js";
 import { TransitionError } from "../../domain/jobMachine.js";
-import type { Offer, User } from "../../domain/types.js";
+import type { Job, Offer, User } from "../../domain/types.js";
 import { notFound } from "../../lib/errors.js";
 import { applyEvent, getJobOrThrow } from "../../services/jobs.js";
 import type { AppEnv } from "../http.js";
@@ -21,6 +21,20 @@ export function offerWire(offer: Offer) {
     distanceMiles: offer.distanceKm === undefined ? null : Math.round((offer.distanceKm / 1.609344) * 10) / 10,
     travelMinutes: offer.travelMinutes ?? null,
   };
+}
+
+// Accept or decline. Exactly one worker can win; a repeated tap by the winner is a success.
+// Returns the offer as answered (its row is updated by an effect after the commit) and the job.
+export async function respondToOffer(deps: Deps, user: User, offerId: string, accept: boolean): Promise<{ offer: Offer; job: Job }> {
+  const offer = await myOffer(deps, user, offerId);
+  const type = accept ? "ACCEPT" : "OFFER_DECLINED";
+  try {
+    await applyEvent(deps, offer.jobId, { type, offerId: offer.offerId }, { kind: "user", userId: user.userId });
+  } catch (e) {
+    // The notification action and the app may both send the accept.
+    if (!(accept && e instanceof TransitionError && e.code === "already_done")) throw e;
+  }
+  return { offer: { ...offer, status: accept ? "accepted" : "declined" }, job: await getJobOrThrow(deps, offer.jobId) };
 }
 
 async function myOffer(deps: Deps, user: User, offerId: string): Promise<Offer> {
@@ -57,17 +71,8 @@ export function offerRoutes(deps: Deps): Hono<AppEnv> {
 
   const respond = (type: "ACCEPT" | "OFFER_DECLINED") => async (c: Context<AppEnv>) => {
     const user = c.get("user");
-    const offer = await myOffer(deps, user, c.req.param("id") ?? "");
-    try {
-      await applyEvent(deps, offer.jobId, { type, offerId: offer.offerId }, c.get("actor"));
-    } catch (e) {
-      // A repeated tap after winning is a success, not "taken" (the notification and the app may both send it).
-      if (!(type === "ACCEPT" && e instanceof TransitionError && e.code === "already_done")) throw e;
-    }
-    // The offer row is updated by an effect after the commit, so report the outcome directly.
-    const answered: Offer = { ...offer, status: type === "ACCEPT" ? "accepted" : "declined" };
-    const job = type === "ACCEPT" ? await jobWire(new WireContext(deps), await getJobOrThrow(deps, offer.jobId), user) : null;
-    return c.json({ offer: offerWire(answered), job });
+    const { offer, job } = await respondToOffer(deps, user, c.req.param("id") ?? "", type === "ACCEPT");
+    return c.json({ offer: offerWire(offer), job: type === "ACCEPT" ? await jobWire(new WireContext(deps), job, user) : null });
   };
 
   // US-24/29: accept (Face ID happens on the device). Exactly one worker can win; others get 409 offer_not_current.

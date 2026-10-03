@@ -47,7 +47,7 @@ npm run typecheck
 npm test
 ```
 
-About 100 tests run in a few seconds with no network. They cover:
+About 130 tests run in a few seconds with no network. They cover:
 - the state machine, including a 10,000-run randomized test that money moves at most once per job
 - the store
 - every API flow: posting, matching, offers, proof, grading, payments, review, disputes and the sweeper
@@ -69,6 +69,8 @@ Each stage name gets its own stack, so teammates can deploy `-c stage=alan` and 
 - `LinkedInRedirectUrl`: add it to the LinkedIn app.
 
 Watch the `EffectsDlqAlarm`. A message in that queue means a payout, refund, push, timer or grade failed every retry.
+
+The stack has not been deployed yet. [infra/README.md](infra/README.md) has handoff notes for whoever owns AWS: every setting, and what is still open.
 
 ## How it fits together
 

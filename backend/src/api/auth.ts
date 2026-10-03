@@ -18,6 +18,13 @@ const appleJwks = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/key
 
 const secretKey = (deps: Deps) => new TextEncoder().encode(deps.config.JWT_SECRET);
 
+// The body every sign-in returns. token/userId are this API's names; access_token, expires_in and
+// user_id are what TwinKit's AuthSessionResponse decodes (there is no refresh token: sign in again).
+export async function sessionBody(deps: Deps, userId: string) {
+  const token = await signSession(deps, userId);
+  return { token, userId, access_token: token, refresh_token: null, expires_in: SESSION_DAYS * 24 * 3600, user_id: userId };
+}
+
 export async function signSession(deps: Deps, userId: string): Promise<string> {
   return new SignJWT({ typ: "session" })
     .setProtectedHeader({ alg: "HS256" })
@@ -91,6 +98,33 @@ async function upsertIdentity(
   return user;
 }
 
+// Exchanges a LinkedIn authorization code (optionally with PKCE) and returns our user for it.
+async function linkedInUser(deps: Deps, opts: { code: string; redirectUri: string; codeVerifier?: string; nonce?: string }): Promise<User> {
+  const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code: opts.code,
+      redirect_uri: opts.redirectUri,
+      client_id: deps.config.LINKEDIN_CLIENT_ID ?? "",
+      client_secret: deps.config.LINKEDIN_CLIENT_SECRET ?? "",
+      ...(opts.codeVerifier ? { code_verifier: opts.codeVerifier } : {}),
+    }),
+  });
+  if (!tokenRes.ok) throw new Error(`token exchange failed: ${tokenRes.status} ${await tokenRes.text()}`);
+  const { id_token } = (await tokenRes.json()) as { id_token?: string };
+  if (!id_token) throw new Error("no id_token");
+  const { payload } = await jwtVerify(id_token, linkedinJwks, { issuer: LINKEDIN_ISSUER, audience: deps.config.LINKEDIN_CLIENT_ID });
+  if (!payload.sub) throw new Error("no subject");
+  if (opts.nonce !== undefined && payload.nonce !== opts.nonce) throw new Error("nonce mismatch");
+  return upsertIdentity(deps, "linkedin", payload.sub, {
+    displayName: typeof payload.name === "string" ? payload.name : "LinkedIn user",
+    email: typeof payload.email === "string" ? payload.email : undefined,
+    photoUrl: typeof payload.picture === "string" ? payload.picture : undefined,
+  });
+}
+
 const appRedirect = (deps: Deps, params: Record<string, string>) =>
   `${deps.config.APP_URL_SCHEME}://auth?${new URLSearchParams(params).toString()}`;
 
@@ -107,7 +141,7 @@ export function authRoutes(deps: Deps): Hono<AppEnv> {
       displayName: body.displayName ?? body.handle,
       isAdmin: body.handle === "admin" && deps.config.STAGE === "local",
     });
-    return c.json({ token: await signSession(deps, user.userId), userId: user.userId });
+    return c.json(await sessionBody(deps, user.userId));
   });
 
   // Open this URL in ASWebAuthenticationSession. It ends at <scheme>://auth?token=... or ?error=...
@@ -136,32 +170,27 @@ export function authRoutes(deps: Deps): Hono<AppEnv> {
       if (error || !code || !state) throw new Error(error ?? "missing code");
       const { payload: st } = await jwtVerify(state, secretKey(deps), { algorithms: ["HS256"] });
       if (st.typ !== "oauth_state") throw new Error("bad state");
-      const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          grant_type: "authorization_code",
-          code,
-          redirect_uri: linkedinRedirectUri,
-          client_id: deps.config.LINKEDIN_CLIENT_ID ?? "",
-          client_secret: deps.config.LINKEDIN_CLIENT_SECRET ?? "",
-        }),
-      });
-      if (!tokenRes.ok) throw new Error(`token exchange failed: ${tokenRes.status}`);
-      const { id_token } = (await tokenRes.json()) as { id_token?: string };
-      if (!id_token) throw new Error("no id_token");
-      const { payload } = await jwtVerify(id_token, linkedinJwks, { issuer: LINKEDIN_ISSUER, audience: deps.config.LINKEDIN_CLIENT_ID });
-      if (payload.nonce !== st.nonce || !payload.sub) throw new Error("nonce mismatch");
-      const user = await upsertIdentity(deps, "linkedin", payload.sub, {
-        displayName: typeof payload.name === "string" ? payload.name : "LinkedIn user",
-        email: typeof payload.email === "string" ? payload.email : undefined,
-        photoUrl: typeof payload.picture === "string" ? payload.picture : undefined,
-      });
+      const user = await linkedInUser(deps, { code, redirectUri: linkedinRedirectUri, nonce: String(st.nonce) });
       return c.redirect(appRedirect(deps, { token: await signSession(deps, user.userId) }));
     } catch (e) {
       deps.log.warn("LinkedIn sign-in failed", { error: e });
       return c.redirect(appRedirect(deps, { error: "linkedin_failed" }));
     }
+  });
+
+  // TwinKit's LinkedInAuthenticator: the app runs the authorization with PKCE and sends us the code.
+  // The redirect URI must be the one the app used (it is registered in the LinkedIn developer app).
+  app.post("/linkedin-callback", async (c) => {
+    if (!deps.config.LINKEDIN_CLIENT_ID || !deps.config.LINKEDIN_CLIENT_SECRET) throw badRequest("LinkedIn sign-in is not configured", "not_configured");
+    const body = await parseBody(c, z.object({ code: z.string().min(1), code_verifier: z.string().min(43).max(128), redirect_uri: z.string().min(1) }));
+    let user: User;
+    try {
+      user = await linkedInUser(deps, { code: body.code, redirectUri: body.redirect_uri, codeVerifier: body.code_verifier });
+    } catch (e) {
+      deps.log.warn("LinkedIn sign-in failed", { error: e });
+      throw unauthorized("LinkedIn sign-in could not be completed. Please try again.");
+    }
+    return c.json(await sessionBody(deps, user.userId));
   });
 
   // The app sends the identity token from ASAuthorizationAppleIDCredential.
@@ -178,7 +207,7 @@ export function authRoutes(deps: Deps): Hono<AppEnv> {
       displayName: body.fullName ?? "Bounty user",
       email: typeof payload.email === "string" ? payload.email : undefined,
     });
-    return c.json({ token: await signSession(deps, user.userId), userId: user.userId });
+    return c.json(await sessionBody(deps, user.userId));
   });
 
   return app;

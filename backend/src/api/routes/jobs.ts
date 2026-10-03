@@ -7,7 +7,7 @@ import { MAX_BOUNTY_CENTS, MIN_BOUNTY_CENTS } from "../../domain/money.js";
 import { Category, EvidenceType, type Actor, type Job, type User } from "../../domain/types.js";
 import { badRequest, notFound } from "../../lib/errors.js";
 import { applyEvent, getJobOrThrow } from "../../services/jobs.js";
-import { createDraft, deleteDraft, regenerateChecklist, setChecklist, updateDetails, type DraftInput } from "../../services/postings.js";
+import { createDraft, deleteDraft, regenerateChecklist, setChecklist, updateDetails, validateDeadline, type DraftInput } from "../../services/postings.js";
 import { parseBody, parseOptionalBody, type AppEnv } from "../http.js";
 import { jobWire, milesToKm, roleOf, timelineWire, WireContext } from "../wire.js";
 import { ownedUploadKey } from "./uploads.js";
@@ -19,7 +19,7 @@ const LocationIn = z.object({
   address: z.string().max(200).default(""),
 });
 
-const DraftBody = z.object({
+const DraftFields = z.object({
   title: z.string().trim().min(3).max(80),
   description: z.string().trim().min(1).max(2000),
   category: Category,
@@ -27,10 +27,13 @@ const DraftBody = z.object({
   location: LocationIn.nullish(),
   deadline: z.string().datetime({ offset: true }),
   payAmount: z.number().positive(),
-  currency: z.enum(["USD", "USDC"]).default("USD"),
-  posterPhotos: z.array(z.string()).max(6).default([]),
+  currency: z.enum(["USD", "USDC"]),
+  posterPhotos: z.array(z.string()).max(6),
   radiusMiles: z.number().min(0.5).max(60).optional(),
 });
+const DraftBody = DraftFields.extend({ currency: DraftFields.shape.currency.default("USD"), posterPhotos: DraftFields.shape.posterPhotos.default([]) });
+// No defaults here: a PATCH that leaves a field out must not reset it.
+const DraftPatch = DraftFields.partial();
 
 const ChecklistItemIn = z.object({
   id: z.string().min(1).max(40).optional(),
@@ -52,7 +55,7 @@ export function centsOf(payAmount: number): number {
   return cents;
 }
 
-function draftInput(deps: Deps, user: User, body: Partial<z.infer<typeof DraftBody>>): Partial<DraftInput> {
+function draftInput(deps: Deps, user: User, body: Partial<z.infer<typeof DraftFields>>): Partial<DraftInput> {
   const input: Partial<DraftInput> = {};
   if (body.title !== undefined) input.title = body.title;
   if (body.description !== undefined) input.description = body.description;
@@ -117,7 +120,7 @@ export function jobRoutes(deps: Deps): Hono<AppEnv> {
 
   app.patch("/:id", async (c) => {
     const user = c.get("user");
-    const body = await parseBody(c, DraftBody.partial());
+    const body = await parseBody(c, DraftPatch);
     return c.json(await wire(await updateDetails(deps, user, c.req.param("id"), draftInput(deps, user, body)), user));
   });
 
@@ -162,7 +165,8 @@ export function jobRoutes(deps: Deps): Hono<AppEnv> {
   // Product rule 7: widen the radius or extend the deadline while no one has accepted.
   app.patch("/:id/terms", async (c) => {
     const body = await parseBody(c, z.object({ deadline: z.string().datetime({ offset: true }).optional(), radiusMiles: z.number().min(0.5).max(60).optional() }));
-    return act(deps, c, { type: "UPDATE_TERMS", deadline: body.deadline, radiusKm: body.radiusMiles === undefined ? undefined : milesToKm(body.radiusMiles) });
+    const deadline = body.deadline === undefined ? undefined : validateDeadline(deps, body.deadline);
+    return act(deps, c, { type: "UPDATE_TERMS", deadline, radiusKm: body.radiusMiles === undefined ? undefined : milesToKm(body.radiusMiles) });
   });
 
   // US-35/36: check in and start. The response carries challengeCode for the proof photos.
@@ -173,7 +177,11 @@ export function jobRoutes(deps: Deps): Hono<AppEnv> {
   });
 
   // Product rule 5: the worker can hand the job back before submitting; it re-opens for matching.
-  app.post("/:id/withdraw", (c) => act(deps, c, { type: "WITHDRAW" }));
+  // The worker is no longer on the job afterwards, so there is no job to return: 204.
+  app.post("/:id/withdraw", async (c) => {
+    await applyEvent(deps, c.req.param("id"), { type: "WITHDRAW" }, c.get("actor"));
+    return c.body(null, 204);
+  });
 
   return app;
 }

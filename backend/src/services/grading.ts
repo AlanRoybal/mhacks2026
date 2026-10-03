@@ -14,6 +14,36 @@ import { applyEvent } from "./jobs.js";
 import { briefOf } from "./postings.js";
 
 const CONFIDENT = 0.7;
+
+// The model reports what it read; we decide whether that is the real code. Handwriting may lose the
+// dash or blur one character, so compare letters and digits only and allow a single mistake.
+export function codeMatches(readAs: string, actual: string): boolean {
+  const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const a = norm(readAs);
+  const b = norm(actual);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  // Levenshtein distance <= 1.
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      i++;
+      j++;
+      continue;
+    }
+    if (++edits > 1) return false;
+    if (a.length > b.length) i++;
+    else if (b.length > a.length) j++;
+    else {
+      i++;
+      j++;
+    }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
 const READABLE_IMAGES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 async function evidenceFor(deps: Deps, job: Job, proof: Proof): Promise<GradeEvidence[]> {
@@ -83,7 +113,8 @@ export async function gradeProof(deps: Deps, jobId: string, proofId: string): Pr
           ? checkInVerdict(deps, job, proof, item.id)
           : (result.items.find((v) => v.itemId === item.id) ?? { itemId: item.id, verdict: "unclear", confidence: 0, reason: "Not graded" }),
     );
-    const { decision, because } = decide(job, proof, items, result.codeVisible);
+    const codeSeen = result.codeVisible && codeMatches(result.codeReadAs, job.challenge?.code ?? "");
+    const { decision, because } = decide(job, proof, items, codeSeen);
     grade = {
       decision,
       decidedBecause: because,

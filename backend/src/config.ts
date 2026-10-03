@@ -34,7 +34,7 @@ const schema = z.object({
   // Signs session tokens. Must be set outside local dev.
   JWT_SECRET: z.string().min(32).optional(),
   // Custom URL scheme the iOS app registers; sign-in redirects back to <scheme>://auth?token=...
-  APP_URL_SCHEME: z.string().default("bountytwin"),
+  APP_URL_SCHEME: z.string().default("bounty"),
   APPLE_BUNDLE_ID: z.string().default("com.alanroybal.BountyTwin"),
   LINKEDIN_CLIENT_ID: z.string().optional(),
   LINKEDIN_CLIENT_SECRET: z.string().optional(),

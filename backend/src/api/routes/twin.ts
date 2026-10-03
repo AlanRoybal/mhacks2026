@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import type { ProfileSourceKind } from "../../ai/index.js";
 import { MAX_FILE_BYTES } from "../../blobs/index.js";
 import type { Deps } from "../../deps.js";
 import { isValidTimeZone } from "../../domain/availability.js";
@@ -21,6 +22,18 @@ const TimeZone = z.string().refine(isValidTimeZone, "Unknown time zone");
 
 export function payoutsRequired(deps: Deps): boolean {
   return deps.config.PAYMENTS_PROVIDER === "stripe";
+}
+
+// Marks the import as processing and starts it in the background.
+export async function startIngest(deps: Deps, userId: string, blobKey: string, kind: ProfileSourceKind): Promise<User> {
+  const info = await deps.blobs.head(blobKey);
+  if (!info) throw badRequest("Upload the file before starting the import", "upload_missing");
+  if (info.size > MAX_FILE_BYTES) throw badRequest("That file is too large (20 MB max)", "too_large");
+  const user = await updateUser(deps, userId, (u) => {
+    u.twin.ingest = { ...u.twin.ingest, status: "processing", error: undefined, updatedAt: deps.now().toISOString() };
+  });
+  await deps.tasks.run({ kind: "task", name: "ingest_profile", userId, blobKey, sourceKind: kind });
+  return user;
 }
 
 export function twinView(deps: Deps, user: User) {
@@ -75,14 +88,7 @@ export function twinRoutes(deps: Deps): Hono<AppEnv> {
   // Poll GET /twin until ingest.status is "done" or "failed".
   app.post("/ingest", async (c) => {
     const body = await parseBody(c, z.object({ blobKey: z.string().optional(), fileURL: z.string().optional(), kind: UploadKind }));
-    const blobKey = ownedUploadKey(deps, userId(c), body);
-    const info = await deps.blobs.head(blobKey);
-    if (!info) throw badRequest("Upload the file before starting the import", "upload_missing");
-    if (info.size > MAX_FILE_BYTES) throw badRequest("That file is too large (20 MB max)", "too_large");
-    const user = await updateUser(deps, userId(c), (u) => {
-      u.twin.ingest = { ...u.twin.ingest, status: "processing", error: undefined, updatedAt: deps.now().toISOString() };
-    });
-    await deps.tasks.run({ kind: "task", name: "ingest_profile", userId: user.userId, blobKey, sourceKind: body.kind });
+    const user = await startIngest(deps, userId(c), ownedUploadKey(deps, userId(c), body), body.kind);
     return c.json(twinView(deps, user), 202);
   });
 
@@ -99,7 +105,8 @@ export function twinRoutes(deps: Deps): Hono<AppEnv> {
   });
 
   app.delete("/skills/:normName", async (c) => {
-    const key = normName(decodeURIComponent(c.req.param("normName")));
+    // Hono has already decoded the path parameter.
+    const key = normName(c.req.param("normName"));
     await updateUser(deps, userId(c), (u) => {
       const next = deleteSkill(u.twin, key, deps.now().toISOString());
       if (!next) throw notFound("Skill");

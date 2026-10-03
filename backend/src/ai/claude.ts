@@ -34,6 +34,8 @@ interface CallOptions<T extends z.ZodType> {
   effort: Effort;
   maxTokens: number;
   timeoutMs: number;
+  // Request-path calls use 0 so a slow model falls back instead of outlasting the API Gateway timeout.
+  maxRetries?: number;
 }
 
 const tag = (name: string, body: string) => `<${name}>\n${body}\n</${name}>`;
@@ -78,7 +80,7 @@ export class ClaudeAi implements Ai {
         output_config: { effort: o.effort, format: betaZodOutputFormat(o.schema) },
         ...(this.serverFallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
       },
-      { timeout: o.timeoutMs, maxRetries: 1 },
+      { timeout: o.timeoutMs, maxRetries: o.maxRetries ?? 1 },
     );
     this.log.info("AI call", {
       task: o.task,
@@ -109,7 +111,9 @@ export class ClaudeAi implements Ai {
       schema: ChecklistDraft,
       effort: "low",
       maxTokens: 3000,
-      timeoutMs: 20_000,
+      // Runs inside POST /jobs (29 s API Gateway limit); on timeout the category template is used.
+      timeoutMs: 12_000,
+      maxRetries: 0,
     });
   }
 

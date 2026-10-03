@@ -40,7 +40,7 @@ test("the poster approves, both sides rate, and ratings show up on profiles", as
 
   await api.call("POST", `/jobs/${jobId}/rating`, poster.token, { stars: 5, comment: "Great session" });
   await api.call("POST", `/jobs/${jobId}/rating`, worker.token, { stars: 4 });
-  assert.equal((await api.call("POST", `/jobs/${jobId}/rating`, poster.token, { stars: 1 })).body.error, "already_done");
+  assert.equal((await api.call("POST", `/jobs/${jobId}/rating`, poster.token, { stars: 1 })).body.error.code, "already_done");
   await deps.settle();
 
   const job = await api.call("GET", `/jobs/${jobId}`, poster.token);
@@ -58,6 +58,7 @@ test("a dispute names an item; an admin resolves it", async () => {
 
   assert.equal((await api.call("POST", `/jobs/${jobId}/resolve`, worker.token, { outcome: "release" })).status, 403);
   const admin = await api.login("admin");
+  assert.equal(((await api.call("GET", `/jobs/${jobId}/proofs`, admin.token)).body as unknown as unknown[]).length, 1, "admins see the evidence");
   const resolved = await api.call("POST", `/jobs/${jobId}/resolve`, admin.token, { outcome: "refund", note: "Link was empty" });
   assert.equal(resolved.body.status, "REFUNDED");
   assert.equal(resolved.body.resolution.outcome, "refund");
@@ -68,7 +69,7 @@ test("a dispute names an item; an admin resolves it", async () => {
 test("the poster can reject work only after it failed review", async () => {
   const passing = testDeps();
   const first = await inReview(passing);
-  assert.equal((await first.api.call("POST", `/jobs/${first.jobId}/reject`, first.poster.token)).body.error, "invalid_transition");
+  assert.equal((await first.api.call("POST", `/jobs/${first.jobId}/reject`, first.poster.token)).body.error.code, "invalid_transition");
 
   // A grader that fails everything: after the worker's two retries, the poster may reject.
   const deps = testDeps();

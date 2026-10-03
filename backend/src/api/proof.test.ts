@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { FakeAi } from "../ai/fake.js";
 import { test } from "node:test";
 import type { Job, Proof } from "../domain/types.js";
-import { decide } from "../services/grading.js";
+import { codeMatches, decide } from "../services/grading.js";
 import { applyEvent, getJobOrThrow } from "../services/jobs.js";
 import { apiClient, isoIn, type Json } from "../testing/api.js";
 import { testDeps, type TestDeps } from "../testing/harness.js";
@@ -87,7 +87,7 @@ test("missing evidence blocks submission with the reasons", async () => {
     items: [{ checklistItemId: photoItem?.id, photos: [{ fileURL: await uploadPhoto(deps, api, worker.token, [9]), capturedAt: "2020-01-01T00:00:00Z" }] }],
   });
   assert.equal(res.status, 422);
-  assert.equal(res.body.error, "proof_incomplete");
+  assert.equal(res.body.error.code, "proof_incomplete");
   assert.ok(res.body.checks.missingRequired.length > 0);
   assert.deepEqual(res.body.checks.outsideTimeWindow, [photoItem?.id], "old photos are rejected");
   assert.equal((await getJobOrThrow(deps, job.id)).state, "IN_PROGRESS");
@@ -181,7 +181,7 @@ test("upload references must be the caller's own, in the exact presigned shape",
     items: [{ checklistItemId: photoItem?.id, photos: [{ blobKey: `uploads/${me}/../someone/x.jpg`, capturedAt: deps.now().toISOString() }] }],
   });
   assert.equal(sneaky.status, 400);
-  assert.equal(sneaky.body.error, "unknown_upload");
+  assert.equal(sneaky.body.error.code, "unknown_upload");
 });
 
 test("a worker who takes over a job doesn't see the previous worker's proofs", async () => {
@@ -197,11 +197,20 @@ test("a worker who takes over a job doesn't see the previous worker's proofs", a
   const next = await api.readyWorker("second", { skill: "Logo design", ...SITE });
   await api.call("POST", `/jobs/${job.id}/proof`, worker.token, { items: await fullProof(deps, api, worker.token, job, 5) });
   await deps.settle();
-  await api.call("POST", `/jobs/${job.id}/withdraw`, worker.token);
+  assert.equal((await api.call("POST", `/jobs/${job.id}/withdraw`, worker.token)).status, 204);
   await deps.settle();
   const offer = (await getJobOrThrow(deps, job.id)).currentOffer;
   assert.equal(offer?.workerId, next.userId);
   await api.call("POST", `/offers/${offer?.offerId}/accept`, next.token);
   assert.deepEqual((await api.call("GET", `/jobs/${job.id}/proofs`, next.token)).body, []);
   assert.equal(((await api.call("GET", `/jobs/${job.id}/proofs`, poster.token)).body as unknown as Json[]).length, 1);
+});
+
+test("the one-time code must actually match what the model read", async () => {
+  assert.equal(codeMatches("K7Q-4MX", "K7Q-4MX"), true);
+  assert.equal(codeMatches("k7q 4mx", "K7Q-4MX"), true, "case and separators don't matter");
+  assert.equal(codeMatches("K7Q4NX", "K7Q-4MX"), true, "one misread character is tolerated");
+  assert.equal(codeMatches("K7Q4M", "K7Q-4MX"), true, "one missing character is tolerated");
+  assert.equal(codeMatches("ABC-DEF", "K7Q-4MX"), false);
+  assert.equal(codeMatches("", "K7Q-4MX"), false);
 });
