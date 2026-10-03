@@ -12,6 +12,9 @@ const schema = z.object({
   STAGE: z.string().default("local"),
   DEMO_MODE: bool,
   STORE: z.enum(["memory", "dynamo"]).default("memory"),
+  // inline: effects run in this process after each commit (local dev).
+  // stream: the worker Lambda runs them from the ledger table's DynamoDB Stream (deployed).
+  EFFECTS_MODE: z.enum(["inline", "stream"]).default("inline"),
   // Memory store snapshot directory. Empty string keeps everything in memory only.
   DATA_DIR: z.string().default(".data"),
   JOBS_TABLE: z.string().optional(),
