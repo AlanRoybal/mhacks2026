@@ -7,7 +7,7 @@ struct JobsView: View {
         switch selection {
         case .working:
             SampleJobs.jobs.filter { $0.status.isActiveForWorker }
-        case .completed:
+        case .done:
             SampleJobs.jobs.filter { $0.status == .released }
         case .posted:
             []
@@ -54,7 +54,7 @@ struct JobsView: View {
 private enum JobCollection: String, CaseIterable, Identifiable {
     case working = "Working"
     case posted = "Posted"
-    case completed = "Completed"
+    case done = "Done"
 
     var id: String { rawValue }
 }

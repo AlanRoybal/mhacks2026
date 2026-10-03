@@ -9,6 +9,7 @@ struct PosterPhotosSection: View {
 
     @State private var libraryItems: [PhotosPickerItem] = []
     @State private var isShowingCamera = false
+    @State private var isShowingLibrary = false
 
     private var cameraAvailable: Bool {
         UIImagePickerController.isSourceTypeAvailable(.camera)
@@ -16,42 +17,42 @@ struct PosterPhotosSection: View {
 
     var body: some View {
         Section {
-            if !model.photos.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(model.photos) { photo in
-                            PhotoThumbnail(
-                                photo: photo,
-                                onRemove: { model.removePhoto(photo.id) },
-                                onRetry: { model.retryPhoto(photo.id, store: store) }
-                            )
+            // A row of photo tiles ending in an "Add photo" tile, as in the design.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(model.photos) { photo in
+                        PhotoThumbnail(
+                            photo: photo,
+                            onRemove: { model.removePhoto(photo.id) },
+                            onRetry: { model.retryPhoto(photo.id, store: store) }
+                        )
+                    }
+                    if model.canAddPhotos {
+                        Menu {
+                            if cameraAvailable {
+                                Button("Take a photo", systemImage: "camera") { isShowingCamera = true }
+                            }
+                            Button("Choose from library", systemImage: "photo.on.rectangle") { isShowingLibrary = true }
+                        } label: {
+                            AddPhotoTile()
                         }
                     }
-                    .padding(.vertical, 4)
                 }
+                .padding(.vertical, 4)
             }
-
-            if model.canAddPhotos {
-                if cameraAvailable {
-                    Button("Take a photo", systemImage: "camera") { isShowingCamera = true }
-                }
-                PhotosPicker(
-                    selection: $libraryItems,
-                    maxSelectionCount: CreateJobModel.maxPhotos - model.photos.count,
-                    matching: .images
-                ) {
-                    Label("Choose from library", systemImage: "photo.on.rectangle")
-                }
-            }
-        } header: {
-            Text("Photos")
         } footer: {
-            if model.category.suggestsBeforePhotos {
+            if model.category?.suggestsBeforePhotos == true {
                 Text("Add 2 to 4 photos showing the current state. Workers match these angles in their proof.")
             } else {
                 Text("Optional. Photos help workers understand the job.")
             }
         }
+        .photosPicker(
+            isPresented: $isShowingLibrary,
+            selection: $libraryItems,
+            maxSelectionCount: CreateJobModel.maxPhotos - model.photos.count,
+            matching: .images
+        )
         .fullScreenCover(isPresented: $isShowingCamera) {
             CameraPicker { image in
                 model.addPhoto(image, store: store)
@@ -70,6 +71,25 @@ struct PosterPhotosSection: View {
                 }
             }
         }
+    }
+}
+
+private struct AddPhotoTile: View {
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "photo.badge.plus")
+                .font(.title3)
+            Text("Add photo")
+                .font(.caption.weight(.medium))
+        }
+        .foregroundStyle(.secondary)
+        .frame(width: 84, height: 84)
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                .foregroundStyle(.tertiary)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 

@@ -7,7 +7,8 @@ import UIKit
 final class CreateJobModel {
     var title = ""
     var description = ""
-    var category = JobCategory.other
+    /// Nil until the poster taps a category chip.
+    var category: JobCategory?
     var isRemote = false
     var location: JobLocation?
     var deadline = Date.now.addingTimeInterval(24 * 3600)
@@ -26,6 +27,7 @@ final class CreateJobModel {
     var blockingIssue: String? {
         if title.trimmingCharacters(in: .whitespaces).isEmpty { return "Add a title." }
         if description.trimmingCharacters(in: .whitespaces).isEmpty { return "Describe the finished result." }
+        if category == nil { return "Pick a category." }
         if !isRemote && location == nil { return "Choose a location, or mark the job as remote." }
         if deadline <= .now { return "Pick a deadline in the future." }
         if payAmount <= 0 { return "Set a payment above zero." }
@@ -81,7 +83,7 @@ final class CreateJobModel {
         NewJobDraft(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             description: description.trimmingCharacters(in: .whitespacesAndNewlines),
-            category: category,
+            category: category ?? .errands,
             location: isRemote ? nil : location,
             deadline: deadline,
             payAmount: payAmount,
@@ -107,7 +109,7 @@ final class CreateJobModel {
     func reset() {
         title = ""
         description = ""
-        category = .other
+        category = nil
         isRemote = false
         location = nil
         deadline = .now.addingTimeInterval(24 * 3600)

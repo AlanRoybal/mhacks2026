@@ -1,67 +1,71 @@
 import SwiftUI
 
-/// The Post tab: describe a job, then generate and edit its proof checklist (plan features 8 and 9).
+/// Step 1 of posting: describe the job (plan feature 8). Layout follows the Figma
+/// "Post a job" screen; styling comes later from iOS-A's design system.
 struct CreateJobView: View {
     @Environment(PosterStore.self) private var store
     @State private var model = CreateJobModel()
     @State private var isPickingLocation = false
-    /// Set when the checklist comes back; pushes the checklist editor.
+    /// Set when the AI checklist comes back; pushes step 2.
     @State private var draftJob: Job?
-    @State private var savedJobTitle: String?
+    @State private var fundedJobTitle: String?
 
     var body: some View {
         @Bindable var model = model
 
         Form {
-            Section("What needs to be done?") {
-                TextField("Job title", text: $model.title)
-                TextField("Describe the finished result", text: $model.description, axis: .vertical)
-                    .lineLimit(4...8)
-                Picker("Category", selection: $model.category) {
-                    ForEach(JobCategory.allCases) { category in
-                        Text(category.displayName).tag(category)
-                    }
-                }
-            }
-
             PosterPhotosSection(model: model)
 
-            Section("Where and when") {
-                Toggle("Remote job", isOn: $model.isRemote.animation())
+            Section("Title") {
+                TextField("Mow my front lawn", text: $model.title)
+            }
+
+            Section("Description") {
+                TextField("Describe the finished result", text: $model.description, axis: .vertical)
+                    .lineLimit(3...8)
+            }
+
+            Section("Category") {
+                CategoryChips(selection: $model.category)
+            }
+
+            Section("Where") {
+                Picker("Where", selection: $model.isRemote.animation()) {
+                    Text("In person").tag(false)
+                    Text("Remote").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
                 if !model.isRemote {
                     Button {
                         isPickingLocation = true
                     } label: {
-                        HStack {
-                            Label(model.location?.address ?? "Choose location", systemImage: "location.fill")
-                                .foregroundStyle(model.location == nil ? BountyTheme.accent : .primary)
-                                .lineLimit(1)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                        }
+                        Label(model.location?.address ?? "Add the address", systemImage: "mappin.and.ellipse")
+                            .foregroundStyle(model.location == nil ? .secondary : .primary)
+                            .lineLimit(1)
                     }
                 }
-                DatePicker("Deadline", selection: $model.deadline, in: Date.now...)
             }
 
-            Section("Payment") {
-                Picker("Currency", selection: $model.currency) {
-                    ForEach(PayCurrency.allCases) { currency in
-                        Text(currency.rawValue).tag(currency)
-                    }
-                }
-                .pickerStyle(.segmented)
+            Section("Deadline and pay") {
+                DatePicker("Deadline", selection: $model.deadline, in: Date.now...)
 
                 HStack {
-                    Text("Amount")
+                    Text("Pay")
                     Spacer()
-                    TextField("25", value: $model.payAmount, format: .number.precision(.fractionLength(0...2)))
+                    TextField("40", value: $model.payAmount, format: .number.precision(.fractionLength(0...2)))
                         .multilineTextAlignment(.trailing)
                         .keyboardType(.decimalPad)
-                    Text(model.currency.rawValue)
-                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: 120)
+                    Picker("Currency", selection: $model.currency) {
+                        ForEach(PayCurrency.allCases) { currency in
+                            Text(currency.rawValue).tag(currency)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
                 }
             }
 
@@ -75,9 +79,9 @@ struct CreateJobView: View {
                         Spacer()
                         if model.isGenerating {
                             ProgressView()
-                            Text("Writing your checklist…")
+                            Text("Drafting your checklist…")
                         } else {
-                            Text("Generate proof checklist")
+                            Label("Draft the proof checklist", systemImage: "sparkles")
                         }
                         Spacer()
                     }
@@ -85,22 +89,31 @@ struct CreateJobView: View {
                 }
                 .disabled(!model.canGenerate)
             } footer: {
-                Text(model.blockingIssue ?? "Your description becomes an editable checklist before you fund the job.")
+                Text(model.blockingIssue ?? "AI turns your description into a checklist you can edit before funding.")
             }
         }
         .navigationTitle("Post a job")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Text("Draft")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(.quaternary, in: Capsule())
+            }
+        }
         .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $isPickingLocation) {
             LocationPicker(location: $model.location)
         }
         .navigationDestination(item: $draftJob) { job in
-            ChecklistEditorView(job: job) { saved in
-                savedJobTitle = saved.title
-                draftJob = nil
+            ChecklistEditorView(job: job) { funded in
+                fundedJobTitle = funded.title
+                draftJob = nil // pops steps 2 and 3 back to the form
                 model.reset()
             }
         }
-        .alert("Couldn't create the job", isPresented: Binding(
+        .alert("Couldn't draft the checklist", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
         )) {
@@ -108,13 +121,36 @@ struct CreateJobView: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
-        .alert("Checklist saved", isPresented: Binding(
-            get: { savedJobTitle != nil },
-            set: { if !$0 { savedJobTitle = nil } }
+        .alert("Job funded", isPresented: Binding(
+            get: { fundedJobTitle != nil },
+            set: { if !$0 { fundedJobTitle = nil } }
         )) {
             Button("OK") {}
         } message: {
-            Text("\"\(savedJobTitle ?? "")\" is saved as a draft in Jobs › Posted. It goes live once it's funded.")
+            Text("\"\(fundedJobTitle ?? "")\" is live. Follow it in Jobs › Posted.")
+        }
+    }
+}
+
+/// The category chips from the design. Tapping the selected chip again keeps it selected.
+private struct CategoryChips: View {
+    @Binding var selection: JobCategory?
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(JobCategory.allCases) { category in
+                    let isSelected = selection == category
+                    Button(category.displayName) {
+                        selection = category
+                    }
+                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+                    .tint(isSelected ? BountyTheme.accent : .secondary)
+                }
+            }
+            .padding(.vertical, 2)
         }
     }
 }

@@ -23,7 +23,7 @@ enum SampleJobs {
         Job(
             id: "sample_desk",
             title: "Photograph a vintage desk",
-            category: .photography,
+            category: .photos,
             location: JobLocation(latitude: 42.2770, longitude: -83.7382, address: "S Main St, Ann Arbor, MI"),
             deadline: hoursFromNow(22),
             payAmount: 28,

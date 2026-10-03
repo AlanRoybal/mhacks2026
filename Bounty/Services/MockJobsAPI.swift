@@ -195,7 +195,7 @@ enum PosterFixtures {
                 id: "job_move",
                 title: "Help move a couch upstairs",
                 description: "One couch, second floor, no elevator.",
-                category: .moving,
+                category: .errands,
                 location: annArbor,
                 deadline: .now.addingTimeInterval(24 * 3600),
                 payAmount: 40,

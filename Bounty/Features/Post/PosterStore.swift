@@ -63,6 +63,30 @@ final class PosterStore {
         return job
     }
 
+    /// Funds a draft job: asks the backend for a payment session, collects payment, then
+    /// waits for the server to mark the job FUNDED (the Stripe webhook does that, not the app).
+    func fund(_ job: Job) async throws -> Job {
+        let session = try await api.startFunding(jobId: job.id)
+        let paid = try await PaymentHandoff.collectPayment(session: session, job: job)
+        guard paid else { throw FundingError.cancelled }
+
+        // Poll briefly so the screen can say "Funded" once the webhook lands.
+        for _ in 0..<15 {
+            if let fresh = await refresh(jobId: job.id), fresh.status != .draft {
+                return fresh
+            }
+            try await Task.sleep(for: .seconds(1))
+        }
+        // Payment went through; the webhook is just slow. The Posted list will catch up.
+        return await refresh(jobId: job.id) ?? job
+    }
+
+    enum FundingError: LocalizedError {
+        case cancelled
+
+        var errorDescription: String? { "Payment was cancelled." }
+    }
+
     /// Uploads one JPEG through a presigned S3 URL and returns the photo's permanent URL.
     func uploadPhoto(jpegData: Data) async throws -> URL {
         let upload = try await api.presignUpload(contentType: "image/jpeg")

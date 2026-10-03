@@ -35,7 +35,7 @@ struct Job: Identifiable, Codable, Hashable, Sendable {
         id: String = UUID().uuidString,
         title: String,
         description: String = "",
-        category: JobCategory = .other,
+        category: JobCategory = .errands,
         location: JobLocation? = nil,
         deadline: Date,
         payAmount: Decimal,
@@ -190,38 +190,27 @@ extension JobStatus {
 // MARK: - Supporting types
 
 enum JobCategory: String, Codable, CaseIterable, Identifiable, Sendable {
-    case design = "DESIGN"
-    case home = "HOME"
     case yardWork = "YARD_WORK"
-    case moving = "MOVING"
+    case design = "DESIGN"
+    case photos = "PHOTOS"
     case tutoring = "TUTORING"
-    case photography = "PHOTOGRAPHY"
-    case technology = "TECHNOLOGY"
     case errands = "ERRANDS"
-    case other = "OTHER"
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .design: "Design"
-        case .home: "Home"
         case .yardWork: "Yard work"
-        case .moving: "Moving"
+        case .design: "Design"
+        case .photos: "Photos"
         case .tutoring: "Tutoring"
-        case .photography: "Photography"
-        case .technology: "Technology"
         case .errands: "Errands"
-        case .other: "Other"
         }
     }
 
     /// Categories where a "before" photo from the poster usually helps.
     var suggestsBeforePhotos: Bool {
-        switch self {
-        case .home, .yardWork, .moving: true
-        default: false
-        }
+        self == .yardWork || self == .errands
     }
 }
 
@@ -315,7 +304,7 @@ struct Verdict: Codable, Hashable, Sendable {
 struct NewJobDraft: Codable, Hashable, Sendable {
     var title = ""
     var description = ""
-    var category = JobCategory.other
+    var category = JobCategory.errands
     var location: JobLocation?
     var deadline = Date.now.addingTimeInterval(24 * 3600)
     var payAmount: Decimal = 25
