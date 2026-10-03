@@ -95,7 +95,9 @@ export function proofRoutes(deps: Deps): Hono<AppEnv> {
   app.get("/:id/proofs", async (c) => {
     const user = c.get("user");
     const job = await visibleJob(deps, user, c.req.param("id"));
-    const proofs = job.posterId === user.userId || job.workerId === user.userId ? await deps.store.listProofs(job.jobId) : [];
+    // The poster sees every attempt; a worker sees only their own (not a previous worker's).
+    const all = job.posterId === user.userId || job.workerId === user.userId ? await deps.store.listProofs(job.jobId) : [];
+    const proofs = job.posterId === user.userId ? all : all.filter((p) => p.workerId === user.userId);
     return c.json(
       proofs.map((p) => ({
         ...proofWire(deps, p),

@@ -3,7 +3,7 @@
 
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { DOWNLOAD_TTL_SEC, UPLOAD_TTL_SEC, type BlobInfo, type Blobs, type PresignedUpload } from "./blobs.js";
 
 interface Stored {
@@ -48,7 +48,11 @@ export class LocalBlobs implements Blobs {
   }
 
   private path(key: string): string | undefined {
-    return this.dir ? join(this.dir, key) : undefined;
+    if (!this.dir) return undefined;
+    const root = resolve(this.dir);
+    const full = resolve(join(root, key));
+    if (!full.startsWith(root + sep)) throw new Error(`Blob key escapes the storage folder: ${key}`);
+    return full;
   }
 
   async put(key: string, bytes: Buffer, contentType?: string): Promise<void> {

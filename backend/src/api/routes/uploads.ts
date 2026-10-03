@@ -16,10 +16,15 @@ const EXTENSIONS: Record<string, string> = {
   "application/zip": "zip",
 };
 
+const KEY_SHAPE = /^uploads\/[0-9A-Z]{26}\/[0-9A-Z]{26}\.(jpg|png|webp|heic|pdf|zip)$/;
+
 // Accepts a blobKey, or a fileURL returned by /uploads/presign, and returns the caller's blob key.
+// The key must have exactly the shape /uploads/presign creates, so "../" tricks can't reach other files.
 export function ownedUploadKey(deps: Deps, userId: string, ref: { blobKey?: string; fileURL?: string }): string {
   const key = ref.blobKey ?? (ref.fileURL ? blobKeyFromFileUrl(deps.config, ref.fileURL) : null);
-  if (!key || !key.startsWith(`uploads/${userId}/`)) throw badRequest("Unknown upload. Upload it through /uploads/presign first.", "unknown_upload");
+  if (!key || !KEY_SHAPE.test(key) || !key.startsWith(`uploads/${userId}/`)) {
+    throw badRequest("Unknown upload. Upload it through /uploads/presign first.", "unknown_upload");
+  }
   return key;
 }
 

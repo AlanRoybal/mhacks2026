@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { FakeAi } from "../ai/fake.js";
 import { test } from "node:test";
 import type { Job, Proof } from "../domain/types.js";
 import { decide } from "../services/grading.js";
@@ -169,4 +170,38 @@ test("a double-tapped submit goes through once", async () => {
   assert.deepEqual([a.status, b.status].sort(), [200, 409]);
   await deps.settle();
   assert.equal((await deps.store.listProofs(job.id)).length, 1);
+});
+
+test("upload references must be the caller's own, in the exact presigned shape", async () => {
+  const deps = testDeps();
+  const { api, worker, job } = await startedJob(deps);
+  const photoItem = (job.checklist as Json[]).find((i) => i.evidenceType === "PHOTO");
+  const me = (await api.call("GET", "/me", worker.token)).body.userId as string;
+  const sneaky = await api.call("POST", `/jobs/${job.id}/proof/precheck`, worker.token, {
+    items: [{ checklistItemId: photoItem?.id, photos: [{ blobKey: `uploads/${me}/../someone/x.jpg`, capturedAt: deps.now().toISOString() }] }],
+  });
+  assert.equal(sneaky.status, 400);
+  assert.equal(sneaky.body.error, "unknown_upload");
+});
+
+test("a worker who takes over a job doesn't see the previous worker's proofs", async () => {
+  const deps = testDeps();
+  const failing = new FakeAi();
+  deps.ai = Object.assign(failing, {
+    grade: async (input: Parameters<FakeAi["grade"]>[0]) => ({
+      ...(await new FakeAi().grade(input)),
+      items: input.checklist.map((i) => ({ itemId: i.id, verdict: "fail" as const, confidence: 0.9, reason: "No" })),
+    }),
+  });
+  const { api, poster, worker, job } = await startedJob(deps);
+  const next = await api.readyWorker("second", { skill: "Logo design", ...SITE });
+  await api.call("POST", `/jobs/${job.id}/proof`, worker.token, { items: await fullProof(deps, api, worker.token, job, 5) });
+  await deps.settle();
+  await api.call("POST", `/jobs/${job.id}/withdraw`, worker.token);
+  await deps.settle();
+  const offer = (await getJobOrThrow(deps, job.id)).currentOffer;
+  assert.equal(offer?.workerId, next.userId);
+  await api.call("POST", `/offers/${offer?.offerId}/accept`, next.token);
+  assert.deepEqual((await api.call("GET", `/jobs/${job.id}/proofs`, next.token)).body, []);
+  assert.equal(((await api.call("GET", `/jobs/${job.id}/proofs`, poster.token)).body as unknown as Json[]).length, 1);
 });
