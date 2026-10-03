@@ -67,53 +67,6 @@ struct PostedJobRow: View {
     }
 }
 
-/// Temporary poster detail screen. Proves navigation and live refresh work against the mock;
-/// it becomes the status timeline in step 6 and links to the review screen in step 8.
-struct PostedJobDetailView: View {
-    @Environment(PosterStore.self) private var store
-    let jobId: String
-
-    private var job: Job? { store.jobs.first { $0.id == jobId } }
-
-    var body: some View {
-        List {
-            if let job {
-                Section {
-                    LabeledContent("Status", value: job.status.displayName)
-                    LabeledContent("Pay", value: job.payText)
-                    LabeledContent("Deadline", value: job.deadlineText)
-                    LabeledContent("Worker", value: job.worker?.name ?? "Not yet")
-                }
-                Section("Proof checklist") {
-                    ForEach(job.checklist) { item in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.text)
-                            if let verdict = job.verdict(for: item) {
-                                Text("\(verdict.pass ? "Pass" : "Fail") · \(verdict.confidence.formatted(.percent.precision(.fractionLength(0)))) confident")
-                                    .font(.caption)
-                                    .foregroundStyle(verdict.pass ? BountyTheme.success : BountyTheme.warning)
-                            } else {
-                                Text(item.evidenceType.displayName)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .navigationTitle(job?.title ?? "Job")
-        .navigationBarTitleDisplayMode(.inline)
-        .task {
-            // Poll while the screen is open so status changes appear live. Fine for the demo.
-            while !Task.isCancelled {
-                await store.refresh(jobId: jobId)
-                try? await Task.sleep(for: .seconds(2))
-            }
-        }
-    }
-}
-
 #Preview {
     NavigationStack {
         PostedJobsList()

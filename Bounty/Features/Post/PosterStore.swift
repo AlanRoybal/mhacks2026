@@ -81,6 +81,11 @@ final class PosterStore {
         return await refresh(jobId: job.id) ?? job
     }
 
+    /// Approves submitted work. The server releases the payment; the app never moves money.
+    func approve(_ job: Job) async throws {
+        upsert(try await api.approve(jobId: job.id))
+    }
+
     enum FundingError: LocalizedError {
         case cancelled
 
