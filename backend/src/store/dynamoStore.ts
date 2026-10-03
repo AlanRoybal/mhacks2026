@@ -8,7 +8,7 @@
 //   ledger  PK jobId, SK seq      (stream enabled: drives the outbox worker)
 //   kv      PK key                (TTL attribute expiresAt)
 
-import { ConditionalCheckFailedException, DynamoDBClient, TransactionCanceledException } from "@aws-sdk/client-dynamodb";
+import { ConditionalCheckFailedException, DynamoDBClient, TransactionCanceledException, TransactionConflictException } from "@aws-sdk/client-dynamodb";
 import {
   DeleteCommand,
   DynamoDBDocumentClient,
@@ -28,6 +28,13 @@ import { AlreadyExistsError, needsAttention, VersionConflictError, type Store } 
 const isConditionFailure = (e: unknown) =>
   e instanceof ConditionalCheckFailedException ||
   (e instanceof TransactionCanceledException && (e.CancellationReasons ?? []).some((r) => r.Code === "ConditionalCheckFailed"));
+
+// Another write to the same item was in flight. For versioned job/user writes this means "re-read and
+// retry", exactly like a failed version check (applyEvent and updateUser retry VersionConflictError).
+export const isWriteConflict = (e: unknown) =>
+  isConditionFailure(e) ||
+  e instanceof TransactionConflictException ||
+  (e instanceof TransactionCanceledException && (e.CancellationReasons ?? []).some((r) => r.Code === "TransactionConflict"));
 
 export class DynamoStore implements Store {
   private readonly db: DynamoDBDocumentClient;
@@ -105,7 +112,7 @@ export class DynamoStore implements Store {
         }),
       );
     } catch (e) {
-      if (isConditionFailure(e)) throw new VersionConflictError(`Job ${next.jobId}`);
+      if (isWriteConflict(e)) throw new VersionConflictError(`Job ${next.jobId}`);
       throw e;
     }
   }
@@ -114,7 +121,7 @@ export class DynamoStore implements Store {
     try {
       await this.db.send(new PutCommand(this.versionedPut(this.t.jobs, next, prevVersion)));
     } catch (e) {
-      if (isConditionFailure(e)) throw new VersionConflictError(`Job ${next.jobId}`);
+      if (isWriteConflict(e)) throw new VersionConflictError(`Job ${next.jobId}`);
       throw e;
     }
   }
@@ -204,7 +211,7 @@ export class DynamoStore implements Store {
     try {
       await this.db.send(new PutCommand(this.versionedPut(this.t.users, next, prevVersion)));
     } catch (e) {
-      if (isConditionFailure(e)) throw new VersionConflictError(`User ${next.userId}`);
+      if (isWriteConflict(e)) throw new VersionConflictError(`User ${next.userId}`);
       throw e;
     }
   }
