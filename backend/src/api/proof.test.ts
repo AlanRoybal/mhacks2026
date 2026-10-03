@@ -197,7 +197,7 @@ test("a worker who takes over a job doesn't see the previous worker's proofs", a
   const next = await api.readyWorker("second", { skill: "Logo design", ...SITE });
   await api.call("POST", `/jobs/${job.id}/proof`, worker.token, { items: await fullProof(deps, api, worker.token, job, 5) });
   await deps.settle();
-  await api.call("POST", `/jobs/${job.id}/withdraw`, worker.token);
+  assert.equal((await api.call("POST", `/jobs/${job.id}/withdraw`, worker.token)).status, 204);
   await deps.settle();
   const offer = (await getJobOrThrow(deps, job.id)).currentOffer;
   assert.equal(offer?.workerId, next.userId);

@@ -5,6 +5,7 @@ import type { EvidenceItem, Job, User } from "../../domain/types.js";
 import { badRequest } from "../../lib/errors.js";
 import { getJobOrThrow } from "../../services/jobs.js";
 import { checkEvidence, requireWorker, submitProof } from "../../services/proof.js";
+import { isAdmin } from "../auth.js";
 import { parseBody, type AppEnv } from "../http.js";
 import { jobWire, proofWire, verdictsWire, WireContext } from "../wire.js";
 import { visibleJob } from "./jobs.js";
@@ -95,9 +96,10 @@ export function proofRoutes(deps: Deps): Hono<AppEnv> {
   app.get("/:id/proofs", async (c) => {
     const user = c.get("user");
     const job = await visibleJob(deps, user, c.req.param("id"));
-    // The poster sees every attempt; a worker sees only their own (not a previous worker's).
-    const all = job.posterId === user.userId || job.workerId === user.userId ? await deps.store.listProofs(job.jobId) : [];
-    const proofs = job.posterId === user.userId ? all : all.filter((p) => p.workerId === user.userId);
+    // The poster and admins see every attempt; a worker sees only their own (not a previous worker's).
+    const all = await deps.store.listProofs(job.jobId);
+    const seesAll = job.posterId === user.userId || isAdmin(deps, user);
+    const proofs = seesAll ? all : all.filter((p) => p.workerId === user.userId);
     return c.json(
       proofs.map((p) => ({
         ...proofWire(deps, p),

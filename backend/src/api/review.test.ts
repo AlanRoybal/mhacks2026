@@ -58,6 +58,7 @@ test("a dispute names an item; an admin resolves it", async () => {
 
   assert.equal((await api.call("POST", `/jobs/${jobId}/resolve`, worker.token, { outcome: "release" })).status, 403);
   const admin = await api.login("admin");
+  assert.equal(((await api.call("GET", `/jobs/${jobId}/proofs`, admin.token)).body as unknown as unknown[]).length, 1, "admins see the evidence");
   const resolved = await api.call("POST", `/jobs/${jobId}/resolve`, admin.token, { outcome: "refund", note: "Link was empty" });
   assert.equal(resolved.body.status, "REFUNDED");
   assert.equal(resolved.body.resolution.outcome, "refund");

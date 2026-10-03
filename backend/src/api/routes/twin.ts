@@ -99,7 +99,8 @@ export function twinRoutes(deps: Deps): Hono<AppEnv> {
   });
 
   app.delete("/skills/:normName", async (c) => {
-    const key = normName(decodeURIComponent(c.req.param("normName")));
+    // Hono has already decoded the path parameter.
+    const key = normName(c.req.param("normName"));
     await updateUser(deps, userId(c), (u) => {
       const next = deleteSkill(u.twin, key, deps.now().toISOString());
       if (!next) throw notFound("Skill");

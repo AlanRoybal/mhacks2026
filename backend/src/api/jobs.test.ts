@@ -145,3 +145,28 @@ test("bad drafts are rejected with readable errors", async () => {
   const foreignPhoto = await call(app, "POST", "/jobs", token, newJobDraft(deps, { posterPhotos: ["https://example.com/x.jpg"] }));
   assert.equal(foreignPhoto.body.error, "unknown_upload");
 });
+
+test("PATCH keeps fields it doesn't mention; terms use the posting deadline rules", async () => {
+  const deps = testDeps();
+  const app = createApp(deps);
+  const token = await login(app, "poster");
+  const { body: job } = await call(app, "POST", "/jobs", token, newJobDraft(deps, { currency: "USDC" }));
+  const patched = await call(app, "PATCH", `/jobs/${job.id}`, token, { title: "A better title" });
+  assert.equal(patched.body.title, "A better title");
+  assert.equal(patched.body.currency, "USDC", "currency is not reset to its default");
+
+  const remote = await call(app, "POST", "/jobs", token, newJobDraft(deps, { location: null }));
+  await call(app, "POST", `/demo/jobs/${remote.body.id}/fund`, token);
+  const tooSoon = await call(app, "PATCH", `/jobs/${remote.body.id}/terms`, token, { deadline: new Date(deps.now().getTime() + 60_000).toISOString() });
+  assert.equal(tooSoon.status, 400);
+});
+
+test("skills with % in the name can be deleted", async () => {
+  const deps = testDeps();
+  const app = createApp(deps);
+  const token = await login(app, "worker");
+  await call(app, "POST", "/twin/skills", token, { name: "100% uptime ops" });
+  const deleted = await call(app, "DELETE", `/twin/skills/${encodeURIComponent("100% uptime ops")}`, token);
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.body.skills.length, 0);
+});

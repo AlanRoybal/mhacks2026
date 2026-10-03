@@ -96,7 +96,8 @@ function fromDraft(draft: ChecklistDraft, job: JobBrief): { checklist: Checklist
   };
 }
 
-function validateDeadline(deps: Deps, deadline: string): string {
+// Deadlines are 30 minutes to 30 days away, when posting and when extending (UPDATE_TERMS).
+export function validateDeadline(deps: Deps, deadline: string): string {
   const ms = Date.parse(deadline);
   const now = deps.now().getTime();
   if (!Number.isFinite(ms)) throw badRequest("Invalid deadline");
