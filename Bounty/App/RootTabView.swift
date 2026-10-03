@@ -2,6 +2,8 @@ import SwiftUI
 
 struct RootTabView: View {
     @Environment(AppRouter.self) private var router
+    /// The tab bar steps aside while typing, instead of riding up on the keyboard.
+    @State private var isKeyboardShown = false
 
     var body: some View {
         Group {
@@ -17,7 +19,9 @@ struct RootTabView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    BountyTabBar(selection: router.tab) { router.select($0) }
+                    if !isKeyboardShown {
+                        BountyTabBar(selection: router.tab) { router.select($0) }
+                    }
                 }
             }
         }
@@ -26,6 +30,12 @@ struct RootTabView: View {
         .onAppear(perform: consumePendingPushRoute)
         .onReceive(NotificationCenter.default.publisher(for: .pushRouteChanged)) { _ in
             consumePendingPushRoute()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            isKeyboardShown = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            isKeyboardShown = false
         }
     }
 

@@ -299,24 +299,26 @@ private struct ProofPhoto: View {
     let label: String
 
     var body: some View {
-        Group {
-            if let url {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFill()
-                    } else {
-                        Image(fallbackAsset).resizable()
+        // A fixed-size frame with the photo as an overlay, so a wide photo can't widen the row.
+        Color.clear
+            .frame(height: 150)
+            .frame(maxWidth: .infinity)
+            .overlay {
+                if let url {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            Image(fallbackAsset).resizable()
+                        }
                     }
+                } else {
+                    Image(fallbackAsset).resizable()
                 }
-            } else {
-                Image(fallbackAsset).resizable()
             }
-        }
-        .frame(height: 150)
-        .frame(maxWidth: .infinity)
-        .overlay(alignment: .topLeading) {
-            Chip(label: label, tone: .dark).padding(10)
-        }
+            .overlay(alignment: .topLeading) {
+                Chip(label: label, tone: .dark).padding(10)
+            }
         .clipShape(RoundedRectangle(cornerRadius: BountyRadius.row, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label) photo")
