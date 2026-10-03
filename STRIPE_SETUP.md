@@ -1,6 +1,6 @@
 # Stripe payments for Bounty
 
-> Moved from `backend/` to `payments-server/` when the branches were merged; `backend/` is now the main API (see `docs/API.md`). The app can keep using this server for checkout until `BountyPaymentsBaseURL` is pointed at the main backend's compatible `/payment-sheet` route.
+> Moved from `backend/` to `payments-server/` when the branches were merged; `backend/` is now the main API (see `docs/API.md`). The app's Debug build now sends checkout to the main backend (port 8787), which serves the same `/payment-sheet` and `GET /jobs/{id}` routes and turns each funded job into a real, matchable job. To use this server instead, set `BOUNTY_PAYMENTS_BASE_URL` to port 4242 in `Config/Local.xcconfig`.
 
 The Post tab now opens Stripe's native PaymentSheet to fund a job. The backend computes the 10% platform fee, creates one PaymentIntent per checkout, and saves jobs in SQLite. Confirmed funding changes the job to `funded` and appends one `JOB_FUNDED` record to `LedgerEvents` in the same transaction. A job appears under Jobs → Posted only after the backend verifies the full payment succeeded. Pending payment IDs are saved on the phone so an interrupted confirmation can recover when the app reopens or returns to the foreground.
 
@@ -18,7 +18,7 @@ npm ci
 npm start
 ```
 
-The default address is `http://127.0.0.1:4242`. The iOS Debug configuration already points there for the Simulator. Open `Bounty.xcodeproj` and run the Bounty scheme. Swift Package Manager resolves the pinned StripePaymentSheet 26.12.1 package. `project.yml` contains the same dependency for XcodeGen users.
+The default address is `http://127.0.0.1:4242`. The iOS Debug configuration points at the main backend (port 8787); set `BOUNTY_PAYMENTS_BASE_URL` to this address in `Config/Local.xcconfig` to use this server. Open `Bounty.xcodeproj` and run the Bounty scheme. Swift Package Manager resolves the pinned StripePaymentSheet 26.12.1 package. `project.yml` contains the same dependency for XcodeGen users.
 
 To replace the sandbox with an existing Stripe test account, copy `.env.example` to `.env` and set matching secret and publishable keys from that account. For a fresh anonymous sandbox:
 

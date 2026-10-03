@@ -1,6 +1,8 @@
 // Main backend (backend/). Empty keeps the app on its built-in sample data; set it in Local.xcconfig.
 BOUNTY_API_BASE_URL =
-BOUNTY_PAYMENTS_BASE_URL = http:/$()/127.0.0.1:4242
+// Checkout. The main backend serves /payment-sheet too, so funded jobs become real, matchable jobs.
+// Caleb's standalone server (payments-server/, port 4242) still works if you point this at it.
+BOUNTY_PAYMENTS_BASE_URL = http:/$()/127.0.0.1:8787
 BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER =
 BOUNTY_CODE_SIGN_ENTITLEMENTS = Bounty/Bounty.entitlements
 #include? "Local.xcconfig"
