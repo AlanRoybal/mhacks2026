@@ -70,6 +70,8 @@ Each stage name gets its own stack, so teammates can deploy `-c stage=alan` and 
 
 Watch the `EffectsDlqAlarm`. A message in that queue means a payout, refund, push, timer or grade failed every retry.
 
+The stack has not been deployed yet. [infra/README.md](infra/README.md) has handoff notes for whoever owns AWS: every setting, and what is still open.
+
 ## How it fits together
 
 ```
