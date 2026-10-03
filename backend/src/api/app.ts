@@ -12,6 +12,7 @@ import { jobRoutes } from "./routes/jobs.js";
 import { localBlobRoutes } from "./routes/localBlobs.js";
 import { meRoutes } from "./routes/me.js";
 import { offerRoutes } from "./routes/offers.js";
+import { paymentSheetRoutes } from "./routes/paymentSheet.js";
 import { fundingRoutes, publicPaymentRoutes, walletRoutes } from "./routes/payments.js";
 import { proofRoutes } from "./routes/proof.js";
 import { reviewRoutes } from "./routes/review.js";
@@ -33,6 +34,8 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   app.route("/files", fileRoutes(deps));
   // Stripe webhooks and Connect redirects.
   app.route("/", publicPaymentRoutes(deps));
+  // The payments checkout's endpoints (its own error format; optional session).
+  app.route("/", paymentSheetRoutes(deps));
 
   // Everything below needs a session token.
   const authed = new Hono<AppEnv>();

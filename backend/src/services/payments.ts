@@ -67,6 +67,16 @@ export async function runRefund(deps: Deps, jobId: string): Promise<void> {
   deps.log.info("Refund sent", { jobId, refundId, amountCents: job.totalCents });
 }
 
+// Asks Stripe directly whether a draft's payment went through and records it, so funding is
+// confirmed even when no webhook reaches this server (local dev without `stripe listen`).
+export async function syncFundingFromStripe(deps: Deps, job: Job): Promise<Job> {
+  const stripe = deps.payments.stripe;
+  if (job.state !== "DRAFT" || job.rail !== "stripe" || !job.payment.paymentIntentId || !stripe) return job;
+  const intent = await stripe.stripe.paymentIntents.retrieve(job.payment.paymentIntentId);
+  if (intent.status === "succeeded") await onPaymentSucceeded(deps, intent);
+  return getJobOrThrow(deps, job.jobId);
+}
+
 async function onPaymentSucceeded(deps: Deps, intent: Stripe.PaymentIntent): Promise<void> {
   const jobId = intent.metadata?.jobId;
   if (!jobId) return;
