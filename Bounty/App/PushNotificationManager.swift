@@ -52,7 +52,9 @@ final class PushNotificationManager: NSObject, UIApplicationDelegate, UNUserNoti
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        let jobID = response.notification.request.content.userInfo["jobId"] as? String
+        let userInfo = response.notification.request.content.userInfo
+        let jobID = userInfo["jobId"] as? String
+        let type = userInfo["type"] as? String
 
         switch response.actionIdentifier {
         case PushNotificationDefinition.acceptActionIdentifier:
@@ -62,7 +64,12 @@ final class PushNotificationManager: NSObject, UIApplicationDelegate, UNUserNoti
                 NotificationCenter.default.post(name: .offerDeclined, object: jobID)
             }
         case UNNotificationDefaultActionIdentifier:
-            await routeToJobs(jobID: jobID, action: "open")
+            // Poster alerts open the posted job itself; RootTabView decides between review and timeline.
+            if let type, let jobID, PosterPush.posterTypes.contains(type) || PosterPush.sharedTypes.contains(type) {
+                await routeToPostedJob(jobID: jobID, type: type)
+            } else {
+                await routeToJobs(jobID: jobID, action: "open")
+            }
         default:
             break
         }
@@ -88,6 +95,16 @@ final class PushNotificationManager: NSObject, UIApplicationDelegate, UNUserNoti
         notificationCenter.setNotificationCategories([offerCategory])
     }
 
+    private func routeToPostedJob(jobID: String, type: String) async {
+        await MainActor.run {
+            let defaults = UserDefaults.standard
+            defaults.set(PushRoute.postedJobDestination, forKey: PushRoute.destinationKey)
+            defaults.set(type, forKey: PushRoute.actionKey)
+            defaults.set(jobID, forKey: PushRoute.jobIDKey)
+            NotificationCenter.default.post(name: .pushRouteChanged, object: jobID)
+        }
+    }
+
     private func routeToJobs(jobID: String?, action: String) async {
         await MainActor.run {
             let defaults = UserDefaults.standard
@@ -109,6 +126,8 @@ enum PushRoute {
     static let destinationKey = "pendingPushDestination"
     static let actionKey = "pendingPushAction"
     static let jobIDKey = "pendingPushJobID"
+    /// Destination for poster alerts; the action key then holds the push `type`.
+    static let postedJobDestination = "postedJob"
 }
 
 extension Notification.Name {

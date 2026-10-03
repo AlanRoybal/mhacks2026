@@ -35,14 +35,48 @@ final class PosterStore {
         isLoading = true
         defer { isLoading = false }
         do {
-            jobs = try await api.myJobs()
+            setJobs(try await api.myJobs())
             errorMessage = nil
         } catch {
             if fallBackIfUnreachable(error) {
-                jobs = (try? await api.myJobs()) ?? []
+                setJobs((try? await api.myJobs()) ?? [])
             } else {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    /// Sends this device's APNs token to the backend so it can push poster alerts.
+    /// Called at launch and whenever iOS hands the app a new token.
+    func registerForPush(token: String) async {
+        do {
+            try await api.registerDevice(token: token)
+        } catch {
+            // Not fatal: the Posted list still refreshes while open, and reminders are local.
+            _ = fallBackIfUnreachable(error)
+        }
+    }
+
+    /// Replaces the list, announcing newly submitted work in sample mode and keeping the
+    /// "review closing" reminders in step with what's in review.
+    private func setJobs(_ fresh: [PostedJob]) {
+        let previous = Dictionary(jobs.map { ($0.id, $0.status) }, uniquingKeysWith: { first, _ in first })
+        jobs = fresh
+        afterStatusChanges(from: previous)
+    }
+
+    private func afterStatusChanges(from previous: [String: PostedJobStatus]) {
+        let snapshot = jobs
+        let usingSampleData = isUsingSampleData
+        Task {
+            if usingSampleData {
+                for job in snapshot where job.status == .inReview {
+                    if let before = previous[job.id], before != .inReview {
+                        await PosterPush.announceProofReady(for: job)
+                    }
+                }
+            }
+            await PosterPush.syncReviewReminders(for: snapshot)
         }
     }
 
@@ -67,11 +101,13 @@ final class PosterStore {
     }
 
     func upsert(_ job: PostedJob) {
+        let previous = Dictionary(jobs.map { ($0.id, $0.status) }, uniquingKeysWith: { first, _ in first })
         if let index = jobs.firstIndex(where: { $0.id == job.id }) {
             jobs[index] = job
         } else {
             jobs.insert(job, at: 0)
         }
+        afterStatusChanges(from: previous)
     }
 
     /// Approves submitted work. The server releases the payment; the app never moves money.

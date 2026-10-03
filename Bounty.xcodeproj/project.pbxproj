@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C0FABD7DF1D1B04C24B6E898 /* PosterPush.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0765A919486404C75CE5767 /* PosterPush.swift */; };
 		C0A08B1ECFB9BD4E15784AE8 /* MockJobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = C005463F342E009FCA8AF367 /* MockJobsAPI.swift */; };
 		C077C166F58068323FBB0EB3 /* JobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0B58AD39BE0102A02761320 /* JobsAPI.swift */; };
 		C05ECDBA3AAE4FCABB4BF321 /* BackendJobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0B167C203712C4E4548A150 /* BackendJobsAPI.swift */; };
@@ -44,6 +45,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C0765A919486404C75CE5767 /* PosterPush.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterPush.swift; sourceTree = "<group>"; };
 		C005463F342E009FCA8AF367 /* MockJobsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockJobsAPI.swift; sourceTree = "<group>"; };
 		C0B58AD39BE0102A02761320 /* JobsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsAPI.swift; sourceTree = "<group>"; };
 		C0B167C203712C4E4548A150 /* BackendJobsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendJobsAPI.swift; sourceTree = "<group>"; };
@@ -255,6 +257,7 @@
 		B1412E7AEF0697DD3B63290D /* Post */ = {
 			isa = PBXGroup;
 			children = (
+				C0765A919486404C75CE5767 /* PosterPush.swift */,
 				C01D52133388C66946BDE3DB /* PosterStore.swift */,
 				C08B4C1F3E185896110EDEC1 /* PostedJobDetailView.swift */,
 				C0B510A9B989BA3E9D2BED95 /* LocationPicker.swift */,
@@ -378,6 +381,7 @@
 				EEA12735F082E2CC54C7B4F0 /* EarningsView.swift in Sources */,
 				A260AAD49C3DC621DAB28FBF /* HomeView.swift in Sources */,
 				F5B1419706DA28BA5C504DB1 /* Job.swift in Sources */,
+				C0FABD7DF1D1B04C24B6E898 /* PosterPush.swift in Sources */,
 				C0A08B1ECFB9BD4E15784AE8 /* MockJobsAPI.swift in Sources */,
 				C077C166F58068323FBB0EB3 /* JobsAPI.swift in Sources */,
 				C05ECDBA3AAE4FCABB4BF321 /* BackendJobsAPI.swift in Sources */,

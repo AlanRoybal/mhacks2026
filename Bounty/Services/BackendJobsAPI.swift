@@ -54,6 +54,17 @@ actor BackendJobsAPI: JobsAPI {
         try await send("POST", "jobs/\(jobId)/dispute", body: ["checklistItemId": checklistItemId, "note": note])
     }
 
+    func registerDevice(token: String) async throws {
+        #if DEBUG
+        let env = "sandbox"     // Xcode builds use APNs' sandbox
+        #else
+        let env = "production"  // TestFlight and App Store builds
+        #endif
+        let _: DeviceCount = try await send("POST", "me/devices", body: ["token": token, "env": env])
+    }
+
+    private struct DeviceCount: Decodable { let devices: Int }
+
     // MARK: Requests
 
     private func send<Response: Decodable>(_ method: String, _ path: String) async throws -> Response {

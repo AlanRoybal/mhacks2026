@@ -26,6 +26,14 @@ protocol JobsAPI: Sendable {
 
     /// `jobs/{id}/dispute` (stretch).
     func dispute(jobId: String, checklistItemId: String, note: String) async throws -> PostedJob
+
+    /// `me/devices`: lets the server push to this device. `token` is the APNs token in hex.
+    func registerDevice(token: String) async throws
+}
+
+extension JobsAPI {
+    /// Sample data has no server to push from.
+    func registerDevice(token: String) async throws {}
 }
 
 struct PresignedUpload: Codable, Hashable, Sendable {

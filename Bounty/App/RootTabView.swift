@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootTabView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(PosterStore.self) private var posterStore
     @Environment(\.scenePhase) private var scenePhase
     // Jobs funded through Stripe checkout (payments branch), shown under Jobs > Posted.
     @StateObject private var postedJobs = PostedJobsStore()
@@ -42,6 +43,17 @@ struct RootTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .pushRouteChanged)) { _ in
             consumePendingPushRoute()
         }
+        // Hand the APNs token to the backend so it can push poster alerts (PushNotificationManager
+        // saves it on registration; this also catches a token from before launch finished).
+        .task {
+            if let token = UserDefaults.standard.string(forKey: PushRegistration.deviceTokenKey) {
+                await posterStore.registerForPush(token: token)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .didRegisterPushToken)) { note in
+            guard let token = note.object as? String else { return }
+            Task { await posterStore.registerForPush(token: token) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             isKeyboardShown = true
         }
@@ -78,9 +90,29 @@ struct RootTabView: View {
 
     private func consumePendingPushRoute() {
         let defaults = UserDefaults.standard
+        if defaults.string(forKey: PushRoute.destinationKey) == PushRoute.postedJobDestination,
+           let jobID = defaults.string(forKey: PushRoute.jobIDKey) {
+            let type = defaults.string(forKey: PushRoute.actionKey) ?? ""
+            [PushRoute.destinationKey, PushRoute.actionKey, PushRoute.jobIDKey].forEach(defaults.removeObject(forKey:))
+            Task { await openPostedJob(jobID, type: type) }
+            return
+        }
         guard defaults.string(forKey: PushRoute.destinationKey) == "jobs" else { return }
         router.reset(to: .jobs)
         defaults.removeObject(forKey: PushRoute.destinationKey)
+    }
+}
+
+extension RootTabView {
+    /// Opens a poster alert's job: its review when it's waiting on the poster, else its timeline.
+    /// A shared alert (dispute, resolution, missed deadline) for a job that isn't ours goes to Jobs.
+    private func openPostedJob(_ jobID: String, type: String) async {
+        let job = await posterStore.refresh(jobId: jobID)
+        router.jobsSegment = .posted
+        router.reset(to: .jobs)
+        guard let job else { return }
+        let wantsReview = PosterPush.reviewTypes.contains(type) && job.status == .inReview
+        router.open(wantsReview ? .reviewProof : .postedJob, posterJob: job.id)
     }
 }
 
