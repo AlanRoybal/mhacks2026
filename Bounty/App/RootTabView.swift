@@ -4,6 +4,7 @@ struct RootTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var selection = AppTab.home
     @StateObject private var postedJobs = PostedJobsStore()
+    @StateObject private var workerPayments = WorkerPayments()
 
     var body: some View {
         TabView(selection: $selection) {
@@ -49,8 +50,12 @@ struct RootTabView: View {
         }
         .tint(BountyTheme.accent)
         .environmentObject(postedJobs)
+        .environmentObject(workerPayments)
         .task(id: scenePhase) {
-            if scenePhase == .active { await postedJobs.refresh() }
+            if scenePhase == .active {
+                await postedJobs.refresh()
+                await workerPayments.refresh()
+            }
         }
         .onAppear(perform:consumePendingPushRoute)
         .onReceive(NotificationCenter.default.publisher(for: .pushRouteChanged)) { _ in

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HomeView: View {
+    @EnvironmentObject private var workerPayments: WorkerPayments
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -11,10 +12,10 @@ struct HomeView: View {
                     Text("In progress")
                         .font(.title2.bold())
 
-                    NavigationLink(value: SampleJobs.jobs[1]) {
-                        JobRow(job: SampleJobs.jobs[1])
+                    ForEach(workerPayments.jobs.filter { [.accepted, .inProgress, .inReview, .releasePending].contains($0.status) }) { job in
+                        NavigationLink(value: job) { JobRow(job: job) }
+                            .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding()
@@ -80,7 +81,7 @@ private struct ActiveOfferCard: View {
                     .foregroundStyle(BountyTheme.warning)
             }
 
-            Text(job.pay, format: .currency(code: "USD"))
+            Text(job.displayPay)
                 .font(.system(size: 44, weight: .bold, design: .rounded))
 
             VStack(alignment: .leading, spacing: 7) {
@@ -130,7 +131,7 @@ struct JobRow: View {
 
             Spacer()
 
-            Text(job.pay, format: .currency(code: "USD"))
+            Text(job.displayPay)
                 .font(.headline)
         }
         .bountyPanel()
@@ -141,4 +142,6 @@ struct JobRow: View {
     NavigationStack {
         HomeView()
     }
+    .environmentObject(WorkerPayments())
+    .environmentObject(PostedJobsStore())
 }

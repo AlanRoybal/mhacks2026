@@ -1,8 +1,10 @@
 import SwiftUI
 import StripePaymentSheet
+@preconcurrency import CoinbaseWalletSDK
 
 @main
 struct BountyApp: App {
+    init() { BountyWallet.configure() }
     @UIApplicationDelegateAdaptor(PushNotificationManager.self) private var pushNotifications
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
@@ -23,7 +25,8 @@ struct BountyApp: App {
                 }
             }
             .onOpenURL { url in
-                _ = StripeAPI.handleURLCallback(with: url)
+                if StripeAPI.handleURLCallback(with: url) { return }
+                _ = try? CoinbaseWalletSDK.shared.handleResponse(url)
             }
         }
     }

@@ -7,7 +7,11 @@ struct Job: Identifiable, Hashable {
     let distance: String
     let deadline: String
     let matchReason: String
-    let status: JobStatus
+    var status: JobStatus
+    var currency = "USD"
+    var displayPay: String {
+        currency == "USDC" ? "\(pay.formatted()) USDC" : pay.formatted(.currency(code: currency))
+    }
 }
 
 enum JobStatus: String, CaseIterable, Identifiable {
@@ -17,6 +21,24 @@ enum JobStatus: String, CaseIterable, Identifiable {
     case inProgress = "In progress"
     case inReview = "In review"
     case paid = "Paid"
+    case refunded = "Refunded"
+    case releasePending = "Payment pending"
+    case refundPending = "Refund pending"
+    case settlementIssue = "Payment needs review"
+
+    static func api(_ value: String) -> JobStatus {
+        switch value {
+        case "accepted": .accepted
+        case "in_progress": .inProgress
+        case "in_review": .inReview
+        case "released": .paid
+        case "refunded": .refunded
+        case "release_pending": .releasePending
+        case "refund_pending": .refundPending
+        case "settlement_issue": .settlementIssue
+        default: .funded
+        }
+    }
 
     var id: String { rawValue }
 }

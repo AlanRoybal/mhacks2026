@@ -5,6 +5,9 @@ options:
     iOS: "17.0"
   createIntermediateGroups: true
 packages:
+  CoinbaseWallet:
+    url: https://github.com/MobileWalletProtocol/wallet-mobile-sdk
+    exactVersion: 1.1.2
   Stripe:
     url: https://github.com/stripe/stripe-ios-spm
     exactVersion: 26.12.1
@@ -31,6 +34,8 @@ targets:
         excludes:
           - Info.plist
     dependencies:
+      - package: CoinbaseWallet
+        product: CoinbaseWalletSDK
       - package: Stripe
         product: StripePaymentSheet
     settings:

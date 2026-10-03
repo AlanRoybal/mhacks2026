@@ -2,13 +2,13 @@
 
 The Post tab now opens Stripe's native PaymentSheet to fund a job. The backend computes the 10% platform fee, creates one PaymentIntent per checkout, and saves jobs in SQLite. Confirmed funding changes the job to `funded` and appends one `JOB_FUNDED` record to `LedgerEvents` in the same transaction. A job appears under Jobs → Posted only after the backend verifies the full payment succeeded. Pending payment IDs are saved on the phone so an interrupted confirmation can recover when the app reopens or returns to the foreground.
 
-For a **$15 job**, the existing 10% fee is **$1.50**, so PaymentSheet collects **$16.50 USD**. Funding captures the poster's test payment; worker transfers happen in a later stage.
+For a **$15 job**, the existing 10% fee is **$1.50**, so PaymentSheet collects **$16.50 USD**. Approval now transfers **$15** from that charge to the assigned worker's connected Stripe account. A bank payout is a separate Stripe step.
 
-This is a local, test-mode integration. It charges the requester; Connect onboarding, worker transfers, refunds, and live payments are separate work. The app and backend reject live Stripe keys. No API secret is compiled into the iOS app.
+This is a local, test-mode integration with funding, Connect onboarding, transfers, full-charge refunds, and ledger audits. The app and backend reject live Stripe keys. No API secret or backend decision token is compiled into the iOS app. Test USDC funding is documented in [contracts/README.md](contracts/README.md).
 
 ## Run the backend
 
-Use Node 22.13 or newer. Dependencies and a temporary Stripe sandbox have been set up locally. Its keys are in the ignored `backend/.env`; keep this file private. The current sandbox expires **October 10, 2026** unless claimed.
+Use Node 22.13 or newer. Test credentials are in the ignored `backend/.env`; keep this file private. Secret and publishable keys must belong to the same sandbox. Connect requires an account with Connect enabled and a key permitted to create accounts, account links, transfers, and refunds. The sandbox currently configured for this workspace has Connect enabled.
 
 ```sh
 cd backend
@@ -38,7 +38,7 @@ In a second terminal in `backend`:
 npm run webhooks
 ```
 
-Set `STRIPE_WEBHOOK_SECRET` in `.env` to the listener's `whsec_...` signing secret, then restart the backend. This has already been configured for the current local listener. The raw-body webhook handler validates signatures and tolerates duplicate, unrelated, and out-of-order payment events. The app also asks Stripe for the payment status through the server, so it can confirm funding without waiting for a webhook.
+The listener uses the test secret key in `.env` and saves its webhook signing secret back to that file without printing it. Once it reports that the secret is saved, start/restart the backend. The raw-body webhook handler validates signatures and tolerates duplicate, unrelated, and out-of-order payment events. The app also asks Stripe for the payment status through the server, so it can confirm funding without waiting for a webhook.
 
 ## Test a payment
 
@@ -98,8 +98,33 @@ With Stripe test keys, use a real card already added to Wallet for an Apple Pay 
 
 If Apple Pay does not appear, check the registered Merchant ID, Xcode entitlement and signing team, Stripe certificate, `Config/Local.xcconfig`, and Wallet availability. Card-entry checkout remains usable while Apple Pay is being configured. See [Stripe's PaymentSheet Apple Pay guide](https://docs.stripe.com/payments/accept-a-payment?payment-ui=mobile&platform=ios#optional-enable-apple-pay).
 
+## Worker setup and payment decisions
+
+In the app's Earnings tab, **Set up Stripe payouts** creates an Express connected account and opens Stripe's hosted onboarding. Use the sandbox test information from [Stripe's Connect testing guide](https://docs.stripe.com/connect/testing). Set `BOUNTY_PUBLIC_URL` to a backend address reachable by the iPhone browser. After returning, Earnings refreshes the worker's account and actual payment records. Working/Completed job lists now use authenticated backend assignments and terminal payment statuses; sample paid jobs are no longer displayed in those lists.
+
+Run `npm run setup:chain` once to generate `BOUNTY_ADMIN_TOKEN` in ignored `.env.chain`, even when testing only Stripe. Restart the backend. This token stays on the backend; the matching/review service uses it as `Authorization: Bearer <token>` to call:
+
+| Endpoint | Behavior |
+| --- | --- |
+| `GET /admin/jobs` / `GET /admin/workers` | Find funded jobs and worker IDs; session tokens are never returned. |
+| `POST /admin/jobs/:id/assign` with `{"workerID":"..."}` | Verify payout readiness, freeze the destination, and set `accepted`. |
+| `POST /admin/jobs/:id/review` with optional `{"reviewSeconds":120}` | Set `in_review` for work submitted before its deadline. |
+| `POST /admin/jobs/:id/approve` | Transfer/release to the frozen worker and record `released` after confirmation. |
+| `POST /admin/jobs/:id/refund` | Refund eligible unfinished work and record `refunded` after confirmation. |
+| `GET /admin/jobs/:id/audit` | Compare amounts, recipient, status, ledger, and actual payment/chain references. |
+
+Every ten seconds the backend resumes pending settlements, releases work after its review window, and refunds expired unfinished work. Stripe allows an unassigned funded job to be refunded before the deadline; USDC always requires the on-chain deadline. A job already in review cannot be refunded through the backend decision endpoint. The contract still permits the poster's deadline refund; if that transaction wins the race, the backend records the refund and never records a release.
+
+SQLite reserves one settlement decision per job. Stripe retries reuse a persistent idempotency key and external reference. After 23 hours, an uncertain request is reconciled against Stripe records rather than recreated with an expired key. A failed or pending transfer/refund remains pending, contributes no released earnings, and exposes its error through the audit. Ledger updates and status transitions commit together. Earnings come from the assigned worker's records, with actual released transactions rechecked before display; a reversed or unverifiable payment is flagged for reconciliation.
+
+```sh
+npm run test:settlements
+```
+
+This uses real Stripe sandbox APIs and a separate `data/connect-smoke.sqlite` database. It creates a synthetic test worker account, charges two test jobs, verifies a single $15 transfer under duplicate approval, checks earnings and ledger audit, and verifies a single $16.50 refund under duplicate requests. It requires the full sandbox keys and the account owner's completed Connect platform-profile acknowledgment. The synthetic account uses Custom account test fixtures; the app uses Express hosted onboarding. Test fixture records remain available in the sandbox for inspection.
+
 ## Before production
 
-This backend has no account authentication and is intended for local sandbox testing. Before public deployment, integrate authenticated job ownership with the application's backend, move the ledger to its database, and implement the planned Stripe Connect onboarding and separate transfers. Funding currently captures the charge into the platform's Stripe balance; it does not transfer money to a worker or provide an escrow service. Add refund handling and the job review/release state machine before taking real payments.
+Worker payout routes now use opaque sessions stored in the iOS Keychain, and all assignment/review/payment decisions require a server-only admin token. This remains a local test backend: poster ownership, persistent user accounts, and the real matching/proof-review service still need integration before public deployment. The sample marketplace screens do not make payment decisions. Stripe funding captures into the platform balance; the USDC path uses a separate escrow contract. Live payments are disabled.
 
 References: [Stripe iOS integration](https://docs.stripe.com/payments/accept-a-payment?payment-ui=mobile&platform=ios), [PaymentIntent creation](https://docs.stripe.com/api/payment_intents/create), [webhook verification](https://docs.stripe.com/webhooks), [temporary sandboxes](https://docs.stripe.com/cli/sandbox).

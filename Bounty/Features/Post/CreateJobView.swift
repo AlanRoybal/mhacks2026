@@ -8,6 +8,7 @@ struct CreateJobView: View {
     @State private var amount: Decimal = 25
     @State private var deadline = Date().addingTimeInterval(86_400)
     @State private var checkoutDraft: FundingDraft?
+    @State private var useUSDC = false
 
     private let categories = ["Design", "Home", "Tutoring", "Photography", "Technology"]
 
@@ -33,6 +34,10 @@ struct CreateJobView: View {
             }
 
             Section("Payment") {
+                Picker("Pay with", selection: $useUSDC) {
+                    Text("Card / Apple Pay").tag(false)
+                    Text("Test USDC").tag(true)
+                }
                 HStack {
                     Text("Amount")
                     Spacer()
@@ -62,16 +67,15 @@ struct CreateJobView: View {
                 .font(.headline)
                 .disabled(!canFund)
             } footer: {
-                Text("Review the total, including a 10% platform fee, before paying with Stripe.")
+                Text(useUSDC ? "Fund with test USDC on Base Sepolia. Your wallet pays network gas in test ETH." : "Review the total, including a 10% platform fee, before paying with Stripe.")
             }
         }
         .navigationTitle("Post a job")
         .sheet(item: $checkoutDraft) { draft in
-            PaymentCheckoutView(draft: draft) {
-                title = ""
-                details = ""
-                amount = 25
-                deadline = Date().addingTimeInterval(86_400)
+            if useUSDC {
+                CryptoCheckoutView(draft: draft, onFunded: resetForm)
+            } else {
+                PaymentCheckoutView(draft: draft, onFunded: resetForm)
             }
         }
     }
@@ -85,6 +89,10 @@ struct CreateJobView: View {
             && amount >= Decimal(50) / 100 && amount <= 10_000
             && cents == Decimal(NSDecimalNumber(decimal: cents).intValue)
             && deadline > Date()
+    }
+    private func resetForm() {
+        title = ""; details = ""; amount = 25
+        deadline = Date().addingTimeInterval(86_400)
     }
 }
 
