@@ -169,7 +169,7 @@ A skill in `GET /twin` looks like this:
 | POST | `/offers/{id}/accept` | — | `{ offer, job }`. A second tap by the winner is a 200. |
 | POST | `/offers/{id}/decline` | — | `{ offer, job: null }`. The job moves to the next match. |
 | GET | `/jobs/working` | — | Jobs assigned to you, active and finished. |
-| POST | `/jobs/{id}/start` | `{ "latitude", "longitude" }` in person, `{}` remote | Check-in. The response's `challengeCode` (like `K7R-4MX`) must be visible in proof photos. It's shown while IN_PROGRESS, SUBMITTED and IN_REVIEW. |
+| POST | `/jobs/{id}/start` | `{ "latitude", "longitude" }` in person, `{}` remote | Check-in. The response's `captureKey` is what the app signs its proof captures with (see [Proof](#proof)). It's sent only to the assigned worker, while IN_PROGRESS. |
 | POST | `/jobs/{id}/withdraw` | — | 204. Gives the job back before submitting; it re-opens for matching and counts against reliability. |
 | POST | `/jobs/{id}/proof/precheck` | Same as `/proof` | `{ checks }` without submitting (US-39). |
 | POST | `/jobs/{id}/proof` | See [Proof](#proof) | The Job (SUBMITTED), or 422 `proof_incomplete`. A double tap gets 409 `already_submitted`. |
@@ -190,7 +190,10 @@ Send one entry per checklist item. Every submission, including a retry, must inc
 
 ```json
 { "items": [
-  { "checklistItemId": "c1", "photos": [{ "fileURL": "...", "capturedAt": "2026-10-04T15:20:00Z", "latitude": 42.2808, "longitude": -83.743, "phase": "after" }] },
+  { "checklistItemId": "c1", "photos": [{ "fileURL": "...", "capturedAt": "2026-10-04T15:20:00Z", "latitude": 42.2808, "longitude": -83.743, "phase": "after",
+                                       "sha256": "<hex of the uploaded bytes>", "signature": "<base64 HMAC>" }] },
+  { "checklistItemId": "c5", "videos": [{ "fileURL": "...", "capturedAt": "...", "latitude": 42.2808, "longitude": -83.743, "phase": "after", "sha256": "...", "signature": "...",
+                                       "frames": [{ "fileURL": "...", "sha256": "...", "signature": "..." }] }] },
   { "checklistItemId": "c2", "link": "https://github.com/me/site/commit/abc123" },
   { "checklistItemId": "c3", "files": [{ "fileURL": "..." }] },
   { "checklistItemId": "c4", "checkIn": { "latitude": 42.2808, "longitude": -83.743, "at": "2026-10-04T15:25:00Z" } }
@@ -198,23 +201,30 @@ Send one entry per checklist item. Every submission, including a retry, must inc
 ```
 
 Rules per evidence type:
-- **`PHOTO`:** needs `photoCount` distinct images. If `beforeAfter` is set, also at least one `"phase": "before"` image, and it must differ from the after shots. One image may cover several items of the same job, but a photo used for another job is rejected.
+- **`PHOTO`:** needs `photoCount` distinct images, or one video. If `beforeAfter` is set, also at least one `"phase": "before"` image or video, and it must differ from the after shots. One image may cover several items of the same job, but a photo used for another job is rejected.
 - **`CHECK_IN`:** needs a `checkIn` near the job.
 - **`LINK`:** needs a full URL, including `https://`.
-- **`FILE`:** needs `files` (a photo also counts).
+- **`FILE`:** needs `files` (a photo or video also counts). PDFs are read by the grader, so digital work is judged on the deliverable itself.
 
-Each photo's `capturedAt` and each `checkIn.at` must fall between 2 minutes before your `POST /jobs/{id}/start` (when the code was issued) and 2 minutes after the server's clock at submission. In-person photos must carry coordinates.
+**In-app capture.** Photos and videos must come from the Bounty camera; there is no code to write on the work.
+- Right after a capture, the app signs it with the job's `captureKey`: `base64(HMAC-SHA256(base64url-decode(captureKey), message))`.
+- The message is these lines joined with `\n`: `bounty-capture-v1`, the job id, the lowercase hex SHA-256 of the uploaded bytes, `capturedAt` in whole Unix seconds, latitude and longitude with five decimals (empty if none).
+- The server hashes what was uploaded and checks the signature. A camera-roll photo, an edited file, a capture from another job or a changed GPS fix lands in `notCapturedInApp`.
+- Videos (`video/quicktime` or `video/mp4`, up to 60 MB) carry 1–4 stills the app takes from them, each signed the same way. The grader reads the stills; the poster gets `videoURLs` to watch the clip.
+
+Each photo's and video's `capturedAt` and each `checkIn.at` must fall between 2 minutes before your `POST /jobs/{id}/start` and 2 minutes after the server's clock at submission. In-person captures must carry coordinates.
 
 A 422 lists the problems in `checks`:
 - **`missingRequired`**: required items with no evidence.
 - **`outsideTimeWindow`**: photos or check-ins taken outside the allowed window.
 - **`duplicates`**: photos already used for another job, or the same image as both before and after.
 - **`missingUploads`**: uploads that are missing or too large.
+- **`notCapturedInApp`**: photos or videos that weren't taken with the Bounty camera for this job.
 - **`outsideGeofence` and `warnings`**: location problems. These don't block submission; a `CHECK_IN` item blocks only when it's missing. The grader and the poster see the warnings. An in-person photo with no GPS, or taken more than 400 m away (1 km in demo mode), turns a pass into `unclear`.
 
 **After submitting**, poll the job until it leaves SUBMITTED. Grading usually takes seconds, but can take up to 15 minutes (3 in demo mode) before it times out to the poster.
 
-- **pass:** every required item passes with confidence ≥ 0.7, the one-time code is visible and matches, and the evidence was on site. The job goes to IN_REVIEW with `reviewDeadline` (24 h, or 2 min in demo mode). If the poster doesn't respond, payment releases automatically (US-47).
+- **pass:** every required item passes with confidence ≥ 0.7 and the evidence was on site. The job goes to IN_REVIEW with `reviewDeadline` (24 h, or 2 min in demo mode). If the poster doesn't respond, payment releases automatically (US-47).
 - **fail:** the job goes back to IN_PROGRESS with per-item `verdicts`. Read `workerFeedback` from `/proofs`. The worker can retry up to two times, but only before the deadline (US-43).
 - **unclear, failed after the retries or past the deadline, or grading timed out:** the job goes to IN_REVIEW with `review.requiresPosterAction = true`. `reviewDeadline` is then a 48-hour poster decision window (5 min in demo mode), and nothing auto-releases. If the poster stays silent, the job becomes DISPUTED with the money held. An admin resolves it with `POST /jobs/{id}/resolve`. If no admin acts within 72 hours (10 min in demo mode), a `fail` refunds the poster and any other grade pays the worker. The app should check `review.requiresPosterAction`, not just `reviewDeadline`.
 
@@ -255,7 +265,7 @@ Here is a real poster draft. Every field before `myRole` is in iOS-B's `Job.swif
   "totalAmount": 16.5,
   "flags": [],
   "offer": null,
-  "challengeCode": null,
+  "captureKey": null,
   "attempts": { "failed": 0, "maxRetries": 2 },
   "review": null,
   "dispute": null,
@@ -275,7 +285,7 @@ Here is a real poster draft. Every field before `myRole` is in iOS-B's `Job.swif
 | `dispute` | `{ itemId, reason, openedBy: "poster" \| "system", openedAt }`. |
 | `resolution` | `{ outcome: "release" \| "refund", by, note, at }`. |
 | `payment.status` | `unpaid`, `held`, `releasing`, `paid`, `refunding` or `refunded`. |
-| `proof.items[]` | `{ checklistItemId, photoURLs, beforePhotoURLs, afterPhotoURLs, link, fileURLs, checkedInAt, note }`. |
+| `proof.items[]` | `{ checklistItemId, photoURLs, beforePhotoURLs, afterPhotoURLs, link, fileURLs, videoURLs, checkedInAt, note }`. |
 | `verdicts[]` | `{ checklistItemId, pass, verdict: pass\|fail\|unclear, confidence, explanation }`. |
 
 ## Payments
