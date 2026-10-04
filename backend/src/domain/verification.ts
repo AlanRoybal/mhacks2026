@@ -81,8 +81,8 @@ export function verificationPlan(job: VerificationInput, limits: VerificationLim
       stage: "proof",
       enforcement: "poster_reviews",
       title: "Time on site",
-      detail: `While the job is open, the worker's location is checked about once a minute and SpacetimeDB keeps the on-site clock, pausing it if they leave. Less than ${minutes} min on site sends the proof to the poster instead of paying automatically.`,
-      collects: "A location check about once a minute while the job is open",
+      detail: `While the job is open, the worker's location is checked about every 30 seconds and SpacetimeDB keeps the on-site clock, pausing it if they leave. Less than ${minutes} min on site sends the proof to the poster instead of paying automatically.`,
+      collects: "A location check about every 30 seconds while the job is open",
     });
   }
   if (checkIns.length > 0) {
@@ -158,7 +158,7 @@ export function verificationPlan(job: VerificationInput, limits: VerificationLim
       : `Verified from the deliverable: AI review of ${count(job.checklist.length, "item", "items")}.`,
     signals,
     privacy: inPerson
-      ? "Bounty reads location only while a job is open: when the worker taps Start, about once a minute while they work (for the on-site clock), at check-in and with proof photos. It stops when the proof is submitted, and the poster sees distances and time on site, never coordinates."
+      ? "Bounty reads location only while a job is open: when the worker taps Start, about every 30 seconds while they work (for the on-site clock), at check-in and with proof photos. It stops when the proof is submitted, and the poster sees distances and time on site, never coordinates."
       : "This job is remote, so Bounty records no location at all.",
   };
 }
