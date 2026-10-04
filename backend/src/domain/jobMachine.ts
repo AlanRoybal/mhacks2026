@@ -294,7 +294,6 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
           startedAt: undefined,
           submittedAt: undefined,
           capture: undefined,
-          challenge: undefined,
           latestProofId: undefined,
           failedAttempts: 0,
           excludedWorkerIds: [...job.excludedWorkerIds, workerId],

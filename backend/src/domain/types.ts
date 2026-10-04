@@ -94,11 +94,8 @@ export interface Job {
   currentOffer?: { offerId: string; workerId: string; expiresAt: string };
   // Workers who declined, let an offer expire, or withdrew. Never re-offered this job.
   excludedWorkerIds: string[];
-  // One-time code that must be visible in proof photos. Issued on START.
   // Issued at START. The worker's app signs its captures with `key`; proof must be captured after issuedAt.
   capture?: { key: string; issuedAt: string };
-  // Jobs started before in-app capture had a one-time code instead.
-  challenge?: { code: string; issuedAt: string };
   failedAttempts: number;
   latestProofId?: string;
   review?: {
@@ -193,9 +190,6 @@ export interface ItemVerdict {
 export interface Grade {
   decision: GradeDecision;
   decidedBecause: string;
-  // Grades from before in-app capture also recorded the one-time code.
-  codeVisible?: boolean;
-  codeReadAs?: string;
   items: ItemVerdict[];
   posterSummary: string;
   workerFeedback: string;

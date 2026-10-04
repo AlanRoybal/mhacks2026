@@ -25,7 +25,7 @@ Rules:
 - Non-photo items: photoCount 0, beforeAfter false, angleHint "".
 - In-person physical jobs: PHOTO items plus exactly one CHECK_IN item.
 - Remote or digital jobs: LINK or FILE items. No CHECK_IN.
-- Do not add an item for the one-time code; the app adds that automatically.
+- Proof photos and videos are taken in the Bounty app, so never ask for codes, watermarks or anything written on the work.
 - required: true for items that define the job; false for nice-to-haves.
 - estMinutes: realistic minutes of work for a typical worker, excluding travel.
 - flags: short reasons if the job looks illegal, dangerous, sexual, asks for personal or financial data, or is not a real task. Empty list if it is fine.

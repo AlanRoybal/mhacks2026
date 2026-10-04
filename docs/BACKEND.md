@@ -55,7 +55,7 @@ This describes the backend in `backend/` as it exists now, why it is built this 
 
 | Table | Keys | Indexes | Holds |
 |---|---|---|---|
-| jobs | `jobId` | `byPoster (posterId, createdAt)`, `byWorker (workerId, updatedAt)` | The job, its state and `version` (optimistic lock), checklist, current offer, challenge code, review, dispute and payment references |
+| jobs | `jobId` | `byPoster (posterId, createdAt)`, `byWorker (workerId, updatedAt)` | The job, its state and `version` (optimistic lock), checklist, current offer, capture key, review, dispute and payment references |
 | users | `userId` | — | Profile, twin (skills with sources, embedding, import status), prefs, availability, devices, Stripe account, stats, `version` |
 | offers | `offerId` | `byJob (jobId, createdAt)`, `byWorker (workerId, createdAt)` | Ranked candidates per matching round: fit, "why you", estimate, status |
 | proofs | `jobId`, `proofId` | — | Evidence items, server checks, stored AI grade |
@@ -96,7 +96,7 @@ ACCEPTED / IN_PROGRESS ──deadline──▶ REFUNDED             IN_REVIEW �
 | 6 | Retry limit | Per submission: the worker can retry two failed gradings. The third failure goes to the poster, who may reject (refund) or approve. |
 | 7 | No match | Rematch rounds every 10 minutes (1 in demo mode). The poster can extend the deadline or widen the radius, or cancel. Unmatched at the deadline means a refund. |
 | 8 | Platform fee | 10% on top, shown by `GET /quote`; $5 minimum bounty. |
-| 9 | AI authority | The AI grades each item; code decides. Pass needs every required item passing with confidence ≥ 0.7, the one-time code visible, and on-site evidence. Unclear results never auto-release. |
+| 9 | AI authority | The AI grades each item; code decides. Pass needs every required item passing with confidence ≥ 0.7 and on-site evidence. Photos and videos must be signed in-app captures. Unclear results never auto-release. |
 | 10 | Demo scope | Fake rail and Stripe are done. USDC, Gmail, Live Activities and the rich notification extension are not. |
 
 Further rules found in review:
@@ -126,7 +126,7 @@ Further rules found in review:
 - **Server checks before submitting:**
   - required coverage, including photo counts and before/after
   - uploads present and within size
-  - photos taken after the one-time code was issued
+  - photos and videos taken with the Bounty camera (signed capture) after the worker started
   - no photo reused from another job (MD5 ETag registry)
 
   Location problems are warnings.

@@ -49,9 +49,8 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
     e.contentType = info.contentType ?? e.contentType;
     const usedBy = await deps.store.kvGet<{ jobId: string }>(`etag:${info.etag}`);
     if (usedBy && usedBy.jobId !== job.jobId) duplicates.push(e.checklistItemId);
-    // Photos must come from the Bounty camera: the app's signature has to match these exact bytes.
-    // Jobs started before in-app capture have no key and skip this.
-    if ((e.kind === "photo" || e.kind === "video") && job.capture && !(await capturedInApp(deps, job, e))) notCapturedInApp.push(e.checklistItemId);
+    // Photos and videos must come from the Bounty camera: the app's signature has to match these exact bytes.
+    if ((e.kind === "photo" || e.kind === "video") && !(await capturedInApp(deps, job, e))) notCapturedInApp.push(e.checklistItemId);
   }
 
   // 2. Coverage, counting distinct uploaded images: the same image can't fill two photo slots or be
@@ -85,7 +84,7 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
   }
 
   // 3. Time and place: photos and check-ins after the worker started, at the job.
-  const issuedAt = Date.parse(job.capture?.issuedAt ?? job.challenge?.issuedAt ?? job.startedAt ?? "");
+  const issuedAt = Date.parse(job.capture?.issuedAt ?? job.startedAt ?? "");
   for (const e of items) {
     if (e.kind === "photo" || e.kind === "video" || e.kind === "location") {
       const at = Date.parse(e.capturedAt ?? "");
