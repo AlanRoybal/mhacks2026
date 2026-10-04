@@ -117,7 +117,10 @@ async function linkedInUser(deps: Deps, opts: { code: string; redirectUri: strin
   if (!id_token) throw new Error("no id_token");
   const { payload } = await jwtVerify(id_token, linkedinJwks, { issuer: LINKEDIN_ISSUER, audience: deps.config.LINKEDIN_CLIENT_ID });
   if (!payload.sub) throw new Error("no subject");
-  if (opts.nonce !== undefined && payload.nonce !== opts.nonce) throw new Error("nonce mismatch");
+  // LinkedIn doesn't always echo the nonce. The ID token comes straight from the token endpoint (client
+  // secret, verified signature) and the signed state already ties the callback to our request, so a
+  // missing nonce is fine; a different one is not.
+  if (opts.nonce !== undefined && payload.nonce !== undefined && payload.nonce !== opts.nonce) throw new Error("nonce mismatch");
   return upsertIdentity(deps, "linkedin", payload.sub, {
     displayName: typeof payload.name === "string" ? payload.name : "LinkedIn user",
     email: typeof payload.email === "string" ? payload.email : undefined,
