@@ -95,7 +95,13 @@ final class LiveTracker {
             return
         }
         self.api = api
-        startActivity(for: job, role: "worker", counterpart: job.poster?.name)
+        if !hasActivity(jobId: job.id, role: "worker") {
+            // Read the session first so the activity opens with the real clock and requirement.
+            Task {
+                await refresh(jobId: job.id, api: api)
+                startActivity(for: job, role: "worker", counterpart: job.poster?.name)
+            }
+        }
         guard !job.isRemote, !tracking.contains(job.id) else { return }
         tracking.insert(job.id)
         let pinger = self.pinger ?? LocationPinger { [weak self] fix in self?.send(fix) } onDenied: { [weak self] in
@@ -113,6 +119,17 @@ final class LiveTracker {
         case .released: "paid"
         case .refunded: "refunded"
         default: nil
+        }
+    }
+
+    /// After a refresh of the worker's jobs: a job that's gone from the list (withdrawn, reassigned) stops
+    /// reporting location and leaves the Lock Screen.
+    func keepOnly(workerJobIds ids: Set<String>) {
+        for jobId in tracking where !ids.contains(jobId) { stopTracking(jobId: jobId) }
+        Task {
+            for activity in Activity<BountyLiveAttributes>.activities where activity.attributes.role == "worker" && !ids.contains(activity.attributes.jobId) {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
         }
     }
 

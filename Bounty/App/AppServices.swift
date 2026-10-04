@@ -230,6 +230,7 @@ final class MarketplaceStore {
             workingJobs = values.1
             errorMessage = nil
             for job in workingJobs { LiveTracker.shared.work(on: job, api: api) }
+            LiveTracker.shared.keepOnly(workerJobIds: Set(workingJobs.map(\.id)))
         } catch {
             errorMessage = error.localizedDescription
         }
