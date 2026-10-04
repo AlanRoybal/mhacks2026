@@ -72,6 +72,8 @@ targets:
           - CFBundleURLName: com.alanroybal.BountyTwin.oauth
             CFBundleURLSchemes: [bounty]
         BountyLinkedInClientID: 86rcq1bjy06k5g
+        # iOS-type Google OAuth client for the Gmail import. Set BOUNTY_GOOGLE_CLIENT_ID in Config/*.xcconfig.
+        BountyGoogleClientID: $(BOUNTY_GOOGLE_CLIENT_ID)
         # Set in Config/*.xcconfig (Local.xcconfig for your machine).
         BountyAPIBaseURL: $(BOUNTY_API_BASE_URL)
         LSApplicationQueriesSchemes: [cbwallet, "mwp+1.1"]

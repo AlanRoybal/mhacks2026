@@ -50,6 +50,7 @@
 		EEA12735F082E2CC54C7B4F0 /* EarningsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125590A634C7CB2F1390755A /* EarningsView.swift */; };
 		F01C9A9668DA7DF4E35ACAC2 /* JobFundingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23558C67A39132B211B07398 /* JobFundingSheet.swift */; };
 		F2D014C6F39EE17DFC1D4D52 /* PaymentsServerAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA10D25328F0FF4EC9CFA6AD /* PaymentsServerAPI.swift */; };
+		F512E1F58EE4B3BF3293D44C /* GmailConnector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 983C07B6422F2BDF5703C0B9 /* GmailConnector.swift */; };
 		F5B1419706DA28BA5C504DB1 /* Job.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDEE0685875FF28B9B991034 /* Job.swift */; };
 		F60EC55A8E92B9A8A66F0C4D /* CoinbaseWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = A26A85414D248B6E3F7DD153 /* CoinbaseWalletSDK */; };
 /* End PBXBuildFile section */
@@ -86,6 +87,7 @@
 		919DD468D1C1A40D707EF084 /* BackendJobsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendJobsAPI.swift; sourceTree = "<group>"; };
 		97535FC0C25668325DA5E484 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
 		97B75E78AC19B705475CC363 /* BountyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BountyApp.swift; sourceTree = "<group>"; };
+		983C07B6422F2BDF5703C0B9 /* GmailConnector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GmailConnector.swift; sourceTree = "<group>"; };
 		9C18A1C5BC0E979DCBE71869 /* LiveReviewProofView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveReviewProofView.swift; sourceTree = "<group>"; };
 		A666B0FB424671C300AF98A9 /* PosterPush.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterPush.swift; sourceTree = "<group>"; };
 		B67D53F052CE5224398EF8F6 /* Bounty.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Bounty.entitlements; sourceTree = "<group>"; };
@@ -315,6 +317,7 @@
 			isa = PBXGroup;
 			children = (
 				919DD468D1C1A40D707EF084 /* BackendJobsAPI.swift */,
+				983C07B6422F2BDF5703C0B9 /* GmailConnector.swift */,
 				EC74DC8BCAE700D156446104 /* JobsAPI.swift */,
 				2A1732769B738D037D975B56 /* MockJobsAPI.swift */,
 			);
@@ -424,6 +427,7 @@
 				996275D656B1EA3C36741893 /* DebugLaunch.swift in Sources */,
 				02AAB2D2B69EFB35E83E2D23 /* DisputeSheet.swift in Sources */,
 				EEA12735F082E2CC54C7B4F0 /* EarningsView.swift in Sources */,
+				F512E1F58EE4B3BF3293D44C /* GmailConnector.swift in Sources */,
 				A260AAD49C3DC621DAB28FBF /* HomeView.swift in Sources */,
 				F5B1419706DA28BA5C504DB1 /* Job.swift in Sources */,
 				A510F93D352ADCF910D48AE0 /* JobDisplay.swift in Sources */,

@@ -4,4 +4,6 @@ BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER =
 BOUNTY_CODE_SIGN_ENTITLEMENTS = Bounty/Bounty.entitlements
 // Escrow, worker earnings and settlement service (payments-server/).
 BOUNTY_SETTLEMENTS_BASE_URL = https:/$()/d3k80b9wnl3rft.cloudfront.net
+// Google OAuth client (iOS type) for the Gmail import; the backend needs the same GOOGLE_CLIENT_ID.
+BOUNTY_GOOGLE_CLIENT_ID =
 #include? "Local.xcconfig"

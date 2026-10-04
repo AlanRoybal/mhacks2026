@@ -6,10 +6,12 @@ import TwinKit
 struct BountyRuntimeConfiguration: Equatable, Sendable {
     let apiBaseURL: URL?
     let linkedInClientID: String?
+    let googleClientID: String?
 
     init(bundle: Bundle = .main) {
         apiBaseURL = (bundle.object(forInfoDictionaryKey: "BountyAPIBaseURL") as? String).flatMap(URL.init(string:))
         linkedInClientID = bundle.object(forInfoDictionaryKey: "BountyLinkedInClientID") as? String
+        googleClientID = (bundle.object(forInfoDictionaryKey: "BountyGoogleClientID") as? String).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
@@ -23,6 +25,7 @@ final class AppServices {
     let profileIngestion: ProfileIngestionService?
     let availability: AvailabilityService?
     let linkedIn: LinkedInServerAuthenticator?
+    let gmail: GmailConnector?
 
     init(configuration: BountyRuntimeConfiguration = BountyRuntimeConfiguration()) {
         let session = SessionStore()
@@ -35,6 +38,7 @@ final class AppServices {
             profileIngestion = nil
             availability = nil
             linkedIn = nil
+            gmail = nil
             return
         }
 
@@ -44,6 +48,7 @@ final class AppServices {
         profile = TwinProfileService(api: api)
         profileIngestion = ProfileIngestionService(api: api)
         availability = AvailabilityService(api: api)
+        gmail = configuration.googleClientID.map { GmailConnector(clientID: $0, api: api) }
 
         if let clientID = configuration.linkedInClientID, !clientID.isEmpty {
             // LinkedIn rejects custom-scheme redirect URLs, so the backend runs the OAuth flow and hands the

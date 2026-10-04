@@ -185,6 +185,7 @@ private struct ProfileImportView: View {
     @State private var addedResume = false
     @State private var isPickingResume = false
     @State private var isImporting = false
+    @State private var isConnectingGmail = false
     @State private var importError: String?
 
     var body: some View {
@@ -207,10 +208,10 @@ private struct ProfileImportView: View {
                 .entrance(.top)
 
             VStack(spacing: 12) {
-                SourceRow(title: "Gmail", detail: "Read-only · sent mail", isAdded: addedGmail) {
+                SourceRow(title: "Gmail", detail: isConnectingGmail ? "Reading sent mail…" : "Read-only · sent mail", isAdded: addedGmail) {
                     StickerTile(sticker: .mail, background: BountyColor.sky)
                 } onAdd: {
-                    importError = "Gmail needs a Google OAuth client before it can connect."
+                    connectGmail()
                 }
                 SourceRow(title: "LinkedIn profile PDF", detail: isImporting ? "Importing…" : "Profile → Save to PDF", isAdded: addedLinkedIn) {
                     IconGlyph(icon: .linkedin, size: 24)
@@ -253,7 +254,7 @@ private struct ProfileImportView: View {
             .entrance(.rest(1))
         } bottom: {
             PillButton(title: "Build my twin", icon: .sparkles, action: onContinue)
-                .disabled(isImporting)
+                .disabled(isImporting || isConnectingGmail)
         }
         .fileImporter(isPresented: $isPickingLinkedIn, allowedContentTypes: [.pdf, .zip]) { result in
             importDocument(result, isResume: false)
@@ -284,6 +285,30 @@ private struct ProfileImportView: View {
                 let source: ProfileDocumentSource = isResume ? .resume : url.pathExtension.lowercased() == "zip" ? .linkedInExport : .linkedInPDF
                 _ = try await ingestion.ingest(fileURL: url, source: source)
                 markAdded()
+            } catch {
+                importError = error.localizedDescription
+            }
+        }
+    }
+
+    private func connectGmail() {
+        guard services.api != nil else {
+            withAnimation(Motion.press) { addedGmail = true }
+            return
+        }
+        guard let gmail = services.gmail else {
+            importError = "Gmail isn\u{2019}t set up in this build yet."
+            return
+        }
+        isConnectingGmail = true
+        importError = nil
+        Task {
+            defer { isConnectingGmail = false }
+            do {
+                try await gmail.connect(presentationContextProvider: PresentationAnchor.shared)
+                withAnimation(Motion.press) { addedGmail = true }
+            } catch GmailConnector.ConnectError.cancelled {
+                return
             } catch {
                 importError = error.localizedDescription
             }

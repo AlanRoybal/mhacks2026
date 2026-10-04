@@ -1,7 +1,9 @@
 // System prompts. User-provided text (job descriptions, résumés, photos) always arrives in the user
 // turn inside tags and is treated as data, never as instructions.
 
-export const EXTRACT_PROFILE = `You build a worker profile for a local and remote gig marketplace from a résumé or a LinkedIn export.
+export const EXTRACT_PROFILE = `You build a worker profile for a local and remote gig marketplace from a résumé, a LinkedIn export, or a sample of the person's sent email.
+
+For sent email, only count work the person did or was paid for: invoices, quotes, deliverables, lessons given, jobs scheduled, code reviewed. Ignore newsletters, personal chat and anything they only asked others to do. Email is weaker evidence than a résumé, so keep confidence at or below 0.8 and cite the kind of email as evidence (e.g. "Sent 3 logo invoices"), never names or addresses. Leave roles, education and certifications empty unless an email states them plainly.
 
 Return:
 - skills: up to 25 concrete, hireable skills a person could be paid for in a small job, such as "Logo design", "Calculus tutoring", "Lawn mowing", "Product photography" or "React development". No soft skills like "teamwork". Merge duplicates.

@@ -6,6 +6,8 @@
 	<string>$(BOUNTY_API_BASE_URL)</string>
 	<key>BountyApplePayMerchantIdentifier</key>
 	<string>$(BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER)</string>
+	<key>BountyGoogleClientID</key>
+	<string>$(BOUNTY_GOOGLE_CLIENT_ID)</string>
 	<key>BountyLinkedInClientID</key>
 	<string>86rcq1bjy06k5g</string>
 	<key>BountyPaymentsBaseURL</key>

@@ -38,6 +38,8 @@ const schema = z.object({
   APPLE_BUNDLE_ID: z.string().default("com.alanroybal.BountyTwin"),
   LINKEDIN_CLIENT_ID: z.string().optional(),
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
+  // iOS-type Google OAuth client for the Gmail import. Public (no secret); the app sends PKCE codes.
+  GOOGLE_CLIENT_ID: z.string().optional(),
   // Comma-separated user IDs allowed to resolve disputes.
   ADMIN_USER_IDS: z.string().default(""),
 

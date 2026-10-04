@@ -152,3 +152,48 @@ test("oversized entries in a LinkedIn ZIP are never expanded", async () => {
   const { body } = await call(app, "GET", "/twin", token);
   assert.equal(body.ingest.status, "failed");
 });
+
+test("Gmail import reads sent mail once, revokes the token and adds email-sourced skills", async (t) => {
+  const deps = testDeps({ GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com" });
+  const app = createApp(deps);
+  const token = await login(app, "worker1");
+  const body = Buffer.from("Invoice for the logo design.\n\nOn Mon, Jane wrote:\n> secret quoted text").toString("base64url");
+  const calls: string[] = [];
+  t.mock.method(globalThis, "fetch", async (input: string | URL, init?: RequestInit) => {
+    const url = String(input);
+    calls.push(url.split("?")[0]!);
+    if (url.startsWith("https://oauth2.googleapis.com/token")) {
+      assert.equal(new URLSearchParams(String(init?.body)).get("client_id"), "test.apps.googleusercontent.com");
+      return Response.json({ access_token: "ya29.x", scope: "https://www.googleapis.com/auth/gmail.readonly" });
+    }
+    if (url.includes("/messages?")) return Response.json({ messages: [{ id: "m1" }] });
+    if (url.includes("/messages/m1")) return Response.json({ payload: { headers: [{ name: "Subject", value: "Logo invoice" }], mimeType: "text/plain", body: { data: body } } });
+    if (url.startsWith("https://oauth2.googleapis.com/revoke")) return new Response("");
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  let sent = "";
+  const extract = deps.ai.extractProfile.bind(deps.ai);
+  t.mock.method(deps.ai, "extractProfile", async (input: { kind: string; text?: string }) => {
+    sent = input.text ?? "";
+    return { ...(await extract(input as never)), skills: [{ name: "Logo design", category: "design", level: 3, confidence: 0.7, evidence: "Sent logo invoices" }] };
+  });
+
+  const started = await call(app, "POST", "/twin/gmail", token, { code: "c", codeVerifier: "v".repeat(43), redirectUri: "com.googleusercontent.apps.test:/oauth2redirect" });
+  assert.equal(started.status, 202);
+  assert.ok(calls.includes("https://oauth2.googleapis.com/revoke"));
+  await deps.settle();
+
+  assert.match(sent, /Logo invoice/);
+  assert.doesNotMatch(sent, /secret quoted text/);
+  const twin = (await call(app, "GET", "/twin", token)).body;
+  assert.equal(twin.ingest.status, "done");
+  assert.deepEqual(twin.ingest.sources, ["gmail_sent"]);
+  assert.equal(twin.skills[0].sources[0].label, "Email");
+});
+
+test("Gmail import is off until a Google client is configured", async () => {
+  const app = createApp(testDeps());
+  const token = await login(app, "worker1");
+  const res = await call(app, "POST", "/twin/gmail", token, { code: "c", codeVerifier: "v".repeat(43), redirectUri: "x:/y" });
+  assert.equal(res.status, 501);
+});

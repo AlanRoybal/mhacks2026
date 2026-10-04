@@ -102,10 +102,10 @@ export class ClaudeAi implements Ai {
   }
 
   async extractProfile(input: ProfileInput): Promise<ProfileExtraction> {
-    const label = input.kind === "linkedin_zip" ? "LinkedIn data export" : input.kind === "linkedin_pdf" ? "LinkedIn profile PDF" : "résumé";
+    const label = { linkedin_zip: "LinkedIn data export", linkedin_pdf: "LinkedIn profile PDF", resume_pdf: "résumé", gmail_sent: "sample of sent email" }[input.kind];
     const content: BetaContentBlockParam[] = [];
     if (input.pdf) content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: input.pdf.toString("base64") } });
-    if (input.text) content.push({ type: "text", text: tag("linkedin_export", input.text) });
+    if (input.text) content.push({ type: "text", text: tag(input.kind === "gmail_sent" ? "sent_mail" : "linkedin_export", input.text) });
     content.push({ type: "text", text: `Build the worker profile from this ${label}.` });
     return this.call({ task: "extract_profile", system: EXTRACT_PROFILE, content, schema: ProfileExtraction, effort: "medium", maxTokens: 8000, timeoutMs: 90_000 });
   }

@@ -1,7 +1,7 @@
 // The digital twin: skills with sources and confidence, built from imports and user edits.
 
 import { unzipSync } from "fflate";
-import { AiUnavailableError, clamp, toEducation, toRoles, type ProfileExtraction, type ProfileSourceKind } from "../ai/index.js";
+import { AiUnavailableError, clamp, toEducation, toRoles, type ProfileExtraction, type ProfileInput, type ProfileSourceKind } from "../ai/index.js";
 import type { Deps } from "../deps.js";
 import type { Skill, SkillSourceKind, Twin, User } from "../domain/types.js";
 import type { Task } from "../tasks/tasks.js";
@@ -13,7 +13,7 @@ const MAX_CSV_CHARS = 20_000;
 // Real LinkedIn CSVs are a few KB. The cap stops a small "zip bomb" from expanding to gigabytes.
 const MAX_CSV_BYTES = 1_000_000;
 
-export const SOURCE_FOR: Record<ProfileSourceKind, SkillSourceKind> = { resume_pdf: "resume", linkedin_pdf: "linkedin", linkedin_zip: "linkedin" };
+export const SOURCE_FOR: Record<ProfileSourceKind, SkillSourceKind> = { resume_pdf: "resume", linkedin_pdf: "linkedin", linkedin_zip: "linkedin", gmail_sent: "email" };
 
 export const normName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -55,12 +55,14 @@ export function mergeExtraction(twin: Twin, ex: ProfileExtraction, source: Skill
     .filter((s) => !s.deleted && !s.userEdited)
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, room);
+  // Email is a weaker source: it only fills a summary, roles or education the twin doesn't have yet.
+  const fills = (has: boolean) => source !== "email" || !has;
   return {
     ...twin,
     skills: [...pinned, ...imported],
-    summary: ex.summary.trim() || twin.summary,
-    roles: ex.roles.length > 0 ? toRoles(ex.roles) : twin.roles,
-    education: ex.education.length > 0 ? toEducation(ex.education) : twin.education,
+    summary: (fills(Boolean(twin.summary)) && ex.summary.trim()) || twin.summary,
+    roles: ex.roles.length > 0 && fills(twin.roles.length > 0) ? toRoles(ex.roles) : twin.roles,
+    education: ex.education.length > 0 && fills(twin.education.length > 0) ? toEducation(ex.education) : twin.education,
     certifications: [...new Set([...twin.certifications, ...ex.certifications.map((c) => c.trim()).filter(Boolean)])],
     yearsExperience: Math.max(twin.yearsExperience, clamp(ex.yearsExperience, 0, 70)),
     updatedAt: now,
@@ -192,27 +194,36 @@ export function linkedinZipText(bytes: Buffer): string {
 export class IngestError extends Error {}
 
 export async function ingestProfile(deps: Deps, task: Extract<Task, { name: "ingest_profile" }>): Promise<void> {
-  const now = () => deps.now().toISOString();
-  try {
+  await ingest(deps, task.userId, task.sourceKind, async () => {
     const bytes = await deps.blobs.get(task.blobKey);
     if (!bytes) throw new IngestError("The upload wasn't found. Try uploading again.");
-    const input = task.sourceKind === "linkedin_zip" ? { kind: task.sourceKind, text: linkedinZipText(bytes) } : { kind: task.sourceKind, pdf: bytes };
-    const extraction = await deps.ai.extractProfile(input);
-    await updateUser(deps, task.userId, (u) => {
-      u.twin = mergeExtraction(u.twin, extraction, SOURCE_FOR[task.sourceKind], now());
-      u.twin.ingest = { status: "done", sources: [...new Set([...u.twin.ingest.sources, task.sourceKind])], updatedAt: now() };
+    return task.sourceKind === "linkedin_zip" ? { kind: task.sourceKind, text: linkedinZipText(bytes) } : { kind: task.sourceKind, pdf: bytes };
+  });
+}
+
+export async function ingestGmail(deps: Deps, task: Extract<Task, { name: "ingest_gmail" }>): Promise<void> {
+  await ingest(deps, task.userId, "gmail_sent", async () => ({ kind: "gmail_sent", text: task.text }));
+}
+
+async function ingest(deps: Deps, userId: string, sourceKind: ProfileSourceKind, load: () => Promise<ProfileInput>): Promise<void> {
+  const now = () => deps.now().toISOString();
+  try {
+    const extraction = await deps.ai.extractProfile(await load());
+    await updateUser(deps, userId, (u) => {
+      u.twin = mergeExtraction(u.twin, extraction, SOURCE_FOR[sourceKind], now());
+      u.twin.ingest = { status: "done", sources: [...new Set([...u.twin.ingest.sources, sourceKind])], updatedAt: now() };
     });
-    await refreshEmbedding(deps, task.userId);
-    deps.log.info("Profile imported", { userId: task.userId, source: task.sourceKind, skills: extraction.skills.length });
+    await refreshEmbedding(deps, userId);
+    deps.log.info("Profile imported", { userId, source: sourceKind, skills: extraction.skills.length });
   } catch (error) {
-    deps.log.warn("Profile import failed", { userId: task.userId, error });
+    deps.log.warn("Profile import failed", { userId, error });
     const message =
       error instanceof IngestError
         ? error.message
         : error instanceof AiUnavailableError
           ? "We couldn't read that file. Try another file or add skills by hand."
           : "Import failed. Please try again.";
-    await updateUser(deps, task.userId, (u) => {
+    await updateUser(deps, userId, (u) => {
       u.twin.ingest = { ...u.twin.ingest, status: "failed", error: message, updatedAt: now() };
     });
   }

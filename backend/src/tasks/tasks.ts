@@ -8,6 +8,8 @@ import type { InlineEffectQueue } from "../services/effectQueue.js";
 
 export type Task =
   | { kind: "task"; name: "ingest_profile"; userId: string; blobKey: string; sourceKind: ProfileSourceKind }
+  // Sent-mail text read during POST /twin/gmail (capped at 50k chars). The Google token is already revoked.
+  | { kind: "task"; name: "ingest_gmail"; userId: string; text: string }
   // Slow, AI-bound effects run as their own invocations so they never hold up the ordered ledger stream.
   | { kind: "task"; name: "grade_proof"; jobId: string; proofId: string }
   | { kind: "task"; name: "match_job"; jobId: string };

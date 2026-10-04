@@ -5,8 +5,9 @@ import { MAX_FILE_BYTES } from "../../blobs/index.js";
 import type { Deps } from "../../deps.js";
 import { isValidTimeZone } from "../../domain/availability.js";
 import { Category, type SkillSourceKind, type User } from "../../domain/types.js";
-import { badRequest, notFound } from "../../lib/errors.js";
+import { AppError, badRequest, notFound } from "../../lib/errors.js";
 import { activeSkills, deleteSkill, normName, readiness, refreshEmbedding, upsertSkill } from "../../services/twin.js";
+import { exchangeGoogleCode, readSentMail, revokeGoogleToken } from "../../services/gmail.js";
 import { updateUser } from "../../services/users.js";
 import { parseBody, type AppEnv } from "../http.js";
 import { kmToMiles, milesToKm, wireDate } from "../wire.js";
@@ -89,6 +90,22 @@ export function twinRoutes(deps: Deps): Hono<AppEnv> {
   app.post("/ingest", async (c) => {
     const body = await parseBody(c, z.object({ blobKey: z.string().optional(), fileURL: z.string().optional(), kind: UploadKind }));
     const user = await startIngest(deps, userId(c), ownedUploadKey(deps, userId(c), body), body.kind);
+    return c.json(twinView(deps, user), 202);
+  });
+
+  // Gmail import. The app runs Google's PKCE flow (gmail.readonly) and sends the code here. We read a
+  // sample of recent sent mail, revoke the token at once, and extract skills in the background.
+  // Poll GET /twin like /ingest.
+  app.post("/gmail", async (c) => {
+    if (!deps.config.GOOGLE_CLIENT_ID) throw new AppError(501, "gmail_not_configured", "Gmail import isn't configured on this server.");
+    const body = await parseBody(c, z.object({ code: z.string().min(1), codeVerifier: z.string().min(43).max(128), redirectUri: z.string().min(1) }));
+    const token = await exchangeGoogleCode(deps, body);
+    const text = await readSentMail(token).finally(() => revokeGoogleToken(token));
+    if (!text.trim()) throw badRequest("We didn't find any sent mail in the last two years.", "gmail_empty");
+    const user = await updateUser(deps, userId(c), (u) => {
+      u.twin.ingest = { ...u.twin.ingest, status: "processing", error: undefined, updatedAt: deps.now().toISOString() };
+    });
+    await deps.tasks.run({ kind: "task", name: "ingest_gmail", userId: userId(c), text });
     return c.json(twinView(deps, user), 202);
   });
 

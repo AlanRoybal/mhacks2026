@@ -53,12 +53,12 @@ export const GradeResult = z.object({
 });
 export type GradeResult = z.infer<typeof GradeResult> & { model: string };
 
-export type ProfileSourceKind = "resume_pdf" | "linkedin_pdf" | "linkedin_zip";
+export type ProfileSourceKind = "resume_pdf" | "linkedin_pdf" | "linkedin_zip" | "gmail_sent";
 
 export interface ProfileInput {
   kind: ProfileSourceKind;
   pdf?: Buffer;
-  // Extracted CSV text for a LinkedIn export ZIP.
+  // Extracted CSV text for a LinkedIn export ZIP, or sent-mail text for Gmail.
   text?: string;
 }
 
