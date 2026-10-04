@@ -17,13 +17,26 @@ struct JobsView: View {
     // The poster's jobs from the backend (GET /jobs/mine), or sample jobs when it isn't running.
     @Environment(PosterStore.self) private var posterStore
 
+    /// Paid or refunded: nothing left to do on either side, so the job moves to Done.
+    private static let finished: Set<JobStatus> = [.paid, .refunded]
+
     private func jobs(for segment: JobsSegment) -> [Job] {
         let workerJobs = marketplace.workingJobs.map(\.displayJob) + workerPayments.jobs
-        return switch segment {
-        case .working: workerJobs.filter { ![.paid, .refunded].contains($0.status) }
         // Checkout jobs the backend hasn't listed yet; normally they all come through `posterStore`.
-        case .posted: postedJobs.fundedJobs.map(\.job).filter { posterStore.job($0.id) == nil }
-        case .done: workerJobs.filter { [.paid, .refunded].contains($0.status) }
+        let checkoutJobs = postedJobs.fundedJobs.map(\.job).filter { posterStore.job($0.id) == nil }
+        return switch segment {
+        case .working: workerJobs.filter { !Self.finished.contains($0.status) }
+        case .posted: checkoutJobs.filter { !Self.finished.contains($0.status) }
+        case .done: (workerJobs + checkoutJobs).filter { Self.finished.contains($0.status) }
+        }
+    }
+
+    /// The backend's posted jobs for a segment: open ones under Posted, paid or refunded ones under Done.
+    private func posterJobs(for segment: JobsSegment) -> [PostedJob] {
+        switch segment {
+        case .working: []
+        case .posted: posterStore.sortedJobs.filter { !$0.status.isTerminal }
+        case .done: posterStore.sortedJobs.filter(\.status.isTerminal)
         }
     }
 
@@ -42,14 +55,12 @@ struct JobsView: View {
             .entrance(.top)
 
             VStack(spacing: 16) {
-                if router.jobsSegment == .posted {
-                    ForEach(Array(posterStore.sortedJobs.enumerated()), id: \.element.id) { index, job in
-                        PostedJobCard(job: job) {
-                            router.open(job.status == .inReview ? .reviewProof : .postedJob, posterJob: job.id)
-                        }
-                        .entrance(index == 0 ? .top : .rest(min(index - 1, 4)))
-                        .transition(.opacity.combined(with: .offset(y: 12)))
+                ForEach(Array(posterJobs(for: router.jobsSegment).enumerated()), id: \.element.id) { index, job in
+                    PostedJobCard(job: job) {
+                        router.open(job.status == .inReview ? .reviewProof : .postedJob, posterJob: job.id)
                     }
+                    .entrance(index == 0 ? .top : .rest(min(index - 1, 4)))
+                    .transition(.opacity.combined(with: .offset(y: 12)))
                 }
                 ForEach(Array(jobs(for: router.jobsSegment).enumerated()), id: \.element.id) { index, job in
                     JobCard(job: job, isPosted: router.jobsSegment == .posted) { open(job) }
@@ -60,7 +71,9 @@ struct JobsView: View {
             .animation(Motion.enterRest, value: router.jobsSegment)
 
             if router.jobsSegment == .posted {
-                PostedListStatus(hasCheckoutJobs: !jobs(for: .posted).isEmpty)
+                PostedListStatus(hasOpenJobs: !posterJobs(for: .posted).isEmpty || !jobs(for: .posted).isEmpty)
+            } else if router.jobsSegment == .done, posterJobs(for: .done).isEmpty, jobs(for: .done).isEmpty {
+                EmptyJobsCard(title: "Nothing done yet", message: "Jobs you finish or post land here once they\u{2019}re paid or refunded.")
             }
 
             if router.jobsSegment == .posted && posterStore.isUsingSampleData {
@@ -86,7 +99,7 @@ struct JobsView: View {
         await postedJobs.refresh()
         await workerPayments.refresh()
         await marketplace.refresh(api: services.api)
-        if router.jobsSegment == .posted { await posterStore.loadJobs() }
+        await posterStore.loadJobs()
     }
 
     private func open(_ job: Job) {
@@ -99,13 +112,34 @@ struct JobsView: View {
 
 }
 
+/// A segment with nothing in it.
+private struct EmptyJobsCard: View {
+    let title: String
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text(title)
+                .bountyType(.headline)
+                .foregroundStyle(BountyColor.inkPrimary)
+            Text(message)
+                .bountyType(.subhead)
+                .foregroundStyle(BountyColor.inkSecondary)
+        }
+        .multilineTextAlignment(.center)
+        .padding(20)
+        .frame(maxWidth: .infinity)
+        .borderedCard()
+    }
+}
+
 /// Plan step 10: what the Posted list says while loading, after an error, or with nothing posted.
 private struct PostedListStatus: View {
-    let hasCheckoutJobs: Bool
+    let hasOpenJobs: Bool
     @Environment(AppRouter.self) private var router
     @Environment(PosterStore.self) private var store
 
-    private var isEmpty: Bool { store.jobs.isEmpty && !hasCheckoutJobs }
+    private var isEmpty: Bool { !hasOpenJobs }
 
     var body: some View {
         if let message = store.errorMessage {
@@ -137,6 +171,8 @@ private struct PostedListStatus: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
+        } else if isEmpty && !store.jobs.isEmpty {
+            EmptyJobsCard(title: "No open posts", message: "Your finished jobs are under Done. Post another and your twin finds someone nearby.")
         } else if isEmpty {
             VStack(spacing: 12) {
                 StickerView(sticker: .poster, size: 72)
