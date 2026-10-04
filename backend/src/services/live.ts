@@ -2,6 +2,7 @@
 // location pings and proof progress, mirrored from every job transition, read back to verify time on
 // site, and pushed to both people's Live Activities whenever something changes.
 
+import { wireDate } from "../api/wire.js";
 import type { Deps } from "../deps.js";
 import type { LedgerEvent } from "../domain/events.js";
 import { minOnSiteSec, type Rules } from "../domain/rules.js";
@@ -57,12 +58,13 @@ export function liveView(deps: Deps, session: LiveSession, events: LiveEvent[], 
   return {
     provider: deps.live.name,
     ...liveContent(session, job, deps.config.rules, now),
-    startedAt: session.startedAt,
-    lastPingAt: session.lastPingAt ?? null,
+    // Second precision, as the app's decoder reads dates.
+    startedAt: wireDate(session.startedAt),
+    lastPingAt: wireDate(session.lastPingAt),
     lastDistanceM: session.lastDistanceM === undefined ? null : Math.round(session.lastDistanceM),
     signalLostCount: session.signalLostCount,
     radiusM: session.radiusM,
-    events: events.slice(-20).reverse(),
+    events: events.slice(-20).reverse().map((e) => ({ ...e, at: wireDate(e.at) })),
   };
 }
 
