@@ -56,6 +56,11 @@ struct JobDetailView: View {
                     .entrance(.top)
             }
 
+            if let job, [.inProgress, .submitted, .inReview, .disputed].contains(job.status) {
+                LiveSessionCard(job: job, role: .worker)
+                    .entrance(.top)
+            }
+
             HStack(spacing: 12) {
                 InitialsAvatar(initials: Self.initials(job?.poster?.name ?? "?"), background: BountyColor.creamBand, foreground: BountyColor.creamInk)
                 TitleSubtitle(

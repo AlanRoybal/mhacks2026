@@ -331,6 +331,11 @@ struct ProofCaptureView: View {
             TitleSubtitle(title: job.title, subtitle: "Due \(job.deadlineText)")
                 .entrance(.top)
 
+            if job.status == .inProgress, !job.isRemote {
+                LiveSessionCard(job: job, role: .worker, compact: true)
+                    .entrance(.top)
+            }
+
             Label("Take photos or a short video with the Bounty camera. Each one is verified automatically, so there\u{2019}s nothing to write on your work.", icon: .shieldCheck)
                 .bountyType(.footnote)
                 .foregroundStyle(BountyColor.inkSecondary)
@@ -406,6 +411,10 @@ struct ProofCaptureView: View {
                 return
             }
             Task { await addFile(url, item: item, draft: draft) }
+        }
+        // Proof progress goes to the live session, for both people's Live Activities.
+        .onChange(of: job.checklist.filter { $0.evidenceType != .checkIn && draft.isCovered($0) }.count) { _, done in
+            if job.status == .inProgress { LiveTracker.shared.reportProgress(jobId: job.id, itemsDone: done, api: services.api) }
         }
         .task(id: job.id) {
             // Captures are signed with the job's key, which comes with the in-progress job. A stale copy

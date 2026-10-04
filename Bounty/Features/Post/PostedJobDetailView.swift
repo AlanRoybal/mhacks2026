@@ -72,6 +72,11 @@ struct PostedJobDetailView: View {
                             .entrance(.rest(0))
                     }
 
+                    if [.inProgress, .submitted, .inReview, .disputed].contains(job.status) {
+                        LiveSessionCard(job: job, role: .poster)
+                            .entrance(.rest(0))
+                    }
+
                     JobThreadCard(jobId: job.id, role: .poster, counterpartName: worker.name)
                         .entrance(.rest(0))
                 }

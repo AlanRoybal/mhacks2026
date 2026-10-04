@@ -53,6 +53,16 @@ struct BountyApp: App {
                     NotificationCenter.default.post(name: .payoutSetupReturned, object: nil)
                     return
                 }
+                // A tapped Live Activity: bounty://job/<id>?role=worker|poster
+                if url.scheme == "bounty", url.host() == "job", let jobID = url.pathComponents.dropFirst().first {
+                    let poster = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "role" }?.value == "poster"
+                    let defaults = UserDefaults.standard
+                    defaults.set(poster ? PushRoute.postedJobDestination : "jobs", forKey: PushRoute.destinationKey)
+                    defaults.set(poster ? "live" : "open", forKey: PushRoute.actionKey)
+                    defaults.set(jobID, forKey: PushRoute.jobIDKey)
+                    NotificationCenter.default.post(name: .pushRouteChanged, object: jobID)
+                    return
+                }
                 if StripeAPI.handleURLCallback(with: url) { return }
                 _ = try? CoinbaseWalletSDK.shared.handleResponse(url)
             }
