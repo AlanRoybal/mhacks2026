@@ -1,7 +1,8 @@
 // The "grade" effect. Claude looks at the evidence; this code makes the decision (AI authority is a
 // recommendation, product rule 9):
 //   fail    any required item fails with confidence >= 0.7
-//   pass    every required item passes with confidence >= 0.7 and no location warnings
+//   pass    every required item passes with confidence >= 0.7, no location warnings, and (in person)
+//           enough time on site by SpacetimeDB's clock
 //   unclear anything else -> the poster decides; nothing auto-releases
 // CHECK_IN items are verified by the server from GPS, not by the model.
 
@@ -73,6 +74,11 @@ export function decide(job: Job, proof: Proof, verdicts: ItemVerdict[]): { decis
   const unsure = required.filter((i) => byId.get(i.id)?.verdict !== "pass" || (byId.get(i.id)?.confidence ?? 0) < CONFIDENT);
   if (unsure.length > 0) return { decision: "unclear", because: `Not confident about: ${unsure.map((i) => i.id).join(", ")}` };
   if (proof.checks.outsideGeofence.length > 0) return { decision: "unclear", because: "Some evidence was captured away from the job" };
+  const onSite = proof.checks.onSite;
+  if (onSite && !onSite.tracked) return { decision: "unclear", because: "Time on site couldn't be verified" };
+  if (onSite && onSite.seconds < onSite.requiredSeconds) {
+    return { decision: "unclear", because: `Only ${Math.round(onSite.seconds / 60)} of the expected ${Math.round(onSite.requiredSeconds / 60)} minutes on site` };
+  }
   return { decision: "pass", because: "Every required item passed" };
 }
 

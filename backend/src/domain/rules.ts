@@ -16,6 +16,15 @@ export interface Rules {
   // Failed gradings a worker may retry after (US-43: "retry up to two times").
   maxRetries: number;
   checkInRadiusM: number;
+  // Minimum time on site (tracked in SpacetimeDB) before in-person proof can pay out without the poster:
+  // this share of the job's estimate, capped.
+  minOnSiteShare: number;
+  maxMinOnSiteSec: number;
+}
+
+// How long the worker must have been on site, by SpacetimeDB's clock, for the proof to auto-pay.
+export function minOnSiteSec(rules: Rules, estMinutes: number): number {
+  return Math.round(Math.min(estMinutes * 60 * rules.minOnSiteShare, rules.maxMinOnSiteSec));
 }
 
 export function rematchDelaySec(rules: Rules, round: number): number {
@@ -34,6 +43,8 @@ export function rulesFor(demoMode: boolean): Rules {
         disputeWindowSec: 600,
         maxRetries: 2,
         checkInRadiusM: 500,
+        minOnSiteShare: 0.4,
+        maxMinOnSiteSec: 60,
       }
     : {
         offerTtlSec: 45,
@@ -45,5 +56,7 @@ export function rulesFor(demoMode: boolean): Rules {
         disputeWindowSec: 72 * 3600,
         maxRetries: 2,
         checkInRadiusM: 200,
+        minOnSiteShare: 0.4,
+        maxMinOnSiteSec: 30 * 60,
       };
 }

@@ -16,9 +16,37 @@ export interface PushMessage {
   expiresAt?: string;
 }
 
+// An update to a Live Activity (the Lock Screen and Dynamic Island tracker), sent to the activity's own
+// push token. contentState must match the app's BountyLiveAttributes.ContentState.
+export interface LiveActivityPush {
+  token: string;
+  env: "sandbox" | "production";
+  event: "update" | "end";
+  contentState: Record<string, unknown>;
+  // Unix seconds: when the content should be shown as out of date, and when an ended activity leaves.
+  staleDate?: number;
+  dismissalDate?: number;
+  alert?: { title: string; body: string };
+}
+
 export interface PushSender {
   // Sends to every device of the user. Never throws; returns tokens APNs says are dead.
   send(user: User, message: PushMessage): Promise<{ deadTokens: string[] }>;
+  // Never throws. "dead": APNs says the activity token is gone.
+  liveActivity(push: LiveActivityPush, now: Date): Promise<"ok" | "dead" | "failed">;
+}
+
+export function liveActivityPayload(push: LiveActivityPush, now: Date): Record<string, unknown> {
+  return {
+    aps: {
+      timestamp: Math.floor(now.getTime() / 1000),
+      event: push.event,
+      "content-state": push.contentState,
+      ...(push.staleDate ? { "stale-date": push.staleDate } : {}),
+      ...(push.dismissalDate ? { "dismissal-date": push.dismissalDate } : {}),
+      ...(push.alert ? { alert: push.alert } : {}),
+    },
+  };
 }
 
 export function apsPayload(message: PushMessage): Record<string, unknown> {

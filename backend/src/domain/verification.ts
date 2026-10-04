@@ -4,6 +4,8 @@
 // same rules the server enforces:
 //
 //   on_site_start     jobMachine START: the worker must be within checkInRadiusM to start
+//   time_on_site      proof checks + grading: on-site time by SpacetimeDB's clock (live session) must cover
+//                     part of the job's estimate, else the poster decides
 //   on_site_check_in  grading: CHECK_IN items are judged from GPS by the server, not the model
 //   photo_location    proof checks: photos taken outside photoRadiusM keep the job from auto-paying
 //   fresh_photos      proof checks: signed Bounty-camera captures after Start, none reused from another job
@@ -12,7 +14,7 @@
 //   deadline          jobMachine SUBMIT: no proof after the deadline
 //   ai_review         grading: every required item needs confidence >= 0.7, else the poster decides
 //
-// Location is only ever read at those moments; nothing tracks the worker in the background.
+// Location is only read while a job is open (Start, the on-site clock, check-in, proof) and stops at submission.
 
 import type { ChecklistItem } from "./types.js";
 
@@ -22,7 +24,7 @@ export type VerificationStage = "start" | "proof" | "review";
 export type Enforcement = "blocks" | "fails_item" | "poster_reviews";
 
 export interface VerificationSignal {
-  id: "on_site_start" | "on_site_check_in" | "photo_location" | "fresh_photos" | "before_after" | "deliverable" | "deadline" | "ai_review";
+  id: "on_site_start" | "time_on_site" | "on_site_check_in" | "photo_location" | "fresh_photos" | "before_after" | "deliverable" | "deadline" | "ai_review";
   stage: VerificationStage;
   enforcement: Enforcement;
   title: string;
@@ -39,12 +41,15 @@ export interface VerificationPlan {
 
 export interface VerificationInput {
   remote: boolean;
+  estMinutes?: number;
   address?: string;
   checklist: ChecklistItem[];
 }
 
 export interface VerificationLimits {
   checkInRadiusM: number;
+  // Minimum on-site seconds for this job (domain/rules.ts minOnSiteSec).
+  minOnSiteSec?: number;
   photoRadiusM: number;
   confidence: number;
 }
@@ -67,6 +72,17 @@ export function verificationPlan(job: VerificationInput, limits: VerificationLim
       title: "On site to start",
       detail: `Start only works within ${limits.checkInRadiusM} m of ${place}, with a GPS fix accurate to ${limits.checkInRadiusM} m or better. The poster sees how far away the worker started.`,
       collects: "One GPS reading when the worker taps Start",
+    });
+  }
+  if (inPerson) {
+    const minutes = Math.max(1, Math.round((limits.minOnSiteSec ?? 0) / 60));
+    signals.push({
+      id: "time_on_site",
+      stage: "proof",
+      enforcement: "poster_reviews",
+      title: "Time on site",
+      detail: `While the job is open, the worker's location is checked about once a minute and SpacetimeDB keeps the on-site clock, pausing it if they leave. Less than ${minutes} min on site sends the proof to the poster instead of paying automatically.`,
+      collects: "A location check about once a minute while the job is open",
     });
   }
   if (checkIns.length > 0) {
@@ -142,7 +158,7 @@ export function verificationPlan(job: VerificationInput, limits: VerificationLim
       : `Verified from the deliverable: AI review of ${count(job.checklist.length, "item", "items")}.`,
     signals,
     privacy: inPerson
-      ? "Bounty never tracks location in the background. It reads GPS only when the worker taps Start, checks in, or takes a proof photo."
+      ? "Bounty reads location only while a job is open: when the worker taps Start, about once a minute while they work (for the on-site clock), at check-in and with proof photos. It stops when the proof is submitted, and the poster sees distances and time on site, never coordinates."
       : "This job is remote, so Bounty records no location at all.",
   };
 }

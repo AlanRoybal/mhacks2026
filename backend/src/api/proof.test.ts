@@ -48,6 +48,14 @@ async function capturedPhoto(deps: TestDeps, api: ReturnType<typeof apiClient>, 
   return { fileURL: await uploadPhoto(deps, api, token, bytes), capturedAt, latitude: SITE.lat, longitude: SITE.lng, sha256, signature, ...extra };
 }
 
+// Stay on site for `minutes`, pinging every minute like the app does, so SpacetimeDB's clock runs.
+async function workOnSite(deps: TestDeps, api: ReturnType<typeof apiClient>, token: string, job: Json, minutes: number) {
+  for (let m = 0; m < minutes; m++) {
+    deps.clock.advance(60);
+    await api.call("POST", `/jobs/${job.id}/live/ping`, token, { latitude: SITE.lat, longitude: SITE.lng, accuracyM: 8 });
+  }
+}
+
 async function fullProof(deps: TestDeps, api: ReturnType<typeof apiClient>, token: string, job: Json, seed: number) {
   const now = deps.now().toISOString();
   const items: Json[] = [];
@@ -65,10 +73,13 @@ async function fullProof(deps: TestDeps, api: ReturnType<typeof apiClient>, toke
 test("proof is checked, graded, reviewed, and auto-released when the window ends", async () => {
   const deps = testDeps();
   const { api, poster, worker, job } = await startedJob(deps);
+  await workOnSite(deps, api, worker.token, job, job.estMinutes);
 
   const items = await fullProof(deps, api, worker.token, job, 1);
   const pre = await api.call("POST", `/jobs/${job.id}/proof/precheck`, worker.token, { items });
   assert.equal(pre.body.checks.ok, true);
+  assert.equal(pre.body.checks.onSite.tracked, true);
+  assert.ok(pre.body.checks.onSite.seconds >= pre.body.checks.onSite.requiredSeconds);
 
   const submitted = await api.call("POST", `/jobs/${job.id}/proof`, worker.token, { items });
   assert.equal(submitted.status, 200);

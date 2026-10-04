@@ -65,7 +65,9 @@ export type Effect =
   | { kind: "grade"; proofId: string }
   | { kind: "payout" }
   | { kind: "refund" }
-  | { kind: "stats"; userId: string; delta: Partial<Record<StatKey, number>> };
+  | { kind: "stats"; userId: string; delta: Partial<Record<StatKey, number>> }
+  // A job with a worker changed state: mirror it to the live session in SpacetimeDB (services/live.ts).
+  | { kind: "live" };
 
 // Append-only history of a job. seq equals the job version the event produced.
 export interface LedgerEvent {

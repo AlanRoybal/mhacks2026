@@ -42,6 +42,10 @@ const PASSTHROUGH = [
   "MESSENGER_URL",
   "MESSENGER_SECRET",
   "ADMIN_USER_IDS",
+  "LIVE_PROVIDER",
+  "SPACETIME_URL",
+  "SPACETIME_DB",
+  "SPACETIME_TOKEN",
 ] as const;
 
 const entry = (file: string) => fileURLToPath(new URL(`../src/handlers/${file}`, import.meta.url));

@@ -6,7 +6,7 @@ import { connect, type ClientHttp2Session } from "node:http2";
 import { importPKCS8, SignJWT } from "jose";
 import type { Device, User } from "../domain/types.js";
 import type { Logger } from "../lib/log.js";
-import { apsPayload, type PushMessage, type PushSender } from "./push.js";
+import { apsPayload, liveActivityPayload, type LiveActivityPush, type PushMessage, type PushSender } from "./push.js";
 
 const HOSTS = { sandbox: "https://api.sandbox.push.apple.com", production: "https://api.push.apple.com" } as const;
 const TOKEN_TTL_MS = 50 * 60 * 1000;
@@ -67,18 +67,20 @@ export class ApnsSender implements PushSender {
   }
 
   private async sendOne(device: Device, message: PushMessage): Promise<{ status: number; reason?: string }> {
-    const token = await this.providerToken();
     const expiration = message.expiresAt ? Math.floor(Date.parse(message.expiresAt) / 1000) : 0;
+    return this.post(device, { "apns-topic": this.cfg.bundleId, "apns-push-type": "alert", "apns-expiration": String(expiration) }, apsPayload(message));
+  }
+
+  private async post(device: Device, headers: Record<string, string>, payload: unknown): Promise<{ status: number; reason?: string }> {
+    const token = await this.providerToken();
     const session = this.session(device.env);
     return new Promise((resolve, reject) => {
       const req = session.request({
         ":method": "POST",
         ":path": `/3/device/${device.token}`,
         authorization: `bearer ${token}`,
-        "apns-topic": this.cfg.bundleId,
-        "apns-push-type": "alert",
         "apns-priority": "10",
-        "apns-expiration": String(expiration),
+        ...headers,
       });
       let status = 0;
       let body = "";
@@ -104,8 +106,24 @@ export class ApnsSender implements PushSender {
         this.evict(device.env, session);
         reject(new ApnsTimeout("APNs did not answer"));
       });
-      req.end(JSON.stringify(apsPayload(message)));
+      req.end(JSON.stringify(payload));
     });
+  }
+
+  async liveActivity(push: LiveActivityPush, now: Date): Promise<"ok" | "dead" | "failed"> {
+    const device = { token: push.token, env: push.env } as Device;
+    const headers = { "apns-topic": `${this.cfg.bundleId}.push-type.liveactivity`, "apns-push-type": "liveactivity" };
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const { status, reason } = await this.post(device, headers, liveActivityPayload(push, now));
+        if (status === 200) return "ok";
+        this.log.warn("APNs rejected Live Activity update", { status, reason });
+        return status === 410 || (reason && DEAD_REASONS.has(reason)) ? "dead" : "failed";
+      } catch (error) {
+        if (attempt === 2) this.log.warn("Live Activity update failed", { error });
+      }
+    }
+    return "failed";
   }
 
   async send(user: User, message: PushMessage): Promise<{ deadTokens: string[] }> {

@@ -43,6 +43,12 @@ const schema = z.object({
   // The messenger service (messenger/, Photon Spectrum iMessage). Both set: texting is on. The secret also
   // authenticates the service's calls to POST /internal/imessage.
   MESSENGER_URL: z.string().url().optional(),
+  // Live job sessions (on-site time, geofence, progress). memory: in process. spacetime: the bounty-live
+  // module on SpacetimeDB (spacetime/), with the backend identity's token that published and owns it.
+  LIVE_PROVIDER: z.enum(["memory", "spacetime"]).default("memory"),
+  SPACETIME_URL: z.string().url().default("https://maincloud.spacetimedb.com"),
+  SPACETIME_DB: z.string().default("bounty-live"),
+  SPACETIME_TOKEN: z.string().optional(),
   MESSENGER_SECRET: z.string().min(16).optional(),
   // Comma-separated user IDs allowed to resolve disputes.
   ADMIN_USER_IDS: z.string().default(""),

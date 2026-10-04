@@ -1,7 +1,7 @@
 import type { Config } from "../config.js";
 import type { Logger } from "../lib/log.js";
 import { ApnsSender } from "./apns.js";
-import type { PushMessage, PushSender } from "./push.js";
+import type { LiveActivityPush, PushMessage, PushSender } from "./push.js";
 
 // Local dev: print pushes instead of sending them.
 export class ConsolePushSender implements PushSender {
@@ -11,15 +11,26 @@ export class ConsolePushSender implements PushSender {
     this.log.info(`PUSH → ${user.userId}: ${message.title} — ${message.body}`, { type: message.type, devices: user.devices.length });
     return { deadTokens: [] };
   }
+
+  async liveActivity(push: LiveActivityPush) {
+    this.log.info(`LIVE ACTIVITY ${push.event} → ${push.token.slice(0, 8)}…`, push.contentState);
+    return "ok" as const;
+  }
 }
 
 // Tests: remember what was sent.
 export class RecordingPushSender implements PushSender {
   readonly sent: { userId: string; message: PushMessage }[] = [];
+  readonly liveActivities: LiveActivityPush[] = [];
 
   async send(user: { userId: string }, message: PushMessage) {
     this.sent.push({ userId: user.userId, message });
     return { deadTokens: [] };
+  }
+
+  async liveActivity(push: LiveActivityPush) {
+    this.liveActivities.push(push);
+    return "ok" as const;
   }
 }
 

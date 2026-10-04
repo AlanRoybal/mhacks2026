@@ -23,6 +23,8 @@ export async function applyEvent(deps: Deps, jobId: string, event: JobEvent, act
     const now = deps.now();
     const result = transition(job, event, { now, actor, rules: deps.config.rules });
     const next: Job = { ...job, ...result.patch, state: result.to, version: job.version + 1, updatedAt: now.toISOString() };
+    // Jobs someone is working on have a live session (SpacetimeDB) that follows every state change.
+    const effects = next.state !== job.state && (job.workerId || next.workerId) ? [...result.effects, { kind: "live" as const }] : result.effects;
     const ledger: LedgerEvent = {
       jobId,
       seq: next.version,
@@ -31,7 +33,7 @@ export async function applyEvent(deps: Deps, jobId: string, event: JobEvent, act
       to: next.state,
       actor,
       event,
-      effects: result.effects,
+      effects,
       at: now.toISOString(),
       inline: Boolean(deps.inlineEffects),
     };
