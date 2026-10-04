@@ -15,6 +15,8 @@
     "test:settlements": "node --env-file=.env settlement-smoke-test.mjs",
     "setup:chain": "node setup-test-env.mjs",
     "deploy:sepolia": "forge build --root ../contracts && node --env-file=.env.chain deploy-escrow.mjs",
+    "deploy:test-token": "forge build --root ../contracts && node --env-file=.env.chain deploy-test-token.mjs",
+    "mint:test-usdc": "node --env-file=.env.chain mint-test-usdc.mjs",
     "test:sandbox": "node --env-file=.env smoke-test.mjs",
     "test:webhook": "node --env-file=.env smoke-test.mjs --webhook",
     "webhooks": "node --env-file=.env webhook-listener.mjs"

@@ -6,10 +6,11 @@ import { validateDraft, PaymentError } from './payments.mjs';
 
 const sameAddress = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
 export class CryptoPayments {
-  constructor({ store, rpcURL, address, privateKey, token = BASE_SEPOLIA_USDC, confirmations = 2, deploymentBlock = 0, local = false }) {
+  // testToken: a deliberately configured stand-in (ESCROW_TOKEN_ADDRESS, e.g. TestUSDC) instead of Circle's USDC.
+  constructor({ store, rpcURL, address, privateKey, token = BASE_SEPOLIA_USDC, testToken = false, confirmations = 2, deploymentBlock = 0, local = false }) {
     this.store = store; this.address = getAddress(address); this.token = getAddress(token);
     this.chain = local ? foundry : baseSepolia;
-    if (!local && !sameAddress(token, BASE_SEPOLIA_USDC)) throw new Error('Use Circle’s Base Sepolia USDC.');
+    if (!local && !testToken && !sameAddress(token, BASE_SEPOLIA_USDC)) throw new Error('Use Circle’s Base Sepolia USDC, or set ESCROW_TOKEN_ADDRESS for a test token.');
     this.account = privateKeyToAccount(privateKey);
     this.public = createPublicClient({ chain: this.chain, transport: http(rpcURL, { timeout: 15_000, retryCount: 1 }) });
     this.wallet = createWalletClient({ account: this.account, chain: this.chain, transport: http(rpcURL, { timeout: 15_000, retryCount: 1 }) });

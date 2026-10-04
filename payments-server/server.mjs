@@ -19,7 +19,8 @@ const payments = new Payments({ stripe, store, publishableKey });
 const workers = new Workers({ store, stripe, publicURL: process.env.BOUNTY_PUBLIC_URL ?? 'http://127.0.0.1:4242' });
 const crypto = process.env.ESCROW_CONTRACT_ADDRESS ? new CryptoPayments({ store,
   rpcURL: process.env.BASE_SEPOLIA_RPC_URL ?? 'https://sepolia.base.org', address: process.env.ESCROW_CONTRACT_ADDRESS,
-  privateKey: process.env.ESCROW_ARBITER_PRIVATE_KEY, deploymentBlock: process.env.ESCROW_DEPLOYMENT_BLOCK ?? 0 }) : null;
+  privateKey: process.env.ESCROW_ARBITER_PRIVATE_KEY, deploymentBlock: process.env.ESCROW_DEPLOYMENT_BLOCK ?? 0,
+  ...(process.env.ESCROW_TOKEN_ADDRESS ? { token: process.env.ESCROW_TOKEN_ADDRESS, testToken: true } : {}) }) : null;
 const settlements = new Settlements({ store, stripe, workers, crypto });
 if (crypto) crypto.settlements = settlements;
 const app = createApp({ payments, stripe, workers, settlements, crypto, adminToken: process.env.BOUNTY_ADMIN_TOKEN,
