@@ -11,7 +11,7 @@ enum AppTab: Hashable, CaseIterable {
 
 /// Full-screen destinations that sit above the tab bar.
 enum AppRoute: Hashable {
-    case lockScreenOffer
+    case notifications
     case offer
     case jobDetail
     case proofCapture
@@ -21,13 +21,6 @@ enum AppRoute: Hashable {
     case reviewProof
     /// A job the user posted, with its status timeline.
     case postedJob
-
-    var usesDarkStatusBar: Bool {
-        switch self {
-        case .lockScreenOffer: true
-        default: false
-        }
-    }
 }
 
 @MainActor

@@ -111,3 +111,24 @@ test("GET /offers/:id (opened from the push) shows the job while the offer is li
   assert.equal(after.body.offer.status, "declined");
   assert.equal(after.body.job, null);
 });
+
+test("every push lands on the notifications page until it is read", async () => {
+  const { deps, api, designer, illustrator, jobId } = await fundedLogoJob();
+  const offer = (await getJobOrThrow(deps, jobId)).currentOffer;
+  const worker = offer?.workerId === designer.userId ? designer : illustrator;
+
+  const inbox = await api.call("GET", "/me/notifications", worker.token);
+  assert.equal(inbox.body.unreadCount, 1);
+  assert.equal(inbox.body.items[0].type, "offer");
+  assert.equal(inbox.body.items[0].jobId, jobId);
+  assert.equal(inbox.body.items[0].offerId, offer?.offerId);
+  assert.equal(inbox.body.items[0].read, false);
+
+  assert.equal((await api.call("POST", "/me/notifications/read", worker.token)).body.unreadCount, 0);
+  const after = await api.call("GET", "/me/notifications", worker.token);
+  assert.equal(after.body.unreadCount, 0);
+  assert.equal(after.body.items[0].read, true);
+
+  const nobody = await api.login("quiet");
+  assert.deepEqual((await api.call("GET", "/me/notifications", nobody.token)).body, { items: [], unreadCount: 0 });
+});

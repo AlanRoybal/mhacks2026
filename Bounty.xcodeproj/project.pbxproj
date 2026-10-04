@@ -41,6 +41,7 @@
 		A510F93D352ADCF910D48AE0 /* JobDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6879C2F5D256C818DE44FEAE /* JobDisplay.swift */; };
 		A8B0B68E701E6FC2B59A7756 /* WorkerPayments.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE26CC60A4D4BA0F7F17E467 /* WorkerPayments.swift */; };
 		B04F46213A684C485B7CA242 /* TwinKit in Frameworks */ = {isa = PBXBuildFile; productRef = 58A11A2658EE3AFE68C27C79 /* TwinKit */; };
+		B59CF5857AF944956AA3AD6A /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 002403D446AD2EB6EC7217D6 /* NotificationsView.swift */; };
 		D2935B4C128BA8403A9A6F7A /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97535FC0C25668325DA5E484 /* AppServices.swift */; };
 		D2E427E75BB9E360579A53C7 /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = 75658A13BA2DDEA9A3B6EA8B /* StripePaymentSheet */; };
 		DBB03E4DF64D7E4FEF117C10 /* BackendJobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 919DD468D1C1A40D707EF084 /* BackendJobsAPI.swift */; };
@@ -56,6 +57,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		002403D446AD2EB6EC7217D6 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		00653F176E5F56A7F9330976 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0B7E2F09CDF905685D922897 /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
 		0B881345578D9442C60B1C2B /* BountyLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BountyLogo.swift; sourceTree = "<group>"; };
@@ -282,6 +284,7 @@
 			isa = PBXGroup;
 			children = (
 				5A659F3622D8C9A9C448F582 /* HomeView.swift */,
+				002403D446AD2EB6EC7217D6 /* NotificationsView.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
@@ -440,6 +443,7 @@
 				DD1917C3911F2E20D6E2DCBD /* MarketplaceEarnings.swift in Sources */,
 				2648EB0D8A6753B81B7323A1 /* MockJobsAPI.swift in Sources */,
 				ED44C175F43DBF6E9510D01B /* Motion.swift in Sources */,
+				B59CF5857AF944956AA3AD6A /* NotificationsView.swift in Sources */,
 				5E9F407B368D43CF613B0AF1 /* OfferViews.swift in Sources */,
 				495A213982B7EC87F9AE6604 /* OnboardingView.swift in Sources */,
 				F2D014C6F39EE17DFC1D4D52 /* PaymentsServerAPI.swift in Sources */,

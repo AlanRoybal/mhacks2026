@@ -305,8 +305,23 @@ export interface User {
   isAdmin?: boolean;
   // Seed users fill the marketplace but never receive offers.
   seed?: boolean;
+  // The in-app notifications page: every push we sent, newest first, capped at INBOX_LIMIT.
+  inbox?: InboxItem[];
+  // Items created after this are unread.
+  inboxReadAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InboxItem {
+  id: string;
+  // Push template, e.g. "offer" or "proof_ready". The app routes on it like a tapped push.
+  type: string;
+  title: string;
+  body: string;
+  jobId: string;
+  offerId?: string;
+  createdAt: string;
 }
 
 export type Actor =

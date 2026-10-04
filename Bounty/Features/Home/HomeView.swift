@@ -8,6 +8,7 @@ struct HomeView: View {
     @EnvironmentObject private var workerPayments: WorkerPayments
     @State private var name: String?
     @State private var showsSettings = false
+    @State private var unreadCount = 0
 
     private var greeting: String {
         switch Calendar.current.component(.hour, from: .now) {
@@ -30,7 +31,19 @@ struct HomeView: View {
                 }
                 Spacer()
                 HStack(spacing: 8) {
-                    IconButton(icon: .bell, label: "Notifications") { router.open(.lockScreenOffer) }
+                    IconButton(icon: .bell, label: unreadCount > 0 ? "Notifications, \(unreadCount) unread" : "Notifications") {
+                        router.open(.notifications)
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if unreadCount > 0 {
+                            Circle()
+                                .fill(BountyColor.red)
+                                .frame(width: 10, height: 10)
+                                .overlay(Circle().strokeBorder(BountyColor.canvas, lineWidth: 2))
+                                .offset(x: -6, y: 6)
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                    }
                     Button { showsSettings = true } label: {
                         InitialsAvatar(initials: JobDetailView.initials(name ?? (services.api == nil ? "Alan R" : "?")))
                     }
@@ -80,6 +93,12 @@ struct HomeView: View {
         .task {
             guard let api = services.api, let me: MeProfile = try? await api.request(.get, "me") else { return }
             name = me.displayName
+        }
+        // Refreshes the bell's dot on launch and whenever a screen above Home (e.g. Notifications) closes.
+        .task(id: router.route == nil) {
+            guard router.route == nil, let api = services.api,
+                  let page: InboxPage = try? await api.request(.get, "me/notifications") else { return }
+            withAnimation(Motion.press) { unreadCount = page.unreadCount }
         }
     }
 }

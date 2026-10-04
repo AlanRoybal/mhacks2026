@@ -71,6 +71,8 @@ export function meRoutes(deps: Deps): Hono<AppEnv> {
       u.prefs = blank.prefs;
       u.availability = undefined;
       u.devices = [];
+      u.inbox = undefined;
+      u.inboxReadAt = undefined;
     });
     deps.log.info("Account deleted", { userId: user.userId });
     return c.body(null, 204);
@@ -85,6 +87,30 @@ export function meRoutes(deps: Deps): Hono<AppEnv> {
       u.devices = [{ token: body.token.toLowerCase(), env: body.env, updatedAt: now }, ...others].slice(0, MAX_DEVICES);
     });
     return c.json({ devices: user.devices.length });
+  });
+
+  // The notifications page, newest first. Opening it calls POST /me/notifications/read.
+  app.get("/notifications", (c) => {
+    const user = c.get("user");
+    const readAt = user.inboxReadAt ?? "";
+    const items = (user.inbox ?? []).map((n) => ({
+      id: n.id,
+      type: n.type,
+      title: n.title,
+      body: n.body,
+      jobId: n.jobId,
+      offerId: n.offerId ?? null,
+      createdAt: wireDate(n.createdAt),
+      read: n.createdAt <= readAt,
+    }));
+    return c.json({ items, unreadCount: items.filter((n) => !n.read).length });
+  });
+
+  app.post("/notifications/read", async (c) => {
+    await updateUser(deps, c.get("user").userId, (u) => {
+      u.inboxReadAt = deps.now().toISOString();
+    });
+    return c.json({ unreadCount: 0 });
   });
 
   return app;

@@ -37,7 +37,7 @@ struct RootTabView: View {
             }
         }
         .environment(\.screenExiting, router.transition.isExiting)
-        .preferredColorScheme(router.route?.usesDarkStatusBar == true ? .dark : .light)
+        .preferredColorScheme(.light)
         .environmentObject(postedJobs)
         .environmentObject(workerPayments)
         .environment(postDraft)
@@ -95,7 +95,7 @@ struct RootTabView: View {
     @ViewBuilder
     private func routeView(_ route: AppRoute) -> some View {
         switch route {
-        case .lockScreenOffer: LockScreenOfferView()
+        case .notifications: NotificationsView()
         case .offer: OfferView()
         case .jobDetail: JobDetailView()
         case .proofCapture: ProofCaptureView()

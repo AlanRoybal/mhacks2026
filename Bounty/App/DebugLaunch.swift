@@ -21,7 +21,7 @@ enum DebugLaunch {
     static func apply(to router: AppRouter) {
         let tabs: [String: AppTab] = ["home": .home, "jobs": .jobs, "post": .post, "twin": .twin, "earnings": .earnings]
         let routes: [String: AppRoute] = [
-            "lockScreenOffer": .lockScreenOffer, "offer": .offer, "jobDetail": .jobDetail,
+            "notifications": .notifications, "offer": .offer, "jobDetail": .jobDetail,
             "proofCapture": .proofCapture, "proofCheck": .proofCheck, "proofChecklist": .proofChecklist,
             "fundJob": .fundJob, "reviewProof": .reviewProof, "postedJob": .postedJob
         ]
