@@ -12,3 +12,4 @@ Config/Local.xcconfig
 
 # CDK lookup cache: holds the AWS account and VPC IDs; regenerated on deploy. Kept out of the public repo.
 backend/cdk.context.json
+spacetime/node_modules/

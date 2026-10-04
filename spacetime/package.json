@@ -1,0 +1,17 @@
+{
+  "name": "bounty-live",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bounty's live job sessions: on-site time, geofence and progress, in SpacetimeDB",
+  "scripts": {
+    "build": "spacetime build",
+    "publish": "spacetime publish bounty-live --yes",
+    "publish:local": "spacetime publish bounty-live --server local --yes"
+  },
+  "dependencies": {
+    "spacetimedb": "2.10.*"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.2"
+  }
+}
