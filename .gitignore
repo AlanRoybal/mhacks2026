@@ -14,3 +14,5 @@ Config/Local.xcconfig
 backend/cdk.context.json
 spacetime/node_modules/
 spacetime/dist/
+spacetime/backend-token
+spacetime/backend.toml
