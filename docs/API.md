@@ -320,6 +320,21 @@ Every job carries `verification`: what Bounty checks before paying, and what it 
 | `deadline` | Always | No proof after the deadline; the poster is refunded if nobody finishes. |
 | `ai_review` | Always | Each required item needs confidence ≥ 0.7; otherwise the poster decides. |
 
+## Ratings, track records and risk
+
+**Track record.** When the poster rates a finished job, Claude names the skills the job exercised and whether the rating shows the worker is strong, adequate or weak at each.
+- Each such skill moves 30% of the way toward its target confidence.
+- It records the job, and cites the review as a `rating` source.
+- `GET /twin` skills carry `trackRecord: { jobs, averageStars }`; `/profile/twin` carries `track_record`, with `source: "rating"`.
+
+**Trust and risk** (`backend/src/domain/risk.ts`):
+
+| Where | What |
+|---|---|
+| `GET /me/trust` | `{ score, conservative, effectiveJobs, exposureLimit, openExposure }`. The worker's Beta-posterior trust: star-weighted, time-decayed, and the k-th job with the same poster counts 1/k. `exposureLimit` is how much escrow they can hold at once ($50 to start, up to $1000). Matching skips workers a job would push over it. |
+| Job `risk` (poster and admins, once funded) | `{ tier: A-E, rail, exposure, probabilityOfLoss, lossGivenDefault, expectedLoss, worker: { trust, conservative, ratedJobs }, posterDisputeProbability }`, with expected loss = PD × LGD × EAD. |
+| `GET /admin/risk` | Every open escrow: `exposureCents`; a Monte Carlo `portfolio` with `expectedLossCents`, `var95Cents`, `var99Cents` and `es99Cents` (99% Expected Shortfall, the reserve to hold); the largest worker `concentration`; `rating_ring` flags (3+ five-star jobs between one pair in 30 days); and the `riskiest` escrows. |
+
 ## Payments
 
 `POST /jobs/{id}/fund` returns a FundingSession plus `provider` and `job`:
