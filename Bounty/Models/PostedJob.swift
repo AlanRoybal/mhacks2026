@@ -42,6 +42,8 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
     /// `poster`, `worker`, `offered` or `admin`.
     var myRole: String?
     var estMinutes: Int?
+    /// What Bounty checks before paying, and what it records about the worker (`docs/API.md`, "Verification plan").
+    var verification: VerificationPlan?
     var feeAmount: Decimal?
     var totalAmount: Decimal?
     var attempts: ProofAttempts?
@@ -369,6 +371,26 @@ struct Proof: Codable, Hashable, Sendable {
     func item(for checklistItem: ChecklistItem) -> ProofItem? {
         items.first { $0.checklistItemId == checklistItem.id }
     }
+}
+
+/// How a job's completion is verified, worked out by the backend from the job and its checklist.
+struct VerificationPlan: Codable, Hashable, Sendable {
+    struct Signal: Codable, Hashable, Sendable, Identifiable {
+        /// `on_site_start`, `on_site_check_in`, `photo_location`, `fresh_photos`, `before_after`, `deliverable`, `deadline`, `ai_review`.
+        let id: String
+        /// `start`, `proof` or `review`.
+        let stage: String
+        /// `blocks`, `fails_item` or `poster_reviews`.
+        let enforcement: String
+        let title: String
+        let detail: String
+        /// What is recorded about the worker for this check, if anything.
+        let collects: String?
+    }
+
+    let summary: String
+    let signals: [Signal]
+    let privacy: String
 }
 
 struct ProofItem: Codable, Hashable, Sendable {

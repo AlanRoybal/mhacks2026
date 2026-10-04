@@ -164,6 +164,12 @@ struct OfferView: View {
                 }
             }
             .entrance(.rest(2))
+
+            // Before accepting: what Bounty will check, and what it records about the worker.
+            if let plan = job?.verification {
+                VerificationPlanCard(plan: plan, audience: .worker)
+                    .entrance(.rest(3))
+            }
         } bottom: {
             if outcome != nil {
                 PillButton(title: "Back to home") { router.finish(on: .home) }

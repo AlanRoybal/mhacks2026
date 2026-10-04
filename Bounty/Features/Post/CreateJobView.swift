@@ -452,6 +452,12 @@ struct FundJobView: View {
             .padding(16)
             .tintedPanel(BountyColor.mint)
             .entrance(.rest(2))
+
+            // The checks that decide whether the escrow is released, from the saved checklist.
+            if let plan = draft.job?.verification {
+                VerificationPlanCard(plan: plan, audience: .poster)
+                    .entrance(.rest(3))
+            }
         } bottom: {
             VStack(spacing: 12) {
                 PillButton(

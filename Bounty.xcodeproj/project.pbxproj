@@ -23,6 +23,7 @@
 		34D8FC0D39B9BDA019E2486B /* BountyTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CE03AB2F0785B5586A1119 /* BountyTheme.swift */; };
 		362CD1ACFCAB84CCFE11B112 /* JobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC74DC8BCAE700D156446104 /* JobsAPI.swift */; };
 		3E079D1C27E6C781A1F698AE /* WorkViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA3B29F599F6FBA66D82AAA /* WorkViews.swift */; };
+		BD0000000000000000000022 /* VerificationPlanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0000000000000000000021 /* VerificationPlanCard.swift */; };
 		495A213982B7EC87F9AE6604 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1406EF46384922539D8BA3BC /* OnboardingView.swift */; };
 		4D295C77E60A3E16F14B00EC /* RateWorkerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEF56E5E9A62A25EF28F5955 /* RateWorkerCard.swift */; };
 		59293C4BEC733AAEB2C058A9 /* TwinSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E03DB252793796851AC0AF /* TwinSources.swift */; };
@@ -84,6 +85,7 @@
 		54627BC3FF0C2B627F7E9D8B /* PushNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationManager.swift; sourceTree = "<group>"; };
 		5A659F3622D8C9A9C448F582 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		5DA3B29F599F6FBA66D82AAA /* WorkViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkViews.swift; sourceTree = "<group>"; };
+		BD0000000000000000000021 /* VerificationPlanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerificationPlanCard.swift; sourceTree = "<group>"; };
 		62029D8562DB3F9C7D7719ED /* CryptoCheckoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoCheckoutView.swift; sourceTree = "<group>"; };
 		639DA50C5ED17C063F385A8F /* TwinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwinView.swift; sourceTree = "<group>"; };
 		6879C2F5D256C818DE44FEAE /* JobDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobDisplay.swift; sourceTree = "<group>"; };
@@ -235,6 +237,7 @@
 				2679EADF798F7C549A97F3EA /* ProofFlow.swift */,
 				BD0000000000000000000011 /* ProofCapture.swift */,
 				5DA3B29F599F6FBA66D82AAA /* WorkViews.swift */,
+				BD0000000000000000000021 /* VerificationPlanCard.swift */,
 			);
 			path = Work;
 			sourceTree = "<group>";
@@ -479,6 +482,7 @@
 				59293C4BEC733AAEB2C058A9 /* TwinSources.swift in Sources */,
 				691999A29A6A649083EE701E /* TwinView.swift in Sources */,
 				3E079D1C27E6C781A1F698AE /* WorkViews.swift in Sources */,
+				BD0000000000000000000022 /* VerificationPlanCard.swift in Sources */,
 				A8B0B68E701E6FC2B59A7756 /* WorkerPayments.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

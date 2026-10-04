@@ -85,6 +85,11 @@ struct JobDetailView: View {
             .borderedCard()
             .entrance(.rest(0))
 
+            if let plan = job?.verification {
+                VerificationPlanCard(plan: plan, audience: .worker)
+                    .entrance(.rest(0))
+            }
+
             if let job {
                 JobThreadCard(jobId: job.id, role: .worker, counterpartName: job.poster?.name)
                     .entrance(.rest(1))
