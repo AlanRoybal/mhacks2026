@@ -226,6 +226,13 @@ describe("doing the work", () => {
     const { job } = apply(accepted(), { type: "START", captureKey: "key-1", at: { lat: 42.281, lng: -83.743 } }, WORKER);
     assert.equal(job.state, "IN_PROGRESS");
     assert.equal(job.capture?.key, "key-1");
+    assert.equal(job.startCheck?.distanceM, 22, "where the worker started is recorded for the poster");
+  });
+
+  test("a GPS fix too vague to prove the worker is at the address can't start the job", () => {
+    rejects(accepted(), { type: "START", captureKey: "key-1", at: SITE, accuracyM: 800 }, WORKER, "location_imprecise");
+    const { job } = apply(accepted(), { type: "START", captureKey: "key-1", at: SITE, accuracyM: 12.4 }, WORKER);
+    assert.deepEqual({ distanceM: job.startCheck?.distanceM, accuracyM: job.startCheck?.accuracyM }, { distanceM: 0, accuracyM: 12 });
   });
 
   test("remote jobs start without a location", () => {

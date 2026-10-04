@@ -179,6 +179,12 @@ export async function jobWire(ctx: WireContext, job: Job, viewer: User) {
       { remote: job.remote, address: job.location?.address, checklist: job.checklist },
       { checkInRadiusM: deps.config.rules.checkInRadiusM, photoRadiusM: photoGeofenceM(deps), confidence: CONFIDENT },
     ),
+    // In-person jobs: how far from the address the worker was when they started, and how accurate
+    // that fix was. Distance only; the worker's coordinates aren't shared.
+    startCheck:
+      (isPoster || role === "worker") && job.startCheck
+        ? { distanceM: job.startCheck.distanceM, accuracyM: job.startCheck.accuracyM ?? null, at: wireDate(job.startCheck.at) }
+        : null,
     radiusMiles: job.remote ? null : kmToMiles(job.radiusKm),
     feeAmount: isPoster ? dollars(job.feeCents) : null,
     totalAmount: isPoster ? dollars(job.totalCents) : null,

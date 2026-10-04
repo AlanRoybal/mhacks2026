@@ -27,8 +27,9 @@ async function startedJob(deps: TestDeps, title = "Sketch a logo for a coffee sh
   await deps.settle();
   const offer = (await getJobOrThrow(deps, created.id)).currentOffer;
   await api.call("POST", `/offers/${offer?.offerId}/accept`, worker.token);
-  const started = await api.call("POST", `/jobs/${created.id}/start`, worker.token, { latitude: SITE.lat, longitude: SITE.lng });
+  const started = await api.call("POST", `/jobs/${created.id}/start`, worker.token, { latitude: SITE.lat, longitude: SITE.lng, accuracyM: 9 });
   assert.equal(started.body.status, "IN_PROGRESS");
+  assert.deepEqual({ ...started.body.startCheck, at: undefined }, { distanceM: 0, accuracyM: 9, at: undefined }, "the start check reaches the app");
   assert.match(started.body.captureKey, /^[A-Za-z0-9_-]{43}$/);
   return { api, poster, worker, job: started.body as Json };
 }

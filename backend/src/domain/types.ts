@@ -119,6 +119,8 @@ export interface Job {
   fundedAt?: string;
   acceptedAt?: string;
   startedAt?: string;
+  // In-person jobs: where the worker was when they tapped Start (checked against the job's address).
+  startCheck?: { lat: number; lng: number; distanceM: number; accuracyM?: number; at: string };
   submittedAt?: string;
   closedAt?: string;
 }

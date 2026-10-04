@@ -6,7 +6,7 @@
 //   on_site_start     jobMachine START: the worker must be within checkInRadiusM to start
 //   on_site_check_in  grading: CHECK_IN items are judged from GPS by the server, not the model
 //   photo_location    proof checks: photos taken outside photoRadiusM keep the job from auto-paying
-//   fresh_photos      proof checks: captures after Start, and no image reused from another job
+//   fresh_photos      proof checks: signed Bounty-camera captures after Start, none reused from another job
 //   before_after      grading: the model checks the before and after show the same place
 //   deliverable       grading: files and links are judged against the description
 //   deadline          jobMachine SUBMIT: no proof after the deadline
@@ -65,7 +65,7 @@ export function verificationPlan(job: VerificationInput, limits: VerificationLim
       stage: "start",
       enforcement: "blocks",
       title: "On site to start",
-      detail: `Start only works within ${limits.checkInRadiusM} m of ${place}.`,
+      detail: `Start only works within ${limits.checkInRadiusM} m of ${place}, with a GPS fix accurate to ${limits.checkInRadiusM} m or better. The poster sees how far away the worker started.`,
       collects: "One GPS reading when the worker taps Start",
     });
   }
@@ -94,9 +94,9 @@ export function verificationPlan(job: VerificationInput, limits: VerificationLim
       id: "fresh_photos",
       stage: "proof",
       enforcement: "blocks",
-      title: "New photos only",
-      detail: "Proof has to be taken after the worker starts, and a photo already used for any other job is rejected.",
-      collects: "When each photo was taken, and a fingerprint of the image",
+      title: "Taken in the Bounty camera",
+      detail: "Photos and videos have to be taken in the app after the worker starts. Each is signed on the phone, so camera-roll or edited files are rejected, and so is anything already used for another job.",
+      collects: "When each photo or video was taken, and a fingerprint of the file",
     });
   }
   if (beforeAfter.length > 0) {

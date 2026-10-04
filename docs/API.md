@@ -169,7 +169,7 @@ A skill in `GET /twin` looks like this:
 | POST | `/offers/{id}/accept` | — | `{ offer, job }`. A second tap by the winner is a 200. |
 | POST | `/offers/{id}/decline` | — | `{ offer, job: null }`. The job moves to the next match. |
 | GET | `/jobs/working` | — | Jobs assigned to you, active and finished. |
-| POST | `/jobs/{id}/start` | `{ "latitude", "longitude" }` in person, `{}` remote | Check-in. The response's `captureKey` is what the app signs its proof captures with (see [Proof](#proof)). It's sent only to the assigned worker, while IN_PROGRESS. |
+| POST | `/jobs/{id}/start` | `{ "latitude", "longitude", "accuracyM" }` in person, `{}` remote | Check-in. The response's `captureKey` is what the app signs its proof captures with (see [Proof](#proof)). It's sent only to the assigned worker, while IN_PROGRESS. In person, the fix must be within the check-in radius of the address and accurate to that radius (`too_far` or `location_imprecise` otherwise); the job then carries `startCheck: { distanceM, accuracyM, at }` for the poster and worker. |
 | POST | `/jobs/{id}/withdraw` | — | 204. Gives the job back before submitting; it re-opens for matching and counts against reliability. |
 | POST | `/jobs/{id}/proof/precheck` | Same as `/proof` | `{ checks }` without submitting (US-39). |
 | POST | `/jobs/{id}/proof` | See [Proof](#proof) | The Job (SUBMITTED), or 422 `proof_incomplete`. A double tap gets 409 `already_submitted`. |

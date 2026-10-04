@@ -171,9 +171,12 @@ export function jobRoutes(deps: Deps): Hono<AppEnv> {
 
   // US-35/36: check in and start. The response carries captureKey, which the app signs its proof captures with.
   app.post("/:id/start", async (c) => {
-    const body = await parseOptionalBody(c, z.object({ latitude: z.number().optional(), longitude: z.number().optional() }));
+    const body = await parseOptionalBody(
+      c,
+      z.object({ latitude: z.number().optional(), longitude: z.number().optional(), accuracyM: z.number().nonnegative().optional() }),
+    );
     const at = body.latitude !== undefined && body.longitude !== undefined ? { lat: body.latitude, lng: body.longitude } : undefined;
-    return act(deps, c, { type: "START", captureKey: captureKey(), at });
+    return act(deps, c, { type: "START", captureKey: captureKey(), at, accuracyM: body.accuracyM });
   });
 
   // Product rule 5: the worker can hand the job back before submitting; it re-opens for matching.
