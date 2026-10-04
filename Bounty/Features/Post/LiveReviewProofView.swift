@@ -136,6 +136,10 @@ struct LiveReviewProofView: View {
                     .foregroundStyle(job.status == .disputed ? BountyColor.creamInk : BountyColor.mintInk)
                     .padding(14)
                     .tintedPanel(job.status == .disputed ? BountyColor.cream : BountyColor.mint, radius: BountyRadius.row)
+
+                    // Step 9: rate the worker right after approving.
+                    RateWorkerCard(job: job)
+                        .transition(.opacity)
                 }
             }
         } bottom: {

@@ -16,6 +16,7 @@
 		C01D31E4842770DEE4B8D010 /* LocationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0B510A9B989BA3E9D2BED95 /* LocationPicker.swift */; };
 		C063AA21C90391028ADDEFDA /* LiveReviewProofView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C028826A943F54585B66E656 /* LiveReviewProofView.swift */; };
 		C0E854AF2B33C9ABB08F2FE6 /* DisputeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02F085446A36585D431EBCA /* DisputeSheet.swift */; };
+		C08FEB115A7BE695C61FB03C /* RateWorkerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02843E421DAC584DB3C2101 /* RateWorkerCard.swift */; };
 		C0541A4A341F884DE3474494 /* JobDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05A9A4077CBC7B5643495B6 /* JobDisplay.swift */; };
 		C07DF502099E40F2E072683B /* PostedJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0BBF9B90D077FB603668977 /* PostedJob.swift */; };
 		0BFBABD98AF3B1B0E44A71E2 /* CreateJobView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F611717A4A9F0276C3E9675 /* CreateJobView.swift */; };
@@ -54,6 +55,7 @@
 		C0B510A9B989BA3E9D2BED95 /* LocationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationPicker.swift; sourceTree = "<group>"; };
 		C028826A943F54585B66E656 /* LiveReviewProofView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveReviewProofView.swift; sourceTree = "<group>"; };
 		C02F085446A36585D431EBCA /* DisputeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisputeSheet.swift; sourceTree = "<group>"; };
+		C02843E421DAC584DB3C2101 /* RateWorkerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateWorkerCard.swift; sourceTree = "<group>"; };
 		C05A9A4077CBC7B5643495B6 /* JobDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobDisplay.swift; sourceTree = "<group>"; };
 		C0BBF9B90D077FB603668977 /* PostedJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostedJob.swift; sourceTree = "<group>"; };
 		A1000000000000000000000B /* ApplePay.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ApplePay.entitlements; sourceTree = "<group>"; };
@@ -263,6 +265,7 @@
 				C0B510A9B989BA3E9D2BED95 /* LocationPicker.swift */,
 				C028826A943F54585B66E656 /* LiveReviewProofView.swift */,
 				C02F085446A36585D431EBCA /* DisputeSheet.swift */,
+				C02843E421DAC584DB3C2101 /* RateWorkerCard.swift */,
 				7F611717A4A9F0276C3E9675 /* CreateJobView.swift */,
 				A10000000000000000000002 /* PaymentCheckoutView.swift */,
 				BD0000000000000000000002 /* PostDraft.swift */,
@@ -390,6 +393,7 @@
 				C01D31E4842770DEE4B8D010 /* LocationPicker.swift in Sources */,
 				C063AA21C90391028ADDEFDA /* LiveReviewProofView.swift in Sources */,
 				C0E854AF2B33C9ABB08F2FE6 /* DisputeSheet.swift in Sources */,
+				C08FEB115A7BE695C61FB03C /* RateWorkerCard.swift in Sources */,
 				C0541A4A341F884DE3474494 /* JobDisplay.swift in Sources */,
 				C07DF502099E40F2E072683B /* PostedJob.swift in Sources */,
 				5B1B545EBF77BA68176EAC68 /* JobsView.swift in Sources */,

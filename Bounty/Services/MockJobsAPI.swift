@@ -96,6 +96,16 @@ actor MockJobsAPI: JobsAPI {
         return job
     }
 
+    func rate(jobId: String, stars: Int, comment: String?) async throws -> PostedJob {
+        try await latency()
+        var job = try existing(jobId)
+        guard job.status == .released || job.status == .refunded else { throw JobsAPIError.invalidState(job.status) }
+        guard job.posterRating == nil else { throw JobsAPIError.server("You already rated this job.") }
+        job.ratings = JobRatings(byPoster: JobRating(stars: stars, comment: comment), byWorker: job.ratings?.byWorker)
+        jobs[jobId] = job
+        return job
+    }
+
     // MARK: Simulation
 
     private func simulateLifecycle(jobId: String) async {
