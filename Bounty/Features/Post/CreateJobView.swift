@@ -149,9 +149,13 @@ struct CreateJobView: View {
         } bottom: {
             VStack(spacing: 10) {
                 if let problem = draft.problem {
+                    // The bottom bar is see-through, so the hint gets its own backing.
                     Text(problem)
                         .bountyType(.footnote)
-                        .foregroundStyle(BountyColor.inkSecondary)
+                        .foregroundStyle(BountyColor.creamInk)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(BountyColor.cream, in: Capsule())
                         .transition(.opacity)
                 }
                 PillButton(title: "Draft the proof checklist", icon: .sparkles) { router.open(.proofChecklist) }
