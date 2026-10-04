@@ -46,6 +46,8 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
     var verification: VerificationPlan?
     /// In-person jobs: how far from the address the worker was when they started.
     var startCheck: StartCheck?
+    /// The escrow's risk, for the poster (backend/src/domain/risk.ts).
+    var risk: EscrowRisk?
     var feeAmount: Decimal?
     var totalAmount: Decimal?
     var attempts: ProofAttempts?
@@ -389,6 +391,35 @@ struct Proof: Codable, Hashable, Sendable {
 }
 
 /// How a job's completion is verified, worked out by the backend from the job and its checklist.
+/// One escrow's credit risk: EL = PD x LGD x EAD, a tier, and the assigned worker's trust.
+struct EscrowRisk: Codable, Hashable, Sendable {
+    struct WorkerTrust: Codable, Hashable, Sendable {
+        let trust: Double
+        let conservative: Double
+        let ratedJobs: Double
+    }
+
+    /// A (safest) to E.
+    let tier: String
+    /// `card` or `usdc`.
+    let rail: String
+    let exposure: Double
+    let probabilityOfLoss: Double
+    let lossGivenDefault: Double
+    let expectedLoss: Double
+    let worker: WorkerTrust?
+    let posterDisputeProbability: Double
+}
+
+/// GET /me/trust: the worker's trust score and the escrow it lets them hold at once.
+struct WorkerTrustScore: Codable, Hashable, Sendable {
+    let score: Double
+    let conservative: Double
+    let effectiveJobs: Double
+    let exposureLimit: Double
+    let openExposure: Double
+}
+
 struct VerificationPlan: Codable, Hashable, Sendable {
     struct Signal: Codable, Hashable, Sendable, Identifiable {
         /// `on_site_start`, `on_site_check_in`, `photo_location`, `fresh_photos`, `before_after`, `deliverable`, `deadline`, `ai_review`.
