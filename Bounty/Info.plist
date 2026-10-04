@@ -67,6 +67,8 @@
 	<string>Bounty uses Face ID to confirm you want to accept a job.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Bounty connects to the local Bounty and payment test servers during development.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Bounty records sound with proof videos you take in the app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Bounty uses your location to match nearby jobs and verify on-site work.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
