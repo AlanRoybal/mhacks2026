@@ -160,6 +160,35 @@ struct IconGlyph: View {
     }
 }
 
+/// The poster's photos of the job, so the worker sees the real thing instead of stock art.
+struct JobPhotoStrip: View {
+    let urls: [URL]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(urls, id: \.self) { url in
+                    BountyColor.field
+                        .frame(width: 120, height: 96)
+                        .overlay {
+                            AsyncImage(url: url) { phase in
+                                if let image = phase.image {
+                                    image.resizable().scaledToFill()
+                                } else if phase.error != nil {
+                                    IconGlyph(icon: .images, size: 22).foregroundStyle(BountyColor.inkTertiary)
+                                } else {
+                                    ProgressView()
+                                }
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+            }
+        }
+        .accessibilityLabel("Photos from the poster")
+    }
+}
+
 /// Round 44 pt icon button used in navigation rows.
 struct IconButton: View {
     let icon: BountyIcon

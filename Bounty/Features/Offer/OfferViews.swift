@@ -59,10 +59,12 @@ struct OfferView: View {
     var body: some View {
         BountyScreen(glow: ScreenGlow(BountyColor.glowCream, height: 520)) {
             NavRow(leadingIcon: .x, leadingLabel: "Close", leadingAction: router.back) {
-                if outcome == nil {
-                    OfferCountdown(expiry: offer?.expiresAt ?? router.offerExpiry) { remaining in
+                if outcome == nil, let expiry = offer?.expiresAt {
+                    OfferCountdown(expiry: expiry) { remaining in
                         Chip(label: "Expires in \(remaining)", tone: .coral)
                     }
+                } else if outcome == nil {
+                    Chip(label: "New offer", tone: .coral)
                 } else {
                     Chip(label: "Closed", tone: .grey)
                 }
@@ -109,7 +111,13 @@ struct OfferView: View {
                 .frame(maxWidth: .infinity)
                 .entrance(.top)
 
-            OfferMap(location: job?.location)
+            if let photos = job?.posterPhotos, !photos.isEmpty {
+                JobPhotoStrip(urls: photos)
+                    .entrance(.rest(0))
+            }
+
+            if let location = job?.location {
+            OfferMap(location: location)
                 .frame(height: 130)
                 .overlay(alignment: .bottomLeading) {
                     HStack(spacing: 6) {
@@ -126,6 +134,7 @@ struct OfferView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .accessibilityElement(children: .combine)
                 .entrance(.rest(0))
+            }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
@@ -150,9 +159,7 @@ struct OfferView: View {
                             Chip(label: item.text, tone: .cream)
                         }
                     } else {
-                        Chip(label: "Photo of the sketch", tone: .cream)
-                        Chip(label: "Code on the page", tone: .cream)
-                        Chip(label: "Shop name readable", tone: .cream)
+                        Chip(label: "Photos or a video of the finished work", tone: .cream)
                     }
                 }
             }
@@ -223,19 +230,15 @@ struct OfferView: View {
 
 /// The job's spot on a map for in-person jobs; the illustrated map for remote ones (US-31).
 private struct OfferMap: View {
-    let location: JobLocation?
+    let location: JobLocation
 
     var body: some View {
-        if let location {
-            let center = CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)
-            Map(initialPosition: .region(MKCoordinateRegion(center: center, latitudinalMeters: 1600, longitudinalMeters: 1600))) {
-                Marker(location.address.isEmpty ? "Job" : location.address, coordinate: center)
-                UserAnnotation()
-            }
-            .allowsHitTesting(false)
-        } else {
-            Image("map-art").resizable()
+        let center = CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)
+        Map(initialPosition: .region(MKCoordinateRegion(center: center, latitudinalMeters: 1600, longitudinalMeters: 1600))) {
+            Marker(location.address.isEmpty ? "Job" : location.address, coordinate: center)
+            UserAnnotation()
         }
+        .allowsHitTesting(false)
     }
 }
 

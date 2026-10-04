@@ -12,9 +12,9 @@ struct JobDetailView: View {
     @State private var history: [TimelineEntry] = []
     @State private var confirmsWithdraw = false
 
+    /// The job that was opened. Never a different one: if it's gone, the screen says so.
     private var job: PostedJob? {
         marketplace.workingJobs.first { $0.id == router.workerJobId }
-            ?? marketplace.workingJobs.first
     }
 
     private var requirements: [String] { job?.checklist.map(\.text) ?? [] }
@@ -43,6 +43,11 @@ struct JobDetailView: View {
                 TitleSubtitle(title: job?.title ?? "Job", subtitle: job.map { "\($0.payText) · Due \($0.deadlineText)" } ?? "", titleType: .headline)
             }
             .entrance(.top)
+
+            if let photos = job?.posterPhotos, !photos.isEmpty {
+                JobPhotoStrip(urls: photos)
+                    .entrance(.top)
+            }
 
             HStack(spacing: 12) {
                 InitialsAvatar(initials: Self.initials(job?.poster?.name ?? "?"), background: BountyColor.creamBand, foreground: BountyColor.creamInk)
@@ -101,16 +106,22 @@ struct JobDetailView: View {
                     .foregroundStyle(BountyColor.red)
             }
 
-            HStack(spacing: 12) {
-                StickerView(sticker: .shield, size: 40)
-                Text("\(job?.payText ?? "$15") is held safely. It releases when your proof passes review.")
-                    .bountyType(.subhead)
-                    .foregroundStyle(BountyColor.mintInk)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            if let job {
+                HStack(spacing: 12) {
+                    StickerView(sticker: .shield, size: 40)
+                    Text("\(job.payText) is held safely. It releases when your proof passes review.")
+                        .bountyType(.subhead)
+                        .foregroundStyle(BountyColor.mintInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(14)
+                .tintedPanel(BountyColor.mint, radius: BountyRadius.row)
+                .entrance(.rest(2))
+            } else if !marketplace.isLoading {
+                Text("This job isn\u{2019}t assigned to you anymore.")
+                    .bountyType(.body)
+                    .foregroundStyle(BountyColor.inkSecondary)
             }
-            .padding(14)
-            .tintedPanel(BountyColor.mint, radius: BountyRadius.row)
-            .entrance(.rest(2))
         } bottom: {
             PillButton(title: primaryTitle, icon: job?.status == .accepted ? .locate : .camera) {
                 beginProof()
@@ -153,7 +164,11 @@ struct JobDetailView: View {
     }
 
     private func beginProof() {
-        guard let job, services.api != nil else { return }
+        guard let job else { return }
+        guard services.api != nil else {
+            actionError = "You\u{2019}re signed out. Sign in again to start this job."
+            return
+        }
         switch job.status {
         case .accepted:
             break
@@ -236,7 +251,10 @@ private struct RatePosterCard: View {
     }
 
     private func send() async {
-        guard let api = services.api else { return }
+        guard let api = services.api else {
+            message = "You\u{2019}re signed out. Sign in again to rate."
+            return
+        }
         isSending = true
         defer { isSending = false }
         let trimmed = comment.trimmingCharacters(in: .whitespacesAndNewlines)

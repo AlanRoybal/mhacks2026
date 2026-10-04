@@ -301,7 +301,7 @@ struct ProofCaptureView: View {
     }
 
     private var job: PostedJob? {
-        marketplace.workingJobs.first { $0.id == router.workerJobId } ?? marketplace.workingJobs.first
+        marketplace.workingJobs.first { $0.id == router.workerJobId }
     }
 
     var body: some View {
@@ -388,6 +388,10 @@ struct ProofCaptureView: View {
                 },
                 onVideo: { url in
                     camera = nil
+                    guard let url else {
+                        draft.message = "That video couldn\u{2019}t be saved. Record it again."
+                        return
+                    }
                     Task { await addVideo(url, item: request.item, phase: request.phase, job: job, draft: draft) }
                 },
                 onCancel: { camera = nil }
@@ -396,10 +400,22 @@ struct ProofCaptureView: View {
         }
         .fileImporter(isPresented: Binding(get: { filePickerItem != nil }, set: { if !$0 { filePickerItem = nil } }),
                       allowedContentTypes: [.pdf, .jpeg, .png, .zip]) { result in
-            guard let item = filePickerItem, case .success(let url) = result else { return }
+            guard let item = filePickerItem else { return }
+            guard case .success(let url) = result else {
+                if case .failure(let error) = result { draft.message = error.localizedDescription }
+                return
+            }
             Task { await addFile(url, item: item, draft: draft) }
         }
         .task(id: job.id) {
+            // Captures are signed with the job's key, which comes with the in-progress job. A stale copy
+            // (loaded before the job started) doesn't have it yet, so fetch a fresh one.
+            if job.status == .inProgress, job.captureKey == nil {
+                await marketplace.refresh(api: services.api)
+                if marketplace.workingJobs.first(where: { $0.id == job.id })?.captureKey == nil {
+                    draft.message = "This job\u{2019}s camera isn\u{2019}t ready. Go back and tap Add proof again."
+                }
+            }
             // A retry shows why each item failed last time.
             if job.status == .inProgress, (job.attempts?.failed ?? 0) > 0, let api = services.api,
                let attempts: [ProofAttemptResult] = try? await api.request(.get, "jobs/\(job.id)/proofs") {
@@ -414,6 +430,9 @@ struct ProofCaptureView: View {
         let capturedAt = CaptureSignature.captureTime()
         // In-person photos carry GPS; the server flags photos taken away from the job.
         let coordinate = job.isRemote ? nil : await location.current()?.coordinate
+        if !job.isRemote, coordinate == nil {
+            draft.message = "Location wasn\u{2019}t available for that photo, so the reviewer will see it without GPS. Turn on Location for Bounty."
+        }
         let photo = ProofDraft.Photo(image: image, phase: phase, capturedAt: capturedAt,
                                      latitude: coordinate?.latitude, longitude: coordinate?.longitude)
         draft.photos[item.id, default: []].append(photo)
@@ -422,10 +441,18 @@ struct ProofCaptureView: View {
     }
 
     private func upload(_ photoId: UUID, itemId: String, job: PostedJob, draft: ProofDraft) async {
-        guard let api = services.api,
-              let index = draft.photos[itemId]?.firstIndex(where: { $0.id == photoId }),
-              let photo = draft.photos[itemId]?[index],
-              let data = photo.image.proofJPEG() else { return }
+        guard let index = draft.photos[itemId]?.firstIndex(where: { $0.id == photoId }),
+              let photo = draft.photos[itemId]?[index] else { return }
+        guard let api = services.api else {
+            draft.photos[itemId]?[index].failed = true
+            draft.message = "You\u{2019}re signed out. Sign in again to upload proof."
+            return
+        }
+        guard let data = photo.image.proofJPEG() else {
+            draft.photos[itemId]?[index].failed = true
+            draft.message = "That photo couldn\u{2019}t be prepared. Take it again."
+            return
+        }
         draft.photos[itemId]?[index].failed = false
         // Signed over the exact bytes that are uploaded, right after capture.
         let signed = CaptureSignature.sign(data, jobId: job.id, capturedAt: photo.capturedAt,
@@ -446,6 +473,9 @@ struct ProofCaptureView: View {
     private func addVideo(_ url: URL, item: ChecklistItem, phase: String, job: PostedJob, draft: ProofDraft) async {
         let capturedAt = CaptureSignature.captureTime()
         let coordinate = job.isRemote ? nil : await location.current()?.coordinate
+        if !job.isRemote, coordinate == nil {
+            draft.message = "Location wasn\u{2019}t available for that video, so the reviewer will see it without GPS. Turn on Location for Bounty."
+        }
         let frames = await VideoFrames.extract(from: url)
         guard let thumbnail = frames.first else {
             draft.message = "That video couldn\u{2019}t be read. Record it again."
@@ -460,9 +490,13 @@ struct ProofCaptureView: View {
 
     /// Uploads the clip and its stills; each is signed like a photo.
     private func uploadVideo(_ videoId: UUID, itemId: String, job: PostedJob, draft: ProofDraft) async {
-        guard let api = services.api,
-              let index = draft.videos[itemId]?.firstIndex(where: { $0.id == videoId }),
+        guard let index = draft.videos[itemId]?.firstIndex(where: { $0.id == videoId }),
               let video = draft.videos[itemId]?[index] else { return }
+        guard let api = services.api else {
+            draft.videos[itemId]?[index].failed = true
+            draft.message = "You\u{2019}re signed out. Sign in again to upload proof."
+            return
+        }
         draft.videos[itemId]?[index].failed = false
         func sign(_ data: Data) -> CaptureSignature.Signed {
             CaptureSignature.sign(data, jobId: job.id, capturedAt: video.capturedAt,
@@ -499,7 +533,10 @@ struct ProofCaptureView: View {
     }
 
     private func addFile(_ url: URL, item: ChecklistItem, draft: ProofDraft) async {
-        guard let api = services.api else { return }
+        guard let api = services.api else {
+            draft.message = "You\u{2019}re signed out. Sign in again to upload proof."
+            return
+        }
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let type = UTType(filenameExtension: url.pathExtension)
@@ -529,7 +566,10 @@ struct ProofCaptureView: View {
 
     /// Runs the server checks first so problems show per item (US-39), then submits (US-41).
     private func submit(job: PostedJob, draft: ProofDraft) async {
-        guard let api = services.api else { return }
+        guard let api = services.api else {
+            draft.message = "You\u{2019}re signed out. Sign in again to submit."
+            return
+        }
         draft.isBusy = true
         draft.message = nil
         defer { draft.isBusy = false }
@@ -705,7 +745,8 @@ struct CameraCapture: View {
     /// Record a short video instead of taking a photo.
     var video = false
     let onCapture: (UIImage) -> Void
-    var onVideo: (URL) -> Void = { _ in }
+    /// The recorded clip, or nil if it couldn't be saved.
+    var onVideo: (URL?) -> Void = { _ in }
     let onCancel: () -> Void
 
     var body: some View {
@@ -731,7 +772,7 @@ private struct CameraPicker: UIViewControllerRepresentable {
     let hint: String?
     let video: Bool
     let onCapture: (UIImage) -> Void
-    let onVideo: (URL) -> Void
+    let onVideo: (URL?) -> Void
     let onCancel: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onCapture: onCapture, onVideo: onVideo, onCancel: onCancel) }
@@ -792,18 +833,18 @@ private struct CameraPicker: UIViewControllerRepresentable {
 
     final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let onCapture: (UIImage) -> Void
-        let onVideo: (URL) -> Void
+        let onVideo: (URL?) -> Void
         let onCancel: () -> Void
 
-        init(onCapture: @escaping (UIImage) -> Void, onVideo: @escaping (URL) -> Void, onCancel: @escaping () -> Void) {
+        init(onCapture: @escaping (UIImage) -> Void, onVideo: @escaping (URL?) -> Void, onCancel: @escaping () -> Void) {
             self.onCapture = onCapture
             self.onVideo = onVideo
             self.onCancel = onCancel
         }
 
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let url = info[.mediaURL] as? URL, let copy = VideoFrames.keepCopy(of: url) {
-                onVideo(copy)
+            if let url = info[.mediaURL] as? URL {
+                onVideo(VideoFrames.keepCopy(of: url))
             } else if let image = info[.originalImage] as? UIImage {
                 onCapture(image)
             } else {
@@ -869,9 +910,10 @@ struct ProofCheckView: View {
     @Environment(AppServices.self) private var services
     @Environment(MarketplaceStore.self) private var marketplace
     @State private var attempt: ProofAttemptResult?
+    @State private var pollError: String?
 
     private var job: PostedJob? {
-        marketplace.workingJobs.first { $0.id == router.workerJobId } ?? marketplace.workingJobs.first
+        marketplace.workingJobs.first { $0.id == router.workerJobId }
     }
 
     var body: some View {
@@ -885,6 +927,12 @@ struct ProofCheckView: View {
                 }
             }
             .entrance(.top)
+
+            if let pollError {
+                Text(pollError)
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.red)
+            }
 
             if let job {
                 header(job)
@@ -1006,15 +1054,26 @@ struct ProofCheckView: View {
 
     /// Refreshes the job every 3 s while it's being graded, then loads the attempt's feedback.
     private func poll() async {
-        guard let api = services.api, let jobId = job?.id else { return }
+        guard let api = services.api, let jobId = job?.id else {
+            pollError = "You\u{2019}re signed out. Sign in again to see the result."
+            return
+        }
+        var failures = 0
         while !Task.isCancelled {
-            if let fresh: PostedJob = try? await api.request(.get, "jobs/\(jobId)") {
+            do {
+                let fresh: PostedJob = try await api.request(.get, "jobs/\(jobId)")
+                failures = 0
+                pollError = nil
                 marketplace.replace(fresh)
                 if fresh.status != .submitted {
                     let attempts: [ProofAttemptResult]? = try? await api.request(.get, "jobs/\(jobId)/proofs")
                     attempt = attempts?.first
                     if fresh.status != .inReview { return }
                 }
+            } catch {
+                failures += 1
+                // One blip is normal on venue Wi-Fi; say something once it keeps failing.
+                if failures >= 3 { pollError = "Can\u{2019}t reach Bounty right now (\(error.localizedDescription)). Still trying\u{2026}" }
             }
             try? await Task.sleep(for: .seconds(3))
         }
