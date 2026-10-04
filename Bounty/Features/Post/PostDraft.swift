@@ -58,9 +58,11 @@ final class PostDraft {
         address = ""
         location = nil
         pay = 15
-        // Later today, on the hour, at least three hours out.
-        let soon = Date.now.addingTimeInterval(3 * 3600)
-        deadline = Calendar.current.nextDate(after: soon, matching: DateComponents(minute: 0), matchingPolicy: .nextTime) ?? soon
+        // 6 PM today, or tomorrow when that's under three hours away.
+        let calendar = Calendar.current
+        let earliest = Date.now.addingTimeInterval(3 * 3600)
+        let sixToday = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: .now) ?? earliest
+        deadline = sixToday >= earliest ? sixToday : calendar.date(byAdding: .day, value: 1, to: sixToday) ?? earliest
     }
 
     var deadlineText: String {
