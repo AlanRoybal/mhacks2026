@@ -11,6 +11,8 @@ import Observation
 final class PosterStore {
     private(set) var jobs: [PostedJob] = []
     private(set) var isLoading = false
+    /// True once a load has finished, so an empty list reads as "nothing posted", not "loading".
+    private(set) var hasLoaded = false
     /// True after falling back to sample data because the backend couldn't be reached.
     private(set) var isUsingSampleData = false
     var errorMessage: String?
@@ -33,7 +35,10 @@ final class PosterStore {
 
     func loadJobs() async {
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoaded = true
+        }
         do {
             setJobs(try await api.myJobs())
             errorMessage = nil
@@ -86,6 +91,7 @@ final class PosterStore {
         do {
             let job = try await api.job(id: jobId)
             upsert(job)
+            errorMessage = nil
             return job
         } catch {
             if !fallBackIfUnreachable(error) {

@@ -54,6 +54,10 @@ struct JobsView: View {
             }
             .animation(Motion.enterRest, value: router.jobsSegment)
 
+            if router.jobsSegment == .posted {
+                PostedListStatus(hasCheckoutJobs: !jobs(for: .posted).isEmpty)
+            }
+
             if router.jobsSegment == .posted && posterStore.isUsingSampleData {
                 Text("Sample jobs. Start the backend (cd backend && npm run dev) to see the jobs you post.")
                     .bountyType(.footnote)
@@ -80,6 +84,63 @@ struct JobsView: View {
         case .offered: router.open(.offer)
         case .accepted, .inProgress: router.open(.jobDetail)
         case .funded, .inReview, .paid: break
+        }
+    }
+}
+
+/// Plan step 10: what the Posted list says while loading, after an error, or with nothing posted.
+private struct PostedListStatus: View {
+    let hasCheckoutJobs: Bool
+    @Environment(AppRouter.self) private var router
+    @Environment(PosterStore.self) private var store
+
+    private var isEmpty: Bool { store.jobs.isEmpty && !hasCheckoutJobs }
+
+    var body: some View {
+        if let message = store.errorMessage {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 10) {
+                    IconGlyph(icon: .refresh, size: 18)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Couldn’t refresh your jobs")
+                            .bountyType(.bodyStrong)
+                        Text(message)
+                            .bountyType(.footnote)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .foregroundStyle(BountyColor.creamInk)
+                PillButton(title: store.isLoading ? "Trying again…" : "Try again", style: .secondary) {
+                    Task { await store.loadJobs() }
+                }
+                .disabled(store.isLoading)
+            }
+            .padding(14)
+            .tintedPanel(BountyColor.cream, radius: BountyRadius.row)
+        } else if isEmpty && !store.hasLoaded {
+            HStack(spacing: 10) {
+                ProgressView()
+                Text("Loading your jobs…")
+                    .bountyType(.subhead)
+                    .foregroundStyle(BountyColor.inkSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+        } else if isEmpty {
+            VStack(spacing: 12) {
+                StickerView(sticker: .poster, size: 72)
+                Text("Nothing posted yet")
+                    .bountyType(.headline)
+                    .foregroundStyle(BountyColor.inkPrimary)
+                Text("Post a job and your twin finds someone nearby. You’ll follow it here.")
+                    .bountyType(.subhead)
+                    .foregroundStyle(BountyColor.inkSecondary)
+                    .multilineTextAlignment(.center)
+                PillButton(title: "Post a job", icon: .plus) { router.select(.post) }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity)
+            .borderedCard()
         }
     }
 }

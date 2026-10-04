@@ -35,6 +35,34 @@ final class PostDraft {
             && deadline > .now
     }
 
+    /// The first thing stopping the poster from continuing, phrased for the screen; `nil` when ready.
+    var problem: String? {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let details = details.trimmingCharacters(in: .whitespacesAndNewlines)
+        if title.isEmpty { return "Add a title." }
+        if title.count > 120 { return "Keep the title under 120 characters." }
+        if details.isEmpty { return "Add a description so workers know what to do." }
+        if details.count > 4000 { return "Shorten the description a little." }
+        if inPerson && address.trimmingCharacters(in: .whitespaces).isEmpty { return "Add an address, or make it remote." }
+        if deadline <= .now { return "Pick a deadline in the future." }
+        if pay < 1 || pay > 10_000 { return "Pay has to be between $1 and $10,000." }
+        return nil
+    }
+
+    /// Plan step 10: the demo's job in one tap.
+    func fillDemo() {
+        title = "Sketch a logo for a coffee shop"
+        details = "On paper, by hand. Include a coffee cup and the shop name \u{201C}Blue Fern\u{201D}, readable. Photograph the finished sketch."
+        category = "Design"
+        inPerson = false
+        address = ""
+        location = nil
+        pay = 15
+        // Later today, on the hour, at least three hours out.
+        let soon = Date.now.addingTimeInterval(3 * 3600)
+        deadline = Calendar.current.nextDate(after: soon, matching: DateComponents(minute: 0), matchingPolicy: .nextTime) ?? soon
+    }
+
     var deadlineText: String {
         deadline.formatted(.dateTime.weekday(.abbreviated).hour().minute())
     }

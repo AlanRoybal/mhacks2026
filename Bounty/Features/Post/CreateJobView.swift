@@ -12,7 +12,17 @@ struct CreateJobView: View {
         @Bindable var draft = draft
         BountyScreen(spacing: 14) {
             ScreenTitle(title: "Post a job") {
-                Chip(label: "Draft", tone: .grey)
+                HStack(spacing: 8) {
+                    // Plan step 10: fills in the demo's coffee shop logo job.
+                    Button {
+                        withAnimation(Motion.press) { draft.fillDemo() }
+                    } label: {
+                        Chip(label: "Demo job", tone: .lavender)
+                    }
+                    .buttonStyle(PressableStyle())
+                    .accessibilityHint("Fills in a sample job: sketch a coffee shop logo for $15")
+                    Chip(label: "Draft", tone: .grey)
+                }
             }
             .entrance(.top)
 
@@ -137,7 +147,18 @@ struct CreateJobView: View {
             }
             .entrance(.rest(3))
         } bottom: {
-            PillButton(title: "Draft the proof checklist", icon: .sparkles) { router.open(.proofChecklist) }
+            VStack(spacing: 10) {
+                if let problem = draft.problem {
+                    Text(problem)
+                        .bountyType(.footnote)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                        .transition(.opacity)
+                }
+                PillButton(title: "Draft the proof checklist", icon: .sparkles) { router.open(.proofChecklist) }
+                    .disabled(draft.problem != nil)
+                    .opacity(draft.problem == nil ? 1 : 0.4)
+            }
+            .animation(Motion.pressTint, value: draft.problem)
         }
         .sheet(isPresented: $pickingLocation) {
             LocationPicker(location: Binding(

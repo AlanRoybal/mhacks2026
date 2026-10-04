@@ -93,6 +93,8 @@ struct PostedJobDetailView: View {
                 .padding(16)
                 .borderedCard()
                 .entrance(.rest(2))
+            } else {
+                JobUnavailable()
             }
         } bottom: {
             if let job {
@@ -147,6 +149,40 @@ struct PostedJobDetailView: View {
 
     private func initials(_ name: String) -> String {
         name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
+    }
+}
+
+/// Shown when the job can't be found or loaded (plan step 10), with a way to try again.
+private struct JobUnavailable: View {
+    @Environment(AppRouter.self) private var router
+    @Environment(PosterStore.self) private var store
+    @State private var isRetrying = false
+
+    var body: some View {
+        VStack(spacing: 12) {
+            if isRetrying || (store.errorMessage == nil && store.isLoading) {
+                ProgressView()
+                    .padding(.vertical, 24)
+            } else {
+                StickerView(sticker: .shield, size: 64)
+                Text("Couldn’t load this job")
+                    .bountyType(.headline)
+                    .foregroundStyle(BountyColor.inkPrimary)
+                Text(store.errorMessage ?? "It may have been removed, or the connection dropped.")
+                    .bountyType(.subhead)
+                    .foregroundStyle(BountyColor.inkSecondary)
+                    .multilineTextAlignment(.center)
+                PillButton(title: "Try again", style: .secondary) {
+                    Task {
+                        isRetrying = true
+                        defer { isRetrying = false }
+                        if let id = router.posterJobId { await store.refresh(jobId: id) }
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity)
     }
 }
 
