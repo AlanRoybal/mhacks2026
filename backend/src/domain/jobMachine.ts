@@ -21,6 +21,7 @@ export type TransitionErrorCode =
   | "not_enough_time"
   | "location_required"
   | "too_far"
+  | "location_imprecise"
   | "deadline_passed"
   | "window_closed"
   | "too_early"
@@ -272,15 +273,25 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
       requireUser(ctx, job.workerId, "assigned worker");
       requireState(job, ev, "ACCEPTED");
       if (pastDeadline(job, ctx.now)) fail("deadline_passed", "The job deadline has passed");
-      if (!ev.code.trim()) fail("bad_request", "Missing one-time code");
+      if (!ev.captureKey.trim()) fail("bad_request", "Missing capture key");
       if (!job.remote) {
         if (!ev.at || !isFiniteLatLng(ev.at) || !job.location) fail("location_required", "Check in with your current location to start");
+        // A fix this vague can't show the worker is at the address (indoors, or GPS still warming up).
+        if (ev.accuracyM !== undefined && ev.accuracyM > ctx.rules.checkInRadiusM) {
+          fail("location_imprecise", `Your location is only accurate to about ${Math.round(ev.accuracyM)} m. Step outside or wait a few seconds, then start again.`);
+        }
         const meters = Math.round(haversineKm(ev.at, job.location) * 1000);
         if (meters > ctx.rules.checkInRadiusM) {
           fail("too_far", `You are ${meters} m from the job. Check in within ${ctx.rules.checkInRadiusM} m.`);
         }
+        const startCheck = { lat: ev.at.lat, lng: ev.at.lng, distanceM: meters, accuracyM: ev.accuracyM === undefined ? undefined : Math.round(ev.accuracyM), at: now };
+        return {
+          to: "IN_PROGRESS",
+          patch: { startedAt: now, startCheck, capture: { key: ev.captureKey, issuedAt: now } },
+          effects: [],
+        };
       }
-      return { to: "IN_PROGRESS", patch: { startedAt: now, challenge: { code: ev.code, issuedAt: now } }, effects: [] };
+      return { to: "IN_PROGRESS", patch: { startedAt: now, capture: { key: ev.captureKey, issuedAt: now } }, effects: [] };
     }
 
     case "WITHDRAW": {
@@ -293,7 +304,8 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
           acceptedAt: undefined,
           startedAt: undefined,
           submittedAt: undefined,
-          challenge: undefined,
+          capture: undefined,
+          startCheck: undefined,
           latestProofId: undefined,
           failedAttempts: 0,
           excludedWorkerIds: [...job.excludedWorkerIds, workerId],

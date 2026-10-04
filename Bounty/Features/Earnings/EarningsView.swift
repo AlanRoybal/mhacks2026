@@ -134,8 +134,7 @@ struct EarningsView: View {
     private var payoutPanel: some View {
         let status = earnings.summary?.payouts
         if status?.payoutsEnabled == true {
-            Label("Stripe payouts are on. Approved jobs transfer to your Stripe account; bank payouts follow Stripe\u{2019}s schedule.",
-                  systemImage: "checkmark.seal.fill")
+            Label("Stripe payouts are on. Approved jobs transfer to your Stripe account; bank payouts follow Stripe\u{2019}s schedule.", icon: .badgeCheck)
                 .bountyType(.footnote)
                 .foregroundStyle(BountyColor.mintInk)
                 .padding(14)

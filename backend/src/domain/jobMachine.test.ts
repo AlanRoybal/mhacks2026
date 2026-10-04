@@ -71,7 +71,7 @@ const kinds = (effects: Effect[]) => effects.map((e) => (e.kind === "push" ? `pu
 const funded = () => apply(makeJob(), FUND, SYSTEM).job;
 const offered = () => apply(funded(), { type: "OFFER_SENT", offerId: "o1", workerId: "worker", expiresAt: iso(2) }, SYSTEM).job;
 const accepted = () => apply(offered(), { type: "ACCEPT", offerId: "o1" }, WORKER).job;
-const inProgress = () => apply(accepted(), { type: "START", code: "ABC-DEF", at: SITE }, WORKER).job;
+const inProgress = () => apply(accepted(), { type: "START", captureKey: "key-1", at: SITE }, WORKER).job;
 const submitted = () => apply(inProgress(), { type: "SUBMIT", proofId: "p1" }, WORKER).job;
 const graded = (decision: "pass" | "fail" | "unclear") => apply(submitted(), { type: "GRADED", proofId: "p1", decision, summary: "" }, SYSTEM).job;
 
@@ -208,7 +208,7 @@ describe("cancel, terms, withdraw", () => {
       const { job: next, effects } = apply(job, { type: "WITHDRAW" }, WORKER);
       assert.equal(next.state, "FUNDED");
       assert.equal(next.workerId, undefined);
-      assert.equal(next.challenge, undefined);
+      assert.equal(next.capture, undefined);
       assert.deepEqual(next.excludedWorkerIds, ["worker"]);
       assert.ok(kinds(effects).includes("match"));
     }
@@ -217,19 +217,26 @@ describe("cancel, terms, withdraw", () => {
 });
 
 describe("doing the work", () => {
-  test("in-person start requires a nearby check-in and a code", () => {
-    rejects(accepted(), { type: "START", code: "X" }, WORKER, "location_required");
-    rejects(accepted(), { type: "START", code: "X", at: { lat: Number.NaN, lng: Number.NaN } }, WORKER, "location_required");
-    rejects(accepted(), { type: "START", code: "X", at: { lat: 42.3, lng: -83.743 } }, WORKER, "too_far");
-    rejects(accepted(), { type: "START", code: " ", at: SITE }, WORKER, "bad_request");
-    rejects(accepted(), { type: "START", code: "X", at: SITE }, OTHER, "forbidden");
-    const { job } = apply(accepted(), { type: "START", code: "ABC-DEF", at: { lat: 42.281, lng: -83.743 } }, WORKER);
+  test("in-person start requires a nearby check-in and issues a capture key", () => {
+    rejects(accepted(), { type: "START", captureKey: "key-1" }, WORKER, "location_required");
+    rejects(accepted(), { type: "START", captureKey: "key-1", at: { lat: Number.NaN, lng: Number.NaN } }, WORKER, "location_required");
+    rejects(accepted(), { type: "START", captureKey: "key-1", at: { lat: 42.3, lng: -83.743 } }, WORKER, "too_far");
+    rejects(accepted(), { type: "START", captureKey: " ", at: SITE }, WORKER, "bad_request");
+    rejects(accepted(), { type: "START", captureKey: "key-1", at: SITE }, OTHER, "forbidden");
+    const { job } = apply(accepted(), { type: "START", captureKey: "key-1", at: { lat: 42.281, lng: -83.743 } }, WORKER);
     assert.equal(job.state, "IN_PROGRESS");
-    assert.equal(job.challenge?.code, "ABC-DEF");
+    assert.equal(job.capture?.key, "key-1");
+    assert.equal(job.startCheck?.distanceM, 22, "where the worker started is recorded for the poster");
+  });
+
+  test("a GPS fix too vague to prove the worker is at the address can't start the job", () => {
+    rejects(accepted(), { type: "START", captureKey: "key-1", at: SITE, accuracyM: 800 }, WORKER, "location_imprecise");
+    const { job } = apply(accepted(), { type: "START", captureKey: "key-1", at: SITE, accuracyM: 12.4 }, WORKER);
+    assert.deepEqual({ distanceM: job.startCheck?.distanceM, accuracyM: job.startCheck?.accuracyM }, { distanceM: 0, accuracyM: 12 });
   });
 
   test("remote jobs start without a location", () => {
-    assert.equal(apply({ ...accepted(), remote: true, location: undefined }, { type: "START", code: "X" }, WORKER).job.state, "IN_PROGRESS");
+    assert.equal(apply({ ...accepted(), remote: true, location: undefined }, { type: "START", captureKey: "key-1" }, WORKER).job.state, "IN_PROGRESS");
   });
 
   test("submit asks for grading with a timeout; late, repeated or foreign submissions are refused", () => {
@@ -427,7 +434,7 @@ describe("invariants under random event sequences", () => {
           { type: "REMATCH", round: job.matchRounds },
           { type: "ACCEPT", offerId: job.currentOffer?.offerId ?? "x" },
           { type: "CANCEL" },
-          { type: "START", code: "ABC-DEF", at: SITE },
+          { type: "START", captureKey: "key-1", at: SITE },
           { type: "WITHDRAW" },
           { type: "SUBMIT", proofId: `p${step}` },
           { type: "GRADED", proofId: job.latestProofId ?? "x", decision: pick(["pass", "fail", "unclear"] as const), summary: "" },

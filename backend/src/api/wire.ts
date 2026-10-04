@@ -10,8 +10,11 @@ import type { Deps } from "../deps.js";
 import type { JobEventType, LedgerEvent } from "../domain/events.js";
 import { allowedActions } from "../domain/jobMachine.js";
 import { hourlyCents } from "../domain/money.js";
+import { verificationPlan } from "../domain/verification.js";
 import type { ChecklistItem, Job, Offer, Proof, User } from "../domain/types.js";
 import { notFound } from "../lib/errors.js";
+import { CONFIDENT } from "../services/grading.js";
+import { photoGeofenceM } from "../services/proof.js";
 import { reliability } from "../services/users.js";
 import { isAdmin } from "./auth.js";
 
@@ -67,7 +70,7 @@ export function proofWire(deps: Deps, proof: Proof) {
     submittedAt: wireDate(proof.createdAt),
     items: ids.map((checklistItemId) => {
       const items = proof.items.filter((i) => i.checklistItemId === checklistItemId);
-      const photos = items.filter((i) => i.kind === "photo");
+      const photos = items.filter((i) => i.kind === "photo" && !i.frameOf);
       const byPhase = (phase: string) => photos.filter((p) => p.phase === phase).map((p) => url(p.blobKey)).filter(Boolean);
       const location = items.find((i) => i.kind === "location");
       return {
@@ -77,6 +80,7 @@ export function proofWire(deps: Deps, proof: Proof) {
         afterPhotoURLs: byPhase("after"),
         link: items.find((i) => i.kind === "link")?.url ?? null,
         fileURLs: items.filter((i) => i.kind === "file").map((i) => url(i.blobKey)).filter(Boolean),
+        videoURLs: items.filter((i) => i.kind === "video").map((i) => url(i.blobKey)).filter(Boolean),
         checkedInAt: wireDate(location?.capturedAt),
         note: items.find((i) => i.note)?.note ?? null,
       };
@@ -140,7 +144,8 @@ export async function jobWire(ctx: WireContext, job: Job, viewer: User) {
     job.latestProofId && role !== "offered" ? deps.store.getProof(job.jobId, job.latestProofId) : Promise.resolve(null),
   ]);
   const isPoster = role === "poster" || role === "admin";
-  const showCode = role === "worker" && ["IN_PROGRESS", "SUBMITTED", "IN_REVIEW"].includes(job.state);
+  // Only the assigned worker's app, and only while it can still capture proof.
+  const showCaptureKey = role === "worker" && job.state === "IN_PROGRESS";
 
   return {
     // Fields in Job.swift
@@ -168,6 +173,18 @@ export async function jobWire(ctx: WireContext, job: Job, viewer: User) {
     allowedActions: allowedActions(job, { userId: viewer.userId, isAdmin: isAdmin(deps, viewer) }, now),
     poster: personWire(poster, "poster"),
     estMinutes: job.estMinutes,
+    // What Bounty checks before paying, and what it records about the worker to do so. Shown to the
+    // poster before funding and to workers before they accept.
+    verification: verificationPlan(
+      { remote: job.remote, address: job.location?.address, checklist: job.checklist },
+      { checkInRadiusM: deps.config.rules.checkInRadiusM, photoRadiusM: photoGeofenceM(deps), confidence: CONFIDENT },
+    ),
+    // In-person jobs: how far from the address the worker was when they started, and how accurate
+    // that fix was. Distance only; the worker's coordinates aren't shared.
+    startCheck:
+      (isPoster || role === "worker") && job.startCheck
+        ? { distanceM: job.startCheck.distanceM, accuracyM: job.startCheck.accuracyM ?? null, at: wireDate(job.startCheck.at) }
+        : null,
     radiusMiles: job.remote ? null : kmToMiles(job.radiusKm),
     feeAmount: isPoster ? dollars(job.feeCents) : null,
     totalAmount: isPoster ? dollars(job.totalCents) : null,
@@ -185,7 +202,7 @@ export async function jobWire(ctx: WireContext, job: Job, viewer: User) {
         : isPoster && job.currentOffer
           ? { id: job.currentOffer.offerId, expiresAt: wireDate(job.currentOffer.expiresAt) }
           : null,
-    challengeCode: showCode ? (job.challenge?.code ?? null) : null,
+    captureKey: showCaptureKey ? (job.capture?.key ?? null) : null,
     attempts: { failed: job.failedAttempts, maxRetries: deps.config.rules.maxRetries },
     review: job.review
       ? {

@@ -17,7 +17,7 @@ import {
   type RerankCandidate,
   type RerankPick,
 } from "./ai.js";
-import { CHECKLIST, EXTRACT_PROFILE, gradePrompt, RERANK } from "./prompts.js";
+import { CHECKLIST, EXTRACT_PROFILE, GRADE, RERANK } from "./prompts.js";
 
 type Effort = "low" | "medium" | "high";
 
@@ -173,13 +173,14 @@ export class ClaudeAi implements Ai {
       if (e.image) {
         content.push({ type: "image", source: { type: "base64", media_type: e.image.mediaType, data: e.image.base64 } });
       }
+      if (e.pdfBase64) content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: e.pdfBase64 } });
       if (e.url) content.push({ type: "text", text: tag("link", e.url) });
       if (e.text) content.push({ type: "text", text: tag("worker_text", e.text) });
     }
     content.push({ type: "text", text: "Grade every checklist item." });
     const result = await this.call({
       task: "grade",
-      system: gradePrompt(input.challengeCode),
+      system: GRADE,
       content,
       schema: GradeResult,
       effort: "medium",

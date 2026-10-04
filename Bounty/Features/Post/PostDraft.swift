@@ -22,17 +22,17 @@ final class PostDraft {
 
     nonisolated static let categories = ["Yard work", "Design", "Photos", "Tutoring", "Errands"]
 
-    var title = "Mow my front lawn"
-    var details = "Front yard only. Bag the clippings. The mower is in the open garage."
+    var title = ""
+    var details = ""
     var category = "Yard work"
     var inPerson = true
-    var address = "1200 S University Ave"
+    var address = ""
     /// Coordinates for `address`, set when the poster picks it from search or their location.
     /// Without them the backend places in-person jobs at a campus default.
     var location: JobLocation?
     var deadline = PostDraft.nextSundayNoon()
-    /// Whole dollars, as shown on the Post screen.
-    var pay = 40
+    /// Whole dollars, as shown on the Post screen. 0 until the poster enters an amount.
+    var pay = 0
     var photos: [Photo] = []
 
     /// The backend draft, once "Draft the proof checklist" has run.
@@ -71,22 +71,6 @@ final class PostDraft {
         if deadline.timeIntervalSinceNow < 30 * 60 { return "Pick a deadline at least 30 minutes from now." }
         if pay < 5 || pay > 1_000 { return "Pay has to be between $5 and $1,000." }
         return nil
-    }
-
-    /// Plan step 10: the demo's job in one tap.
-    func fillDemo() {
-        title = "Sketch a logo for a coffee shop"
-        details = "On paper, by hand. Include a coffee cup and the shop name \u{201C}Blue Fern\u{201D}, readable. Photograph the finished sketch."
-        category = "Design"
-        inPerson = false
-        address = ""
-        location = nil
-        pay = 15
-        // 6 PM today, or tomorrow when that's under three hours away.
-        let calendar = Calendar.current
-        let earliest = Date.now.addingTimeInterval(3 * 3600)
-        let sixToday = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: .now) ?? earliest
-        deadline = sixToday >= earliest ? sixToday : calendar.date(byAdding: .day, value: 1, to: sixToday) ?? earliest
     }
 
     var deadlineText: String {

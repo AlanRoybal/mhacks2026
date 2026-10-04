@@ -27,7 +27,6 @@ test("a failed grade sends every item to the poster as unclear", async () => {
   const grade = await ai.grade({
     job,
     checklist: [{ id: "c1", text: "Logo visible", evidenceType: "PHOTO", photoCount: 1, required: true }],
-    challengeCode: "ACD-EFH",
     evidence: [],
   });
   assert.deepEqual(
@@ -58,4 +57,25 @@ test("hash embeddings put related skills closer together", async () => {
   const designer = await e.embed("Skills: logo design, illustration, branding");
   const mower = await e.embed("Skills: lawn mowing, yard work, snow shoveling");
   assert.ok(cosine(jobVec, designer) > cosine(jobVec, mower));
+});
+
+test("PDF deliverables reach the grader as documents", async () => {
+  let sent: { messages: { content: { type: string; source?: { media_type?: string } }[] }[] } | undefined;
+  const client = {
+    beta: {
+      messages: {
+        parse: async (request: typeof sent) => {
+          sent = request;
+          return { stop_reason: "end_turn", parsed_output: { items: [], posterSummary: "", workerFeedback: "" }, usage: { input_tokens: 1, output_tokens: 1 } };
+        },
+      },
+    },
+  } as unknown as MessagesClient;
+  await new ClaudeAi(client, "claude-opus-5-5", silentLogger, true).grade({
+    job,
+    checklist: [{ id: "c1", text: "Flyer PDF with the cat's photo", evidenceType: "FILE", required: true }],
+    evidence: [{ itemId: "c1", phase: "single", kind: "file", pdfBase64: Buffer.from("%PDF-1.7").toString("base64") }],
+  });
+  const blocks = sent?.messages[0]?.content ?? [];
+  assert.ok(blocks.some((b) => b.type === "document" && b.source?.media_type === "application/pdf"));
 });

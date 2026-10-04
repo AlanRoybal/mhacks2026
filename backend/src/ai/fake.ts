@@ -150,8 +150,6 @@ export class FakeAi implements Ai {
   async grade(input: GradeInput): Promise<GradeResult> {
     const covered = new Set(input.evidence.map((e) => e.itemId));
     return {
-      codeVisible: true,
-      codeReadAs: input.challengeCode,
       items: input.checklist.map((item) => ({
         itemId: item.id,
         verdict: covered.has(item.id) || !item.required ? "pass" : "fail",

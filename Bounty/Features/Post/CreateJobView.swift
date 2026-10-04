@@ -1,3 +1,4 @@
+import MapKit
 import PhotosUI
 import StripePaymentSheet
 import SwiftUI
@@ -16,17 +17,7 @@ struct CreateJobView: View {
         @Bindable var draft = draft
         BountyScreen(spacing: 14, alwaysBounces: true) {
             ScreenTitle(title: "Post a job") {
-                HStack(spacing: 8) {
-                    // Plan step 10: fills in the demo's coffee shop logo job.
-                    Button {
-                        withAnimation(Motion.press) { draft.fillDemo() }
-                    } label: {
-                        Chip(label: "Demo job", tone: .lavender)
-                    }
-                    .buttonStyle(PressableStyle())
-                    .accessibilityHint("Fills in a sample job: sketch a coffee shop logo for $15")
-                    Chip(label: "Draft", tone: .grey)
-                }
+                Chip(label: "Draft", tone: .grey)
             }
             .entrance(.top)
 
@@ -42,7 +33,7 @@ struct CreateJobView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                             .overlay {
                                 if photo.failed {
-                                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.white, BountyColor.red)
+                                    IconGlyph(icon: .alert, size: 18).foregroundStyle(BountyColor.red)
                                 } else if photo.fileURL == nil {
                                     ProgressView().tint(.white)
                                 }
@@ -136,6 +127,21 @@ struct CreateJobView: View {
                 .opacity(draft.inPerson ? 1 : 0.4)
                 .disabled(!draft.inPerson)
                 .animation(Motion.pressTint, value: draft.inPerson)
+
+                // The spot the worker has to be at to start, so the poster can confirm it's right.
+                if draft.inPerson, let place = draft.location {
+                    let center = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
+                    Map(initialPosition: .region(MKCoordinateRegion(center: center, latitudinalMeters: 500, longitudinalMeters: 500))) {
+                        Marker(place.address.isEmpty ? "Job" : place.address, coordinate: center)
+                    }
+                    .allowsHitTesting(false)
+                    .frame(height: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: BountyRadius.row, style: .continuous))
+                    .id(place)
+                    Text("The worker checks in here: Start only works on site.")
+                        .bountyType(.footnote)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                }
             }
             .entrance(.rest(2))
 
@@ -162,7 +168,8 @@ struct CreateJobView: View {
                     HStack(spacing: 10) {
                         HStack(spacing: 0) {
                             Text("$")
-                            TextField("40", value: $draft.pay, format: .number)
+                            // Empty until the poster types an amount, rather than a made-up price.
+                            TextField("0", value: Binding(get: { draft.pay > 0 ? draft.pay : nil }, set: { draft.pay = $0 ?? 0 }), format: .number)
                                 .keyboardType(.numberPad)
                         }
                         .bountyType(.moneyM)
@@ -461,6 +468,12 @@ struct FundJobView: View {
             .padding(16)
             .tintedPanel(BountyColor.mint)
             .entrance(.rest(2))
+
+            // The checks that decide whether the escrow is released, from the saved checklist.
+            if let plan = draft.job?.verification {
+                VerificationPlanCard(plan: plan, audience: .poster)
+                    .entrance(.rest(3))
+            }
         } bottom: {
             VStack(spacing: 12) {
                 PillButton(

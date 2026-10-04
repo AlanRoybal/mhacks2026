@@ -1,8 +1,7 @@
 // The "grade" effect. Claude looks at the evidence; this code makes the decision (AI authority is a
 // recommendation, product rule 9):
 //   fail    any required item fails with confidence >= 0.7
-//   pass    every required item passes with confidence >= 0.7, the one-time code was seen in a photo,
-//           and no location warnings
+//   pass    every required item passes with confidence >= 0.7 and no location warnings
 //   unclear anything else -> the poster decides; nothing auto-releases
 // CHECK_IN items are verified by the server from GPS, not by the model.
 
@@ -13,48 +12,32 @@ import type { Grade, GradeDecision, ItemVerdict, Job, Proof } from "../domain/ty
 import { applyEvent } from "./jobs.js";
 import { briefOf } from "./postings.js";
 
-const CONFIDENT = 0.7;
+export const CONFIDENT = 0.7;
 
-// The model reports what it read; we decide whether that is the real code. Handwriting may lose the
-// dash or blur one character, so compare letters and digits only and allow a single mistake.
-export function codeMatches(readAs: string, actual: string): boolean {
-  const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const a = norm(readAs);
-  const b = norm(actual);
-  if (!a || !b) return false;
-  if (a === b) return true;
-  if (Math.abs(a.length - b.length) > 1) return false;
-  // Levenshtein distance <= 1.
-  let i = 0;
-  let j = 0;
-  let edits = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      i++;
-      j++;
-      continue;
-    }
-    if (++edits > 1) return false;
-    if (a.length > b.length) i++;
-    else if (b.length > a.length) j++;
-    else {
-      i++;
-      j++;
-    }
-  }
-  return edits + (a.length - i) + (b.length - j) <= 1;
-}
 const READABLE_IMAGES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 async function evidenceFor(deps: Deps, job: Job, proof: Proof): Promise<GradeEvidence[]> {
   const out: GradeEvidence[] = [];
   for (const e of proof.items) {
-    const base = { itemId: e.checklistItemId, phase: e.phase, kind: e.kind, note: e.note } as const;
+    const base = { itemId: e.checklistItemId, phase: e.phase, kind: e.kind === "video" ? "file" : e.kind, note: e.note } as const;
+    // The model reads stills: the app sends a few frames with every video, and those follow as photos.
+    if (e.kind === "video") {
+      const frames = proof.items.filter((f) => f.frameOf === e.blobKey).length;
+      out.push({ ...base, text: `The worker recorded a short video of this item in the app. ${frames} frame${frames === 1 ? "" : "s"} from it follow.` });
+      continue;
+    }
     if ((e.kind === "photo" || e.kind === "file") && e.blobKey) {
       const type = e.contentType ?? "";
       if (READABLE_IMAGES.has(type)) {
         const bytes = await deps.blobs.get(e.blobKey);
-        if (bytes) out.push({ ...base, image: { mediaType: type as "image/jpeg", base64: bytes.toString("base64") } });
+        const note = e.frameOf ? ["Frame from the video", e.note].filter(Boolean).join(". ") : e.note;
+        if (bytes) out.push({ ...base, note, image: { mediaType: type as "image/jpeg", base64: bytes.toString("base64") } });
+        continue;
+      }
+      // Digital deliverables are judged on the file itself.
+      if (type === "application/pdf") {
+        const bytes = await deps.blobs.get(e.blobKey);
+        if (bytes) out.push({ ...base, pdfBase64: bytes.toString("base64") });
         continue;
       }
       out.push({ ...base, text: `A ${type || "file"} was uploaded; it cannot be shown here.` });
@@ -80,7 +63,7 @@ function checkInVerdict(deps: Deps, job: Job, proof: Proof, itemId: string): Ite
     : { itemId, verdict: "fail", confidence: 1, reason: `Checked in ${meters} m from the job (limit ${deps.config.rules.checkInRadiusM} m)` };
 }
 
-export function decide(job: Job, proof: Proof, verdicts: ItemVerdict[], codeVisible: boolean): { decision: GradeDecision; because: string } {
+export function decide(job: Job, proof: Proof, verdicts: ItemVerdict[]): { decision: GradeDecision; because: string } {
   // If no photo/link/file item is marked required (older drafts), all of them must pass.
   const evidence = job.checklist.filter((i) => i.evidenceType !== "CHECK_IN");
   const required = [...job.checklist.filter((i) => i.required), ...(evidence.some((i) => i.required) ? [] : evidence)];
@@ -89,8 +72,6 @@ export function decide(job: Job, proof: Proof, verdicts: ItemVerdict[], codeVisi
   if (failed.length > 0) return { decision: "fail", because: `Failed: ${failed.map((i) => i.id).join(", ")}` };
   const unsure = required.filter((i) => byId.get(i.id)?.verdict !== "pass" || (byId.get(i.id)?.confidence ?? 0) < CONFIDENT);
   if (unsure.length > 0) return { decision: "unclear", because: `Not confident about: ${unsure.map((i) => i.id).join(", ")}` };
-  const hasPhotos = proof.items.some((e) => e.kind === "photo");
-  if (hasPhotos && !codeVisible) return { decision: "unclear", because: "The one-time code was not visible in any photo" };
   if (proof.checks.outsideGeofence.length > 0) return { decision: "unclear", because: "Some evidence was captured away from the job" };
   return { decision: "pass", because: "Every required item passed" };
 }
@@ -104,7 +85,6 @@ export async function gradeProof(deps: Deps, jobId: string, proofId: string): Pr
     const result: GradeResult = await deps.ai.grade({
       job: briefOf(job),
       checklist: job.checklist.filter((i) => i.evidenceType !== "CHECK_IN"),
-      challengeCode: job.challenge?.code ?? "",
       evidence: await evidenceFor(deps, job, proof),
     });
     const items = job.checklist.map(
@@ -113,13 +93,10 @@ export async function gradeProof(deps: Deps, jobId: string, proofId: string): Pr
           ? checkInVerdict(deps, job, proof, item.id)
           : (result.items.find((v) => v.itemId === item.id) ?? { itemId: item.id, verdict: "unclear", confidence: 0, reason: "Not graded" }),
     );
-    const codeSeen = result.codeVisible && codeMatches(result.codeReadAs, job.challenge?.code ?? "");
-    const { decision, because } = decide(job, proof, items, codeSeen);
+    const { decision, because } = decide(job, proof, items);
     grade = {
       decision,
       decidedBecause: because,
-      codeVisible: result.codeVisible,
-      codeReadAs: result.codeReadAs,
       items,
       posterSummary: result.posterSummary,
       workerFeedback: result.workerFeedback,

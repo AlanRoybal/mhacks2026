@@ -12,16 +12,28 @@ import { visibleJob } from "./jobs.js";
 import { ownedUploadKey } from "./uploads.js";
 
 const FileRef = z.object({ fileURL: z.string().optional(), blobKey: z.string().optional() });
+// Signed by the app right after it captured the file (services/capture.ts).
+const InAppCapture = {
+  sha256: z.string().regex(/^[0-9a-fA-F]{64}$/).optional(),
+  signature: z.string().max(200).optional(),
+};
 const Photo = FileRef.extend({
   // "before" photos are taken at the start of before/after items; everything else is the result.
   phase: z.enum(["before", "after"]).optional(),
+  // The capture time as the app signed it, so it is kept exactly as sent.
   capturedAt: z.string().datetime({ offset: true }),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
+  ...InAppCapture,
+});
+// A short in-app video, with a few stills the app pulled from it (each signed like a photo).
+const Video = Photo.extend({
+  frames: z.array(FileRef.extend(InAppCapture)).min(1).max(4),
 });
 const ProofItemIn = z.object({
   checklistItemId: z.string(),
   photos: z.array(Photo).max(10).optional(),
+  videos: z.array(Video).max(3).optional(),
   link: z.string().url().optional(),
   files: z.array(FileRef).max(5).optional(),
   checkIn: z.object({ latitude: z.number(), longitude: z.number(), at: z.string().datetime({ offset: true }) }).optional(),
@@ -44,7 +56,23 @@ function toEvidence(deps: Deps, user: User, job: Job, body: z.infer<typeof Proof
         capturedAt: new Date(p.capturedAt).toISOString(),
         lat: p.latitude,
         lng: p.longitude,
+        sha256: p.sha256,
+        signature: p.signature,
       });
+    }
+    for (const v of item.videos ?? []) {
+      const capture = {
+        checklistItemId: item.checklistItemId,
+        phase: v.phase ?? (checklistItem.beforeAfter ? "after" : "single"),
+        capturedAt: new Date(v.capturedAt).toISOString(),
+        lat: v.latitude,
+        lng: v.longitude,
+      } as const;
+      const videoKey = ownedUploadKey(deps, user.userId, v);
+      out.push({ ...capture, kind: "video", blobKey: videoKey, sha256: v.sha256, signature: v.signature });
+      for (const f of v.frames) {
+        out.push({ ...capture, kind: "photo", blobKey: ownedUploadKey(deps, user.userId, f), sha256: f.sha256, signature: f.signature, frameOf: videoKey });
+      }
     }
     for (const f of item.files ?? []) out.push({ checklistItemId: item.checklistItemId, kind: "file", phase: "single", blobKey: ownedUploadKey(deps, user.userId, f) });
     if (item.link) out.push({ checklistItemId: item.checklistItemId, kind: "link", phase: "single", url: item.link });
@@ -106,7 +134,6 @@ export function proofRoutes(deps: Deps): Hono<AppEnv> {
         verdicts: verdictsWire(p),
         decision: p.grade?.decision ?? null,
         decidedBecause: p.grade?.decidedBecause ?? null,
-        codeVisible: p.grade?.codeVisible ?? null,
         posterSummary: p.grade?.posterSummary ?? null,
         workerFeedback: p.grade?.workerFeedback ?? null,
       })),

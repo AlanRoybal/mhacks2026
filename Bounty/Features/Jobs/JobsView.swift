@@ -43,9 +43,7 @@ struct JobsView: View {
     var body: some View {
         @Bindable var router = router
         BountyScreen(alwaysBounces: true) {
-            ScreenTitle(title: "Jobs") {
-                IconButton(icon: .sliders, label: "Filters") {}
-            }
+            ScreenTitle(title: "Jobs") { EmptyView() }
             .entrance(.top)
 
             SegmentedPill(
@@ -76,10 +74,10 @@ struct JobsView: View {
                 EmptyJobsCard(title: "Nothing done yet", message: "Jobs you finish or post land here once they\u{2019}re paid or refunded.")
             }
 
-            if router.jobsSegment == .posted && posterStore.isUsingSampleData {
-                Text("Sample jobs. Start the backend (cd backend && npm run dev) to see the jobs you post.")
+            if let error = posterStore.errorMessage, router.jobsSegment != .working {
+                Text("Couldn\u{2019}t load your posted jobs: \(error) Pull down to try again.")
                     .bountyType(.footnote)
-                    .foregroundStyle(BountyColor.inkTertiary)
+                    .foregroundStyle(BountyColor.red)
             }
         }
         .sheet(item: $selectedJob) { job in NavigationStack { FundedJobDetailView(job: job) } }
@@ -233,118 +231,38 @@ private struct JobCard: View {
 
 // MARK: - 15 Review proof
 
-/// Opens the live review for one of the poster's jobs, or the design's sample when there isn't one.
+/// The live review for one of the poster's jobs. If the job isn't loaded yet, it loads it; if that
+/// fails, it says so.
 struct ReviewProofView: View {
     @Environment(AppRouter.self) private var router
     @Environment(PosterStore.self) private var posterStore
+    @State private var loading = true
 
     var body: some View {
         if posterStore.job(router.posterJobId) != nil {
             LiveReviewProofView()
         } else {
-            SampleReviewProofView()
-        }
-    }
-}
-
-private struct SampleReviewProofView: View {
-    @Environment(AppRouter.self) private var router
-    @State private var autoApproveAt = Date.now.addingTimeInterval(23 * 3600 + 41 * 60 + 10)
-
-    private let checks = [
-        ("Whole front lawn mowed", "4 photos · 96%"),
-        ("Clippings bagged", "1 photo · 98%"),
-        ("Sidewalk edges trimmed", "2 photos · 88%"),
-        ("On site 2:02 – 2:51 PM", "GPS · verified")
-    ]
-
-    var body: some View {
-        BountyScreen(spacing: 14) {
-            NavRow(leadingAction: router.back) {
-                Chip(label: "Needs your review", tone: .yellow)
-            } trailing: {
-                IconButton(icon: .ellipsis, label: "More") {}
-            }
-            .entrance(.top)
-
-            Text("Review Jordan’s work")
-                .bountyType(.title)
-                .foregroundStyle(BountyColor.inkPrimary)
-                .entrance(.top)
-
-            HStack(spacing: 11) {
-                proofPhoto("before-photo", label: "Before")
-                proofPhoto("after-photo", label: "After")
-            }
-            .entrance(.top)
-
-            HStack(spacing: 10) {
-                IconGlyph(icon: .shieldCheck, size: 20)
-                Text("AI check: 4 of 4 passed")
-                    .bountyType(.bodyStrong)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text("94% avg")
-                    .bountyType(.subheadStrong)
-            }
-            .foregroundStyle(BountyColor.mintInk)
-            .padding(14)
-            .tintedPanel(BountyColor.mint, radius: BountyRadius.row)
-            .entrance(.rest(0))
-
-            VStack(spacing: 2) {
-                ForEach(checks, id: \.0) { check in
-                    HStack(spacing: 12) {
-                        StatusBadge(status: .done)
-                        Text(check.0)
-                            .bountyType(.subheadStrong)
-                            .foregroundStyle(BountyColor.inkPrimary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(check.1)
-                            .bountyType(.footnote)
-                            .foregroundStyle(BountyColor.inkSecondary)
-                    }
-                    .padding(.vertical, 8)
+            BountyScreen {
+                NavRow(leadingAction: router.back) { Text("Review").bountyType(.bodyStrong) } trailing: { EmptyView() }
+                if loading {
+                    ProgressView("Loading the job\u{2026}")
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                } else {
+                    Text(posterStore.errorMessage ?? "This job couldn\u{2019}t be found.")
+                        .bountyType(.body)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                    PillButton(title: "Try again", icon: .refresh, style: .secondary) { Task { await load() } }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .borderedCard()
-            .entrance(.rest(1))
-
-            HStack(spacing: 8) {
-                IconGlyph(icon: .timer, size: 16)
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text("Approves on its own in \(remaining(at: context.date)) if you don’t respond")
-                        .bountyType(.footnote)
-                        .monospacedDigit()
-                }
-            }
-            .foregroundStyle(BountyColor.inkSecondary)
-            .entrance(.rest(2))
-        } bottom: {
-            VStack(spacing: 12) {
-                PillButton(title: "Approve and pay $40", icon: .check) { router.finish(on: .earnings) }
-                PillButton(title: "Dispute an item", icon: .flag, style: .secondary) {}
-            }
+            .task { await load() }
         }
     }
 
-    private func proofPhoto(_ asset: String, label: String) -> some View {
-        Image(asset)
-            .resizable()
-            .frame(height: 150)
-            .frame(maxWidth: .infinity)
-            .overlay(alignment: .topLeading) {
-                Chip(label: label, tone: .dark).padding(10)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: BountyRadius.row, style: .continuous))
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(label) photo")
-    }
-
-    private func remaining(at date: Date) -> String {
-        let seconds = max(0, Int(autoApproveAt.timeIntervalSince(date)))
-        return String(format: "%d:%02d:%02d", seconds / 3600, seconds % 3600 / 60, seconds % 60)
+    private func load() async {
+        loading = true
+        if let id = router.posterJobId { await posterStore.refresh(jobId: id) }
+        loading = false
     }
 }
 
@@ -384,7 +302,7 @@ struct FundedJobDetailView: View {
                         .font(.system(size: 42, weight: .bold, design: .rounded))
                     Text(job.title)
                         .font(.title2.bold())
-                    Label(currentStatus.rawValue, systemImage: "clock.fill")
+                    Label(currentStatus.rawValue, icon: .clock)
                         .foregroundStyle(BountyColor.greenInk)
                 }
 
@@ -398,11 +316,10 @@ struct FundedJobDetailView: View {
                 .borderedCard()
 
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Proof checklist")
+                    Text("Proof")
                         .font(.headline)
-                    Label("Show the finished work clearly", systemImage: "checkmark.circle")
-                    Label("Include the one-time code", systemImage: "checkmark.circle")
-                    Label("Submit before \(job.deadline)", systemImage: "checkmark.circle")
+                    Label("Photos or a short video of the finished work, taken in the Bounty app", icon: .camera)
+                    Label("Due \(job.deadline)", icon: .clock)
                 }
                 .padding(16)
                 .borderedCard()

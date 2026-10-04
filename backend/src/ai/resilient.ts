@@ -46,8 +46,6 @@ export class ResilientAi implements Ai {
     } catch (error) {
       this.log.warn("Grading AI failed; sending to the poster", { error });
       return {
-        codeVisible: false,
-        codeReadAs: "",
         items: input.checklist.map((item) => ({ itemId: item.id, verdict: "unclear", confidence: 0, reason: "Automatic review was unavailable" })),
         posterSummary: "Automatic review was unavailable. Please check the evidence yourself.",
         workerFeedback: "",

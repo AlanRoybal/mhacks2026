@@ -86,6 +86,7 @@ targets:
         NSFaceIDUsageDescription: Bounty uses Face ID to confirm you want to accept a job.
         NSCameraUsageDescription: Bounty uses the camera to capture proof that a job was completed.
         NSCalendarsFullAccessUsageDescription: Bounty uses your calendar availability to avoid offering jobs when you are busy. Event names never leave this device.
+        NSMicrophoneUsageDescription: Bounty records sound with proof videos you take in the app.
         NSLocationWhenInUseUsageDescription: Bounty uses your location to match nearby jobs and verify on-site work.
     scheme:
       testTargets: [BountyScreenshots]

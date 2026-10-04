@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { hasFreeWindow, isQuietTime, localTime } from "./availability.js";
 import { haversineKm, travelMinutes } from "./geo.js";
-import { challengeCode, newId } from "./ids.js";
+import { captureKey, newId } from "./ids.js";
 import { formatUsd, hourlyCents, quote } from "./money.js";
 import type { Availability } from "./types.js";
 
@@ -24,7 +24,8 @@ test("ids are 26 chars and sortable by time", () => {
   const b = newId(1_700_000_000_001);
   assert.equal(a.length, 26);
   assert.ok(a < b);
-  assert.match(challengeCode(), /^[A-Z0-9]{3}-[A-Z0-9]{3}$/);
+  assert.match(captureKey(), /^[A-Za-z0-9_-]{43}$/);
+  assert.notEqual(captureKey(), captureKey());
 });
 
 test("haversine and travel time", () => {
@@ -81,4 +82,13 @@ test("free windows are never overstated", () => {
 test("money formatting handles negatives and bad durations", () => {
   assert.equal(formatUsd(-150), "-$1.50");
   assert.equal(hourlyCents(1500, Number.NaN), 90000);
+});
+
+test("capture signatures match the app's (shared test vector)", async () => {
+  const { captureMessage, signCapture } = await import("../services/capture.js");
+  const claim = { jobId: "01JOB", sha256: "AB".repeat(32), capturedAt: "2026-10-04T15:20:07Z", lat: 42.2808, lng: -83.743 };
+  assert.equal(captureMessage(claim), `bounty-capture-v1\n01JOB\n${"ab".repeat(32)}\n1791127207\n42.28080\n-83.74300`);
+  assert.equal(captureMessage({ ...claim, lat: undefined, lng: undefined }).endsWith("\n1791127207\n\n"), true);
+  // Bounty/Features/Work/ProofCapture.swift must produce this for the same key and claim.
+  assert.equal(signCapture("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8", claim), "Mbs+Cp4HmHYRobxqCv7nixII08KFGEDy2j2JREh9F+M=");
 });

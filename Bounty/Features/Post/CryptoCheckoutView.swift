@@ -96,7 +96,7 @@ struct CryptoCheckoutView: View {
                 }
                 Section {
                     if funded {
-                        Label(JobStatus.api(confirmedJob?.status ?? "funded").rawValue, systemImage: "checkmark.circle.fill").foregroundStyle(BountyColor.greenInk)
+                        Label(JobStatus.api(confirmedJob?.status ?? "funded").rawValue, icon: .checkCircle).foregroundStyle(BountyColor.greenInk)
                         Button("Done") { onFunded(); dismiss() }
                     } else if busy {
                         HStack { ProgressView(); Text(stage) }

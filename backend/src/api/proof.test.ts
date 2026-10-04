@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { FakeAi } from "../ai/fake.js";
 import { test } from "node:test";
 import type { Job, Proof } from "../domain/types.js";
-import { codeMatches, decide } from "../services/grading.js";
+import { sha256Hex, signCapture } from "../services/capture.js";
+import { decide } from "../services/grading.js";
 import { applyEvent, getJobOrThrow } from "../services/jobs.js";
 import { apiClient, isoIn, type Json } from "../testing/api.js";
 import { testDeps, type TestDeps } from "../testing/harness.js";
@@ -26,9 +27,10 @@ async function startedJob(deps: TestDeps, title = "Sketch a logo for a coffee sh
   await deps.settle();
   const offer = (await getJobOrThrow(deps, created.id)).currentOffer;
   await api.call("POST", `/offers/${offer?.offerId}/accept`, worker.token);
-  const started = await api.call("POST", `/jobs/${created.id}/start`, worker.token, { latitude: SITE.lat, longitude: SITE.lng });
+  const started = await api.call("POST", `/jobs/${created.id}/start`, worker.token, { latitude: SITE.lat, longitude: SITE.lng, accuracyM: 9 });
   assert.equal(started.body.status, "IN_PROGRESS");
-  assert.match(started.body.challengeCode, /^[A-Z0-9]{3}-[A-Z0-9]{3}$/);
+  assert.deepEqual({ ...started.body.startCheck, at: undefined }, { distanceM: 0, accuracyM: 9, at: undefined }, "the start check reaches the app");
+  assert.match(started.body.captureKey, /^[A-Za-z0-9_-]{43}$/);
   return { api, poster, worker, job: started.body as Json };
 }
 
@@ -38,13 +40,21 @@ async function uploadPhoto(deps: TestDeps, api: ReturnType<typeof apiClient>, to
   return body.fileURL as string;
 }
 
+// What the app sends for a photo taken with the Bounty camera: the upload, plus its signed fingerprint.
+async function capturedPhoto(deps: TestDeps, api: ReturnType<typeof apiClient>, token: string, job: Json, bytes: number[], extra: Json = {}) {
+  const capturedAt = deps.now().toISOString();
+  const sha256 = sha256Hex(Buffer.from(bytes));
+  const signature = signCapture(job.captureKey, { jobId: job.id, sha256, capturedAt, lat: SITE.lat, lng: SITE.lng });
+  return { fileURL: await uploadPhoto(deps, api, token, bytes), capturedAt, latitude: SITE.lat, longitude: SITE.lng, sha256, signature, ...extra };
+}
+
 async function fullProof(deps: TestDeps, api: ReturnType<typeof apiClient>, token: string, job: Json, seed: number) {
   const now = deps.now().toISOString();
   const items: Json[] = [];
   for (const item of job.checklist as Json[]) {
     if (item.evidenceType === "PHOTO") {
       const photos = [];
-      for (let i = 0; i < item.photoCount; i++) photos.push({ fileURL: await uploadPhoto(deps, api, token, [seed, i, item.id.length]), capturedAt: now, latitude: SITE.lat, longitude: SITE.lng });
+      for (let i = 0; i < item.photoCount; i++) photos.push(await capturedPhoto(deps, api, token, job, [seed, i, item.id.length]));
       items.push({ checklistItemId: item.id, photos });
     }
     if (item.evidenceType === "CHECK_IN") items.push({ checklistItemId: item.id, checkIn: { latitude: SITE.lat, longitude: SITE.lng, at: now } });
@@ -120,7 +130,7 @@ test("a photo used as proof for one job cannot be reused for another", async () 
   assert.ok(res.body.checks.duplicates.length > 0);
 });
 
-test("decision rules: confident fails fail, unsure or missing code goes to the poster", () => {
+test("decision rules: confident fails fail, unsure or away from the job goes to the poster", () => {
   const job = {
     checklist: [
       { id: "c1", text: "a", evidenceType: "PHOTO", photoCount: 1, required: true },
@@ -129,13 +139,12 @@ test("decision rules: confident fails fail, unsure or missing code goes to the p
   } as Job;
   const proof = { items: [{ checklistItemId: "c1", kind: "photo", phase: "single" }], checks: { outsideGeofence: [] } } as unknown as Proof;
   const v = (verdict: "pass" | "fail" | "unclear", confidence: number) => [{ itemId: "c1", verdict, confidence, reason: "" }];
-  assert.equal(decide(job, proof, v("pass", 0.9), true).decision, "pass");
-  assert.equal(decide(job, proof, v("fail", 0.8), true).decision, "fail");
-  assert.equal(decide(job, proof, v("fail", 0.5), true).decision, "unclear");
-  assert.equal(decide(job, proof, v("pass", 0.6), true).decision, "unclear");
-  assert.equal(decide(job, proof, v("pass", 0.95), false).decision, "unclear", "code not visible");
+  assert.equal(decide(job, proof, v("pass", 0.9)).decision, "pass");
+  assert.equal(decide(job, proof, v("fail", 0.8)).decision, "fail");
+  assert.equal(decide(job, proof, v("fail", 0.5)).decision, "unclear");
+  assert.equal(decide(job, proof, v("pass", 0.6)).decision, "unclear");
   const away = { ...proof, checks: { outsideGeofence: ["c1"] } } as unknown as Proof;
-  assert.equal(decide(job, away, v("pass", 0.95), true).decision, "unclear");
+  assert.equal(decide(job, away, v("pass", 0.95)).decision, "unclear");
 });
 
 test("one image can't fill two photo slots or be both before and after", async () => {
@@ -206,11 +215,72 @@ test("a worker who takes over a job doesn't see the previous worker's proofs", a
   assert.equal(((await api.call("GET", `/jobs/${job.id}/proofs`, poster.token)).body as unknown as Json[]).length, 1);
 });
 
-test("the one-time code must actually match what the model read", async () => {
-  assert.equal(codeMatches("K7Q-4MX", "K7Q-4MX"), true);
-  assert.equal(codeMatches("k7q 4mx", "K7Q-4MX"), true, "case and separators don't matter");
-  assert.equal(codeMatches("K7Q4NX", "K7Q-4MX"), true, "one misread character is tolerated");
-  assert.equal(codeMatches("K7Q4M", "K7Q-4MX"), true, "one missing character is tolerated");
-  assert.equal(codeMatches("ABC-DEF", "K7Q-4MX"), false);
-  assert.equal(codeMatches("", "K7Q-4MX"), false);
+test("only photos taken with the Bounty camera for this job count", async () => {
+  const deps = testDeps();
+  const { api, worker, job } = await startedJob(deps);
+  const items = await fullProof(deps, api, worker.token, job, 7);
+  const photoItem = items.find((i) => i.photos);
+  assert.ok(photoItem);
+  const check = async () => (await api.call("POST", `/jobs/${job.id}/proof/precheck`, worker.token, { items })).body.checks;
+
+  // From the camera roll: no signature.
+  const [signed] = photoItem.photos;
+  photoItem.photos = [{ fileURL: signed.fileURL, capturedAt: signed.capturedAt, latitude: SITE.lat, longitude: SITE.lng }];
+  assert.deepEqual((await check()).notCapturedInApp, [photoItem.checklistItemId]);
+
+  // Signed, but the uploaded bytes aren't the ones that were signed (edited after capture).
+  photoItem.photos = [{ ...signed, fileURL: await uploadPhoto(deps, api, worker.token, [9, 9, 9]) }];
+  assert.deepEqual((await check()).notCapturedInApp, [photoItem.checklistItemId]);
+
+  // Signed with a key from another job.
+  const elsewhere = await capturedPhoto(deps, api, worker.token, { ...job, id: "another-job" }, [4, 5, 6]);
+  photoItem.photos = [elsewhere];
+  assert.deepEqual((await check()).notCapturedInApp, [photoItem.checklistItemId]);
+
+  // A moved GPS fix breaks the signature too.
+  photoItem.photos = [{ ...signed, latitude: SITE.lat + 0.01 }];
+  assert.deepEqual((await check()).notCapturedInApp, [photoItem.checklistItemId]);
+
+  photoItem.photos = [signed];
+  const ok = await check();
+  assert.equal(ok.ok, true);
+  assert.deepEqual(ok.notCapturedInApp, []);
+});
+
+test("a short in-app video can stand in for an item's photos", async () => {
+  const deps = testDeps();
+  const { api, poster, worker, job } = await startedJob(deps);
+  const items = await fullProof(deps, api, worker.token, job, 11);
+  const photoItem = items.find((i) => i.photos);
+  assert.ok(photoItem);
+
+  // The app records the clip, pulls three stills from it, and signs the clip and each still.
+  const { body: upload } = await api.call("POST", "/uploads/presign", worker.token, { contentType: "video/quicktime" });
+  const clip = [0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70, 11];
+  await api.app.request(upload.uploadURL.replace(deps.config.PUBLIC_BASE_URL, ""), { method: "PUT", headers: upload.headers, body: new Uint8Array(clip) });
+  const signedClip = await capturedPhoto(deps, api, worker.token, job, clip);
+  const frames = [];
+  for (const n of [1, 2, 3]) {
+    const frame = await capturedPhoto(deps, api, worker.token, job, [77, n]);
+    frames.push({ fileURL: frame.fileURL, sha256: frame.sha256, signature: frame.signature });
+  }
+  const video = { ...signedClip, fileURL: upload.fileURL, frames };
+  delete photoItem.photos;
+  photoItem.videos = [video];
+
+  const pre = await api.call("POST", `/jobs/${job.id}/proof/precheck`, worker.token, { items });
+  assert.equal(pre.body.checks.ok, true, JSON.stringify(pre.body.checks));
+
+  const unsigned = await api.call("POST", `/jobs/${job.id}/proof/precheck`, worker.token, {
+    items: items.map((i) => (i === photoItem ? { ...i, videos: [{ ...video, signature: undefined }] } : i)),
+  });
+  assert.deepEqual(unsigned.body.checks.notCapturedInApp, [photoItem.checklistItemId]);
+
+  assert.equal((await api.call("POST", `/jobs/${job.id}/proof`, worker.token, { items })).status, 200);
+  await deps.settle();
+  const review = await api.call("GET", `/jobs/${job.id}`, poster.token);
+  assert.equal(review.body.status, "IN_REVIEW");
+  const shown = (review.body.proof.items as Json[]).find((i) => i.checklistItemId === photoItem.checklistItemId);
+  assert.equal(shown?.videoURLs.length, 1, "the poster can watch the clip");
+  assert.deepEqual(shown?.photoURLs, [], "its stills aren't listed as separate photos");
 });

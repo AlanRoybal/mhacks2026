@@ -31,7 +31,8 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
     /// Distance from the worker, in miles. `nil` for remote jobs or the poster's own view.
     var distanceMiles: Double?
     var poster: WorkerSummary?
-    var challengeCode: String?
+    /// Signs this worker's proof captures (`CaptureSignature`). Only sent to the assigned worker while the job is in progress.
+    var captureKey: String?
     var allowedActions: [String]?
 
     /// Ratings left after the job closed. `nil` until the backend sends them.
@@ -41,6 +42,10 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
     /// `poster`, `worker`, `offered` or `admin`.
     var myRole: String?
     var estMinutes: Int?
+    /// What Bounty checks before paying, and what it records about the worker (`docs/API.md`, "Verification plan").
+    var verification: VerificationPlan?
+    /// In-person jobs: how far from the address the worker was when they started.
+    var startCheck: StartCheck?
     var feeAmount: Decimal?
     var totalAmount: Decimal?
     var attempts: ProofAttempts?
@@ -67,7 +72,7 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
         matchReason: String? = nil,
         distanceMiles: Double? = nil,
         poster: WorkerSummary? = nil,
-        challengeCode: String? = nil,
+        captureKey: String? = nil,
         allowedActions: [String]? = nil
     ) {
         self.id = id
@@ -89,7 +94,7 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
         self.matchReason = matchReason
         self.distanceMiles = distanceMiles
         self.poster = poster
-        self.challengeCode = challengeCode
+        self.captureKey = captureKey
         self.allowedActions = allowedActions
     }
 
@@ -289,6 +294,19 @@ enum PayCurrency: String, Codable, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 }
 
+/// The location check when the worker tapped Start (`POST /jobs/{id}/start`).
+struct StartCheck: Codable, Hashable, Sendable {
+    let distanceM: Int
+    let accuracyM: Int?
+    let at: Date
+
+    /// "Started 35 m from the address (±8 m) at 3:02 PM"
+    var summary: String {
+        let accuracy = accuracyM.map { " (\u{00B1}\($0) m)" } ?? ""
+        return "Started \(distanceM) m from the address\(accuracy) at \(at.formatted(date: .omitted, time: .shortened))"
+    }
+}
+
 struct JobLocation: Codable, Hashable, Sendable {
     var latitude: Double
     var longitude: Double
@@ -370,6 +388,26 @@ struct Proof: Codable, Hashable, Sendable {
     }
 }
 
+/// How a job's completion is verified, worked out by the backend from the job and its checklist.
+struct VerificationPlan: Codable, Hashable, Sendable {
+    struct Signal: Codable, Hashable, Sendable, Identifiable {
+        /// `on_site_start`, `on_site_check_in`, `photo_location`, `fresh_photos`, `before_after`, `deliverable`, `deadline`, `ai_review`.
+        let id: String
+        /// `start`, `proof` or `review`.
+        let stage: String
+        /// `blocks`, `fails_item` or `poster_reviews`.
+        let enforcement: String
+        let title: String
+        let detail: String
+        /// What is recorded about the worker for this check, if anything.
+        let collects: String?
+    }
+
+    let summary: String
+    let signals: [Signal]
+    let privacy: String
+}
+
 struct ProofItem: Codable, Hashable, Sendable {
     let checklistItemId: String
     var photoURLs: [URL] = []
@@ -378,6 +416,8 @@ struct ProofItem: Codable, Hashable, Sendable {
     var link: URL?
     var fileURLs: [URL]?
     var checkedInAt: Date?
+    /// Short clips from the worker's Bounty camera.
+    var videoURLs: [URL]?
 }
 
 /// The vision model's grade for one checklist item (plan feature 26).

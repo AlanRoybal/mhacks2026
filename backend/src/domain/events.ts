@@ -11,7 +11,7 @@ export type JobEvent =
   | { type: "ACCEPT"; offerId: string }
   | { type: "CANCEL" }
   | { type: "UPDATE_TERMS"; deadline?: string; radiusKm?: number }
-  | { type: "START"; code: string; at?: LatLng }
+  | { type: "START"; captureKey: string; at?: LatLng; accuracyM?: number }
   | { type: "WITHDRAW" }
   | { type: "SUBMIT"; proofId: string }
   | { type: "GRADED"; proofId: string; decision: GradeDecision; summary: string }

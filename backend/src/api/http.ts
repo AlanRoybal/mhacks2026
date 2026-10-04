@@ -21,6 +21,7 @@ const TRANSITION_STATUS: Record<TransitionErrorCode, ContentfulStatusCode> = {
   window_closed: 409,
   location_required: 400,
   too_far: 422,
+  location_imprecise: 422,
   deadline_passed: 409,
   too_early: 409,
   already_done: 409,

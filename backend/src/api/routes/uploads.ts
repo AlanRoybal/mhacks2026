@@ -14,9 +14,11 @@ const EXTENSIONS: Record<string, string> = {
   "image/heic": "heic",
   "application/pdf": "pdf",
   "application/zip": "zip",
+  "video/quicktime": "mov",
+  "video/mp4": "mp4",
 };
 
-const KEY_SHAPE = /^uploads\/[0-9A-Z]{26}\/[0-9A-Z]{26}\.(jpg|png|webp|heic|pdf|zip)$/;
+const KEY_SHAPE = /^uploads\/[0-9A-Z]{26}\/[0-9A-Z]{26}\.(jpg|png|webp|heic|pdf|zip|mov|mp4)$/;
 
 // Accepts a blobKey, or a fileURL returned by /uploads/presign, and returns the caller's blob key.
 // The key must have exactly the shape /uploads/presign creates, so "../" tricks can't reach other files.

@@ -1,4 +1,5 @@
 import CoreLocation
+import MapKit
 import SwiftUI
 
 // MARK: - 09 Job detail — in progress
@@ -9,12 +10,13 @@ struct JobDetailView: View {
     @Environment(MarketplaceStore.self) private var marketplace
     @StateObject private var location = JobLocationProvider()
     @State private var actionError: String?
+    @State private var checkingLocation = false
     @State private var history: [TimelineEntry] = []
     @State private var confirmsWithdraw = false
 
+    /// The job that was opened. Never a different one: if it's gone, the screen says so.
     private var job: PostedJob? {
         marketplace.workingJobs.first { $0.id == router.workerJobId }
-            ?? marketplace.workingJobs.first
     }
 
     private var requirements: [String] { job?.checklist.map(\.text) ?? [] }
@@ -43,6 +45,16 @@ struct JobDetailView: View {
                 TitleSubtitle(title: job?.title ?? "Job", subtitle: job.map { "\($0.payText) · Due \($0.deadlineText)" } ?? "", titleType: .headline)
             }
             .entrance(.top)
+
+            if let photos = job?.posterPhotos, !photos.isEmpty {
+                JobPhotoStrip(urls: photos)
+                    .entrance(.top)
+            }
+
+            if let job, !job.isRemote, let place = job.location {
+                JobPlaceCard(place: place, startCheck: job.startCheck, started: job.status != .accepted)
+                    .entrance(.top)
+            }
 
             HStack(spacing: 12) {
                 InitialsAvatar(initials: Self.initials(job?.poster?.name ?? "?"), background: BountyColor.creamBand, foreground: BountyColor.creamInk)
@@ -80,6 +92,11 @@ struct JobDetailView: View {
             .borderedCard()
             .entrance(.rest(0))
 
+            if let plan = job?.verification {
+                VerificationPlanCard(plan: plan, audience: .worker)
+                    .entrance(.rest(0))
+            }
+
             if let job {
                 MoneyTrailCard(jobId: job.id, refreshKey: job.status.rawValue)
                     .entrance(.rest(1))
@@ -95,37 +112,33 @@ struct JobDetailView: View {
                     .entrance(.rest(1))
             }
 
-            if let code = job?.challengeCode {
-                HStack {
-                    Text("Proof code")
-                    Spacer()
-                    Text(code).monospaced().bold()
-                }
-                .padding(14)
-                .tintedPanel(BountyColor.cream, radius: BountyRadius.row)
-            }
-
             if let actionError {
                 Text(actionError)
                     .bountyType(.footnote)
                     .foregroundStyle(BountyColor.red)
             }
 
-            HStack(spacing: 12) {
-                StickerView(sticker: .shield, size: 40)
-                Text("\(job?.payText ?? "$15") is held safely. It releases when your proof passes review.")
-                    .bountyType(.subhead)
-                    .foregroundStyle(BountyColor.mintInk)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            if let job {
+                HStack(spacing: 12) {
+                    StickerView(sticker: .shield, size: 40)
+                    Text("\(job.payText) is held safely. It releases when your proof passes review.")
+                        .bountyType(.subhead)
+                        .foregroundStyle(BountyColor.mintInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(14)
+                .tintedPanel(BountyColor.mint, radius: BountyRadius.row)
+                .entrance(.rest(2))
+            } else if !marketplace.isLoading {
+                Text("This job isn\u{2019}t assigned to you anymore.")
+                    .bountyType(.body)
+                    .foregroundStyle(BountyColor.inkSecondary)
             }
-            .padding(14)
-            .tintedPanel(BountyColor.mint, radius: BountyRadius.row)
-            .entrance(.rest(2))
         } bottom: {
             PillButton(title: primaryTitle, icon: job?.status == .accepted ? .locate : .camera) {
                 beginProof()
             }
-            .disabled(marketplace.isLoading || job == nil)
+            .disabled(marketplace.isLoading || checkingLocation || job == nil)
         }
         .confirmationDialog("Withdraw from this job?", isPresented: $confirmsWithdraw, titleVisibility: .visible) {
             Button("Withdraw", role: .destructive) { Task { await withdraw() } }
@@ -155,7 +168,8 @@ struct JobDetailView: View {
     }
 
     private var primaryTitle: String {
-        switch job?.status {
+        if checkingLocation { return "Checking your location\u{2026}" }
+        return switch job?.status {
         case .accepted: "Check in & start"
         case .submitted, .inReview, .disputed, .released, .refunded: "See proof results"
         default: "Add proof"
@@ -163,7 +177,11 @@ struct JobDetailView: View {
     }
 
     private func beginProof() {
-        guard let job, services.api != nil else { return }
+        guard let job else { return }
+        guard services.api != nil else {
+            actionError = "You\u{2019}re signed out. Sign in again to start this job."
+            return
+        }
         switch job.status {
         case .accepted:
             break
@@ -175,27 +193,79 @@ struct JobDetailView: View {
             return
         }
         Task {
-            let coordinate: CLLocationCoordinate2D?
-            if job.isRemote {
-                coordinate = nil
-            } else {
-                coordinate = await location.current()?.coordinate
-                guard coordinate != nil else {
-                    actionError = "Location access is required to check in for this job."
+            var fix: CLLocation?
+            if !job.isRemote {
+                // Checked right now, at the job: a fresh fix, never a cached one.
+                checkingLocation = true
+                fix = await location.current(accuracy: 50, timeout: 15)
+                checkingLocation = false
+                guard fix != nil else {
+                    actionError = location.failure == .denied
+                        ? "Bounty needs your location to check you in. Turn on Location for Bounty in Settings."
+                        : "Couldn\u{2019}t get your location. Step outside or near a window, then try again."
                     return
                 }
             }
             if await marketplace.start(
                 api: services.api,
                 jobId: job.id,
-                latitude: coordinate?.latitude,
-                longitude: coordinate?.longitude
+                latitude: fix?.coordinate.latitude,
+                longitude: fix?.coordinate.longitude,
+                accuracyM: fix?.horizontalAccuracy
             ) != nil {
                 router.open(.proofCapture, workerJob: job.id)
             } else {
                 actionError = marketplace.errorMessage
             }
         }
+    }
+}
+
+/// Where an in-person job happens: the address on a map, directions there, and, once started, how far
+/// from it the worker checked in. Start is checked against this spot at the moment it's tapped.
+private struct JobPlaceCard: View {
+    let place: JobLocation
+    let startCheck: StartCheck?
+    let started: Bool
+
+    private var coordinate: CLLocationCoordinate2D { .init(latitude: place.latitude, longitude: place.longitude) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Map(initialPosition: .region(MKCoordinateRegion(center: coordinate, latitudinalMeters: 600, longitudinalMeters: 600))) {
+                Marker(place.address.isEmpty ? "Job" : place.address, coordinate: coordinate)
+                UserAnnotation()
+            }
+            .allowsHitTesting(false)
+            .frame(height: 140)
+            .clipShape(RoundedRectangle(cornerRadius: BountyRadius.row, style: .continuous))
+
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(place.address.isEmpty ? "Job location" : place.address)
+                        .bountyType(.subheadStrong)
+                        .foregroundStyle(BountyColor.inkPrimary)
+                    Text(startCheck?.summary ?? (started ? "Started" : "You\u{2019}ll check in here when you tap Start."))
+                        .bountyType(.footnote)
+                        .foregroundStyle(startCheck == nil ? BountyColor.inkSecondary : BountyColor.mintInk)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    let item = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+                    item.name = place.address.isEmpty ? "Bounty job" : place.address
+                    item.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDefault])
+                } label: {
+                    Label("Directions", icon: .navigation)
+                        .bountyType(.footnote)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(BountyColor.pill, in: Capsule())
+                }
+                .buttonStyle(PressableStyle())
+            }
+        }
+        .padding(12)
+        .borderedCard(radius: BountyRadius.row)
     }
 }
 
@@ -246,7 +316,10 @@ private struct RatePosterCard: View {
     }
 
     private func send() async {
-        guard let api = services.api else { return }
+        guard let api = services.api else {
+            message = "You\u{2019}re signed out. Sign in again to rate."
+            return
+        }
         isSending = true
         defer { isSending = false }
         let trimmed = comment.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -264,9 +337,22 @@ private struct RatePosterCard: View {
     }
 }
 
+/// A fresh GPS fix at the moment it's needed (tapping Start, checking in, taking proof). Nothing is
+/// tracked in the background: updates run only until a good enough fix arrives or the timeout passes.
+@MainActor
 final class JobLocationProvider: NSObject, ObservableObject, CLLocationManagerDelegate {
+    enum Failure {
+        case denied, unavailable
+    }
+
     private let manager = CLLocationManager()
     private var continuation: CheckedContinuation<CLLocation?, Never>?
+    private var best: CLLocation?
+    private var requestedAt = Date.distantPast
+    private var wanted: CLLocationAccuracy = 50
+    private var timeout: Task<Void, Never>?
+    /// Why the last request came back empty.
+    private(set) var failure: Failure?
 
     override init() {
         super.init()
@@ -274,40 +360,80 @@ final class JobLocationProvider: NSObject, ObservableObject, CLLocationManagerDe
         manager.desiredAccuracy = kCLLocationAccuracyBest
     }
 
-    @MainActor
-    func current() async -> CLLocation? {
-        await withCheckedContinuation { continuation in
-            self.continuation?.resume(returning: nil)
+    /// Waits for a fix taken after this call (never a cached one) that's accurate to `accuracy` meters.
+    /// After `timeout` it settles for the best fresh fix so far, or nil if there was none.
+    func current(accuracy: CLLocationAccuracy = 50, timeout seconds: TimeInterval = 12) async -> CLLocation? {
+        finish(with: nil)
+        failure = nil
+        best = nil
+        wanted = accuracy
+        requestedAt = .now
+        return await withCheckedContinuation { continuation in
             self.continuation = continuation
             switch manager.authorizationStatus {
             case .notDetermined:
                 manager.requestWhenInUseAuthorization()
             case .authorizedAlways, .authorizedWhenInUse:
-                manager.requestLocation()
+                begin(timeout: seconds)
             default:
-                continuation.resume(returning: nil)
-                self.continuation = nil
+                failure = .denied
+                finish(with: nil)
             }
         }
     }
 
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        if manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse {
-            manager.requestLocation()
-        } else if manager.authorizationStatus != .notDetermined {
-            continuation?.resume(returning: nil)
-            continuation = nil
+    private func begin(timeout seconds: TimeInterval) {
+        manager.startUpdatingLocation()
+        timeout?.cancel()
+        timeout = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled, let self else { return }
+            if self.best == nil { self.failure = .unavailable }
+            self.finish(with: self.best)
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        continuation?.resume(returning: locations.last)
+    private func finish(with location: CLLocation?) {
+        timeout?.cancel()
+        timeout = nil
+        manager.stopUpdatingLocation()
+        continuation?.resume(returning: location)
         continuation = nil
     }
 
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        continuation?.resume(returning: nil)
-        continuation = nil
+    private func received(_ locations: [CLLocation]) {
+        guard continuation != nil else { return }
+        // Only fixes taken after the request, with a real accuracy.
+        for location in locations where location.timestamp >= requestedAt.addingTimeInterval(-1) && location.horizontalAccuracy >= 0 {
+            if best == nil || location.horizontalAccuracy < best!.horizontalAccuracy { best = location }
+        }
+        if let best, best.horizontalAccuracy <= wanted { finish(with: best) }
+    }
+
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
+        Task { @MainActor in
+            guard self.continuation != nil else { return }
+            if status == .authorizedAlways || status == .authorizedWhenInUse {
+                self.begin(timeout: 12)
+            } else if status != .notDetermined {
+                self.failure = .denied
+                self.finish(with: nil)
+            }
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        Task { @MainActor in self.received(locations) }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        // kCLErrorLocationUnknown is temporary: keep waiting until the timeout.
+        guard (error as? CLError)?.code != .locationUnknown else { return }
+        Task { @MainActor in
+            self.failure = (error as? CLError)?.code == .denied ? .denied : .unavailable
+            self.finish(with: self.best)
+        }
     }
 }
 

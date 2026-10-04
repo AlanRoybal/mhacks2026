@@ -35,6 +35,7 @@
 		75699AB388309FB6BB304112 /* PosterStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 209BEC4ADD47C11B13577D52 /* PosterStore.swift */; };
 		78AB2F56177B8016949DA2C6 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E62E1AB9621E26837315559 /* RootTabView.swift */; };
 		82C3D916A32E24EA74FB2E71 /* CalendarLinkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB57653DB8B9887EEBBA102 /* CalendarLinkSheet.swift */; };
+		83C957A0DF197B07CA13D2C7 /* ProofCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60FA4932D9715CD6C9C4869 /* ProofCapture.swift */; };
 		85B63159010D69B7AE220FF5 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA4291A1097864BCB54653E /* AppRouter.swift */; };
 		89EB37923DCD14C625896A87 /* PostedJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BD610BB72571AE34E8FDF26 /* PostedJob.swift */; };
 		8F0C271BA61342672BB08AF3 /* PushNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54627BC3FF0C2B627F7E9D8B /* PushNotificationManager.swift */; };
@@ -52,6 +53,7 @@
 		DBB03E4DF64D7E4FEF117C10 /* BackendJobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 919DD468D1C1A40D707EF084 /* BackendJobsAPI.swift */; };
 		DD1917C3911F2E20D6E2DCBD /* MarketplaceEarnings.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE4CCB7A0CC7D40B4A484826 /* MarketplaceEarnings.swift */; };
 		E77F4702B825C686E26EE94D /* BountyScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 350B074C9ED028478228FAEF /* BountyScreen.swift */; };
+		E9C2EFBCC13957F500DBCC0B /* VerificationPlanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A99FBF0A4E87817C1FE32DE2 /* VerificationPlanCard.swift */; };
 		ED44C175F43DBF6E9510D01B /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7E2F09CDF905685D922897 /* Motion.swift */; };
 		EEA12735F082E2CC54C7B4F0 /* EarningsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125590A634C7CB2F1390755A /* EarningsView.swift */; };
 		F01C9A9668DA7DF4E35ACAC2 /* JobFundingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23558C67A39132B211B07398 /* JobFundingSheet.swift */; };
@@ -112,10 +114,12 @@
 		983C07B6422F2BDF5703C0B9 /* GmailConnector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GmailConnector.swift; sourceTree = "<group>"; };
 		9C18A1C5BC0E979DCBE71869 /* LiveReviewProofView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveReviewProofView.swift; sourceTree = "<group>"; };
 		A666B0FB424671C300AF98A9 /* PosterPush.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterPush.swift; sourceTree = "<group>"; };
+		A99FBF0A4E87817C1FE32DE2 /* VerificationPlanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerificationPlanCard.swift; sourceTree = "<group>"; };
 		B67D53F052CE5224398EF8F6 /* Bounty.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Bounty.entitlements; sourceTree = "<group>"; };
 		BA10D25328F0FF4EC9CFA6AD /* PaymentsServerAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentsServerAPI.swift; sourceTree = "<group>"; };
 		BE26CC60A4D4BA0F7F17E467 /* WorkerPayments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerPayments.swift; sourceTree = "<group>"; };
 		C9A15692336B82CDFFD4D2BF /* DebugLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLaunch.swift; sourceTree = "<group>"; };
+		D60FA4932D9715CD6C9C4869 /* ProofCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProofCapture.swift; sourceTree = "<group>"; };
 		DAB57653DB8B9887EEBBA102 /* CalendarLinkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarLinkSheet.swift; sourceTree = "<group>"; };
 		DC8624359FB1F5B608B1CFE0 /* PostDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDraft.swift; sourceTree = "<group>"; };
 		DEF56E5E9A62A25EF28F5955 /* RateWorkerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateWorkerCard.swift; sourceTree = "<group>"; };
@@ -244,7 +248,9 @@
 		637DD341A0BD6B614CE087F1 /* Work */ = {
 			isa = PBXGroup;
 			children = (
+				D60FA4932D9715CD6C9C4869 /* ProofCapture.swift */,
 				2679EADF798F7C549A97F3EA /* ProofFlow.swift */,
+				A99FBF0A4E87817C1FE32DE2 /* VerificationPlanCard.swift */,
 				5DA3B29F599F6FBA66D82AAA /* WorkViews.swift */,
 			);
 			path = Work;
@@ -526,6 +532,7 @@
 				6D9A16F3B9A74710F67B974F /* PostedJobDetailView.swift in Sources */,
 				9516CE80CFD99ADD879D9651 /* PosterPush.swift in Sources */,
 				75699AB388309FB6BB304112 /* PosterStore.swift in Sources */,
+				83C957A0DF197B07CA13D2C7 /* ProofCapture.swift in Sources */,
 				0107E97F3BC1B33F7FD4EF1B /* ProofFlow.swift in Sources */,
 				8F0C271BA61342672BB08AF3 /* PushNotificationManager.swift in Sources */,
 				4D295C77E60A3E16F14B00EC /* RateWorkerCard.swift in Sources */,
@@ -533,6 +540,7 @@
 				72ADE8E3DD17FCABABCB7084 /* SettingsView.swift in Sources */,
 				59293C4BEC733AAEB2C058A9 /* TwinSources.swift in Sources */,
 				691999A29A6A649083EE701E /* TwinView.swift in Sources */,
+				E9C2EFBCC13957F500DBCC0B /* VerificationPlanCard.swift in Sources */,
 				3E079D1C27E6C781A1F698AE /* WorkViews.swift in Sources */,
 				A8B0B68E701E6FC2B59A7756 /* WorkerPayments.swift in Sources */,
 			);

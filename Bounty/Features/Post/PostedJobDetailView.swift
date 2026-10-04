@@ -60,6 +60,17 @@ struct PostedJobDetailView: View {
                     .padding(.vertical, 14)
                     .borderedCard(radius: BountyRadius.row)
                     .entrance(.rest(0))
+
+                    // Checked by the server the moment the worker tapped Start.
+                    if let check = job.startCheck {
+                        Label(check.summary, icon: .mapPin)
+                            .bountyType(.footnote)
+                            .foregroundStyle(BountyColor.mintInk)
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .tintedPanel(BountyColor.mint, radius: BountyRadius.row)
+                            .entrance(.rest(0))
+                    }
                 }
 
                 // Step 9: paid or refunded jobs ask for a rating, then show the one given.

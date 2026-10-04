@@ -100,7 +100,14 @@ struct HomeView: View {
                 Text("No assigned jobs yet.").bountyType(.footnote)
             }
             ForEach((marketplace.workingJobs.map(\.displayJob) + workerPayments.jobs).prefix(3)) { job in
-                Button { router.select(.jobs) } label: {
+                Button {
+                    // Marketplace jobs open their own screen; checkout-only jobs live under Jobs.
+                    if marketplace.workingJobs.contains(where: { $0.id == job.id }) {
+                        router.open(.jobDetail, workerJob: job.id)
+                    } else {
+                        router.select(.jobs)
+                    }
+                } label: {
                     HomeJobRow(job: job, detail: "\(job.status.rawValue) · \(job.deadline)")
                 }
                 .buttonStyle(PressableStyle())

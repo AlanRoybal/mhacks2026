@@ -94,8 +94,8 @@ export interface Job {
   currentOffer?: { offerId: string; workerId: string; expiresAt: string };
   // Workers who declined, let an offer expire, or withdrew. Never re-offered this job.
   excludedWorkerIds: string[];
-  // One-time code that must be visible in proof photos. Issued on START.
-  challenge?: { code: string; issuedAt: string };
+  // Issued at START. The worker's app signs its captures with `key`; proof must be captured after issuedAt.
+  capture?: { key: string; issuedAt: string };
   failedAttempts: number;
   latestProofId?: string;
   review?: {
@@ -119,6 +119,8 @@ export interface Job {
   fundedAt?: string;
   acceptedAt?: string;
   startedAt?: string;
+  // In-person jobs: where the worker was when they tapped Start (checked against the job's address).
+  startCheck?: { lat: number; lng: number; distanceM: number; accuracyM?: number; at: string };
   submittedAt?: string;
   closedAt?: string;
 }
@@ -147,7 +149,7 @@ export interface Offer {
 }
 
 export type EvidencePhase = "before" | "after" | "single";
-export type EvidenceKind = "photo" | "link" | "file" | "location";
+export type EvidenceKind = "photo" | "video" | "link" | "file" | "location";
 
 export interface EvidenceItem {
   checklistItemId: string;
@@ -162,6 +164,11 @@ export interface EvidenceItem {
   lat?: number;
   lng?: number;
   etag?: string;
+  // In-app capture: SHA-256 of the file and the app's signature over it (services/capture.ts).
+  sha256?: string;
+  signature?: string;
+  // A still the app took from a proof video (the video's blob key). The grader reads frames, not video.
+  frameOf?: string;
 }
 
 export interface ProofChecks {
@@ -171,6 +178,8 @@ export interface ProofChecks {
   outsideGeofence: string[];
   duplicates: string[];
   missingUploads: string[];
+  // Photos or videos that weren't taken with the Bounty camera for this job (or were changed since).
+  notCapturedInApp?: string[];
 }
 
 export interface ItemVerdict {
@@ -183,8 +192,6 @@ export interface ItemVerdict {
 export interface Grade {
   decision: GradeDecision;
   decidedBecause: string;
-  codeVisible: boolean;
-  codeReadAs: string;
   items: ItemVerdict[];
   posterSummary: string;
   workerFeedback: string;
