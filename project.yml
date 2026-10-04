@@ -44,6 +44,7 @@ targets:
         product: TwinKit
       - package: Stripe
         product: StripePaymentSheet
+      - target: BountyWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alanroybal.BountyTwin
@@ -87,7 +88,11 @@ targets:
         NSCameraUsageDescription: Bounty uses the camera to capture proof that a job was completed.
         NSCalendarsFullAccessUsageDescription: Bounty uses your calendar availability to avoid offering jobs when you are busy. Event names never leave this device.
         NSMicrophoneUsageDescription: Bounty records sound with proof videos you take in the app.
-        NSLocationWhenInUseUsageDescription: Bounty uses your location to match nearby jobs and verify on-site work.
+        NSLocationWhenInUseUsageDescription: "Bounty uses your location to match nearby jobs and, while a job you started is open, to time how long you're on site. It stops when you submit proof."
+        # Live Activities for jobs in progress (BountyWidgets), and location pings while one is open.
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
+        UIBackgroundModes: [location]
     scheme:
       testTargets: [BountyScreenshots]
   # Pitch screenshots in the Simulator (BountyScreenshots/ScreenshotTour.swift). Not part of the app.
@@ -104,3 +109,18 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: Bounty
         CODE_SIGN_ENTITLEMENTS: ""
+  BountyWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: BountyWidgets
+        excludes:
+          - Info.plist
+      - path: Bounty/Live/BountyLiveAttributes.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alanroybal.BountyTwin.Widgets
+        PRODUCT_NAME: BountyWidgets
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: BountyWidgets/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"

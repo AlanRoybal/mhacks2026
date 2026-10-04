@@ -40,6 +40,12 @@ const schema = z.object({
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
   // iOS-type Google OAuth client for the Gmail import. Public (no secret); the app sends PKCE codes.
   GOOGLE_CLIENT_ID: z.string().optional(),
+  // Live job sessions (on-site time, geofence, progress). memory: in process. spacetime: the bounty-live
+  // module on SpacetimeDB (spacetime/), with the backend identity's token that published and owns it.
+  LIVE_PROVIDER: z.enum(["memory", "spacetime"]).default("memory"),
+  SPACETIME_URL: z.string().url().default("https://maincloud.spacetimedb.com"),
+  SPACETIME_DB: z.string().default("bounty-live"),
+  SPACETIME_TOKEN: z.string().optional(),
   // Comma-separated user IDs allowed to resolve disputes.
   ADMIN_USER_IDS: z.string().default(""),
 

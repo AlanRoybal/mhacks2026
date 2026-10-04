@@ -11,6 +11,8 @@ import { haversineKm } from "../domain/geo.js";
 import { newId } from "../domain/ids.js";
 import type { EvidenceItem, Job, Proof, ProofChecks, User } from "../domain/types.js";
 import { conflict, forbidden } from "../lib/errors.js";
+import { minOnSiteSec } from "../domain/rules.js";
+import { onSiteSeconds } from "../live/index.js";
 import { verifyCapture, sha256Hex } from "./capture.js";
 import { applyEvent, getJobOrThrow } from "./jobs.js";
 
@@ -106,6 +108,26 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
     }
   }
 
+  // 4. Time on site, from the live session in SpacetimeDB: in-person work has to have happened there.
+  //    Not blocking: too little time, or no readable session, sends the job to the poster (grading.ts).
+  let onSite: Checks["onSite"];
+  if (!job.remote) {
+    const requiredSeconds = minOnSiteSec(deps.config.rules, job.estMinutes);
+    const session = await deps.live.get(job.jobId).catch((error: unknown) => {
+      deps.log.warn("Live session unavailable for proof check", { jobId: job.jobId, error });
+      return null;
+    });
+    if (!session) {
+      onSite = { seconds: 0, requiredSeconds, leftSite: 0, tracked: false };
+      warnings.push("Time on site couldn't be verified (no live session)");
+    } else {
+      const seconds = onSiteSeconds(session, deps.now());
+      onSite = { seconds, requiredSeconds, leftSite: session.leftSiteCount, tracked: true };
+      if (seconds < requiredSeconds) warnings.push(`Only ${Math.round(seconds / 60)} min on site; this job expects at least ${Math.round(requiredSeconds / 60)} min`);
+      if (session.leftSiteCount > 0) warnings.push(`Left the site ${session.leftSiteCount} time${session.leftSiteCount === 1 ? "" : "s"} during the job`);
+    }
+  }
+
   const uniq = (xs: string[]) => [...new Set(xs)];
   const checks = {
     missingRequired: uniq(missingRequired),
@@ -114,6 +136,7 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
     duplicates: uniq(duplicates),
     missingUploads: uniq(missingUploads),
     notCapturedInApp: uniq(notCapturedInApp),
+    onSite,
     warnings,
   };
   const ok =
@@ -151,6 +174,7 @@ export async function submitProof(deps: Deps, user: User, jobId: string, items: 
       duplicates: checks.duplicates,
       missingUploads: checks.missingUploads,
       notCapturedInApp: checks.notCapturedInApp,
+      onSite: checks.onSite,
     },
     createdAt: deps.now().toISOString(),
   };

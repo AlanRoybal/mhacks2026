@@ -23,14 +23,14 @@ test("lawn mowing is verified on site: location to start, check-in, located phot
   );
   assert.deepEqual(
     plan.signals.map((s) => s.id),
-    ["on_site_start", "on_site_check_in", "photo_location", "fresh_photos", "before_after", "deadline", "ai_review"],
+    ["on_site_start", "time_on_site", "on_site_check_in", "photo_location", "fresh_photos", "before_after", "deadline", "ai_review"],
   );
   const start = plan.signals.find((s) => s.id === "on_site_start");
   assert.equal(start?.enforcement, "blocks");
   assert.match(start?.detail ?? "", /within 200 m of 1200 S University Ave/);
   assert.equal(plan.signals.find((s) => s.id === "photo_location")?.enforcement, "poster_reviews");
   assert.match(plan.signals.find((s) => s.id === "ai_review")?.detail ?? "", /3 required items .* 70% confident/);
-  assert.match(plan.privacy, /never tracks location in the background/);
+  assert.match(plan.privacy, /only while a job is open/);
 });
 
 test("a remote design job records no location and is judged on the deliverable", () => {

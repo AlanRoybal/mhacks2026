@@ -10,6 +10,7 @@ import type { Deps } from "../deps.js";
 import type { JobEventType, LedgerEvent } from "../domain/events.js";
 import { allowedActions } from "../domain/jobMachine.js";
 import { hourlyCents } from "../domain/money.js";
+import { minOnSiteSec } from "../domain/rules.js";
 import { verificationPlan } from "../domain/verification.js";
 import type { ChecklistItem, Job, Offer, Proof, User } from "../domain/types.js";
 import { notFound } from "../lib/errors.js";
@@ -177,8 +178,13 @@ export async function jobWire(ctx: WireContext, job: Job, viewer: User) {
     // What Bounty checks before paying, and what it records about the worker to do so. Shown to the
     // poster before funding and to workers before they accept.
     verification: verificationPlan(
-      { remote: job.remote, address: job.location?.address, checklist: job.checklist },
-      { checkInRadiusM: deps.config.rules.checkInRadiusM, photoRadiusM: photoGeofenceM(deps), confidence: CONFIDENT },
+      { remote: job.remote, address: job.location?.address, checklist: job.checklist, estMinutes: job.estMinutes },
+      {
+        checkInRadiusM: deps.config.rules.checkInRadiusM,
+        photoRadiusM: photoGeofenceM(deps),
+        confidence: CONFIDENT,
+        minOnSiteSec: minOnSiteSec(deps.config.rules, job.estMinutes),
+      },
     ),
     // The escrow's risk (domain/risk.ts), for the poster and admins once the job holds money:
     // tier A-E, EL = PD x LGD x EAD, and the assigned worker's trust score.

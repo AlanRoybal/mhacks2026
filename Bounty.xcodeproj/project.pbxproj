@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0107E97F3BC1B33F7FD4EF1B /* ProofFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2679EADF798F7C549A97F3EA /* ProofFlow.swift */; };
 		02AAB2D2B69EFB35E83E2D23 /* DisputeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B00BDB4B984BC9B96A3AA27 /* DisputeSheet.swift */; };
+		084E3927DA2C9965965F462A /* BountyWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 6181C6875F1EC6BA18C4633F /* BountyWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		0A5758126FDDC608B81DB807 /* LocationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71B8D3FEA9D76F1C4CF92259 /* LocationPicker.swift */; };
 		0BFBABD98AF3B1B0E44A71E2 /* CreateJobView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F611717A4A9F0276C3E9675 /* CreateJobView.swift */; };
 		1506E89A595E9BD62C89C674 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 00653F176E5F56A7F9330976 /* Assets.xcassets */; };
@@ -18,11 +19,13 @@
 		2648EB0D8A6753B81B7323A1 /* MockJobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A1732769B738D037D975B56 /* MockJobsAPI.swift */; };
 		27A55C706B72D4F97913F92B /* BountyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B75E78AC19B705475CC363 /* BountyApp.swift */; };
 		2F5AA839D4D7D9194209EB9C /* BountyLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B881345578D9442C60B1C2B /* BountyLogo.swift */; };
+		2FDAAF3E7B2B6E6D8FBDF285 /* BountyLiveAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8661E20384565E0C632ED95 /* BountyLiveAttributes.swift */; };
 		34D8FC0D39B9BDA019E2486B /* BountyTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CE03AB2F0785B5586A1119 /* BountyTheme.swift */; };
 		362CD1ACFCAB84CCFE11B112 /* JobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC74DC8BCAE700D156446104 /* JobsAPI.swift */; };
 		3E079D1C27E6C781A1F698AE /* WorkViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA3B29F599F6FBA66D82AAA /* WorkViews.swift */; };
 		495A213982B7EC87F9AE6604 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1406EF46384922539D8BA3BC /* OnboardingView.swift */; };
 		4D295C77E60A3E16F14B00EC /* RateWorkerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEF56E5E9A62A25EF28F5955 /* RateWorkerCard.swift */; };
+		579AFA9F433BC07ED3702B0B /* LiveTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A74F95D235CA35194B87046 /* LiveTracker.swift */; };
 		59293C4BEC733AAEB2C058A9 /* TwinSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E03DB252793796851AC0AF /* TwinSources.swift */; };
 		5B1B545EBF77BA68176EAC68 /* JobsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC90A7ACD84995DB726CAAA /* JobsView.swift */; };
 		5E9F407B368D43CF613B0AF1 /* OfferViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3603C166E2B033C894391DD7 /* OfferViews.swift */; };
@@ -34,6 +37,7 @@
 		72ADE8E3DD17FCABABCB7084 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7535BD8DAFC6469AF250FA /* SettingsView.swift */; };
 		75699AB388309FB6BB304112 /* PosterStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 209BEC4ADD47C11B13577D52 /* PosterStore.swift */; };
 		78AB2F56177B8016949DA2C6 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E62E1AB9621E26837315559 /* RootTabView.swift */; };
+		7A497472423C688E8D5F2012 /* LiveSessionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 024CEDA5B2E64B01B7489A19 /* LiveSessionCard.swift */; };
 		82C3D916A32E24EA74FB2E71 /* CalendarLinkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB57653DB8B9887EEBBA102 /* CalendarLinkSheet.swift */; };
 		83C957A0DF197B07CA13D2C7 /* ProofCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60FA4932D9715CD6C9C4869 /* ProofCapture.swift */; };
 		85B63159010D69B7AE220FF5 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA4291A1097864BCB54653E /* AppRouter.swift */; };
@@ -50,8 +54,10 @@
 		B59CF5857AF944956AA3AD6A /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 002403D446AD2EB6EC7217D6 /* NotificationsView.swift */; };
 		D2935B4C128BA8403A9A6F7A /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97535FC0C25668325DA5E484 /* AppServices.swift */; };
 		D2E427E75BB9E360579A53C7 /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = 75658A13BA2DDEA9A3B6EA8B /* StripePaymentSheet */; };
+		D79CA793ADCFAA8847D135F2 /* JobLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = B585D0C66BB0B1FCB986210F /* JobLiveActivity.swift */; };
 		DBB03E4DF64D7E4FEF117C10 /* BackendJobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 919DD468D1C1A40D707EF084 /* BackendJobsAPI.swift */; };
 		DD1917C3911F2E20D6E2DCBD /* MarketplaceEarnings.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE4CCB7A0CC7D40B4A484826 /* MarketplaceEarnings.swift */; };
+		E5473F4A8D48BCE02FA9ECBB /* BountyLiveAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8661E20384565E0C632ED95 /* BountyLiveAttributes.swift */; };
 		E77F4702B825C686E26EE94D /* BountyScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 350B074C9ED028478228FAEF /* BountyScreen.swift */; };
 		E9C2EFBCC13957F500DBCC0B /* VerificationPlanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A99FBF0A4E87817C1FE32DE2 /* VerificationPlanCard.swift */; };
 		ED44C175F43DBF6E9510D01B /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7E2F09CDF905685D922897 /* Motion.swift */; };
@@ -65,6 +71,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		666F2AEDB6D8A5B51405BA8B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 209C86035F696DCD6A8B3A57 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8BB5FB9FCAF70E648A4A8223;
+			remoteInfo = BountyWidgets;
+		};
 		C311CA2074AB06A735D1BB7F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 209C86035F696DCD6A8B3A57 /* Project object */;
@@ -74,9 +87,24 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		2BE9139004B6BABA4D0FF055 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				084E3927DA2C9965965F462A /* BountyWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		002403D446AD2EB6EC7217D6 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		00653F176E5F56A7F9330976 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		024CEDA5B2E64B01B7489A19 /* LiveSessionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSessionCard.swift; sourceTree = "<group>"; };
 		034B84D7A195A97B090DF6A6 /* RemoteControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControl.swift; sourceTree = "<group>"; };
 		0B7E2F09CDF905685D922897 /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
 		0B881345578D9442C60B1C2B /* BountyLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BountyLogo.swift; sourceTree = "<group>"; };
@@ -95,10 +123,12 @@
 		350B074C9ED028478228FAEF /* BountyScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BountyScreen.swift; sourceTree = "<group>"; };
 		35CE03AB2F0785B5586A1119 /* BountyTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BountyTheme.swift; sourceTree = "<group>"; };
 		3603C166E2B033C894391DD7 /* OfferViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferViews.swift; sourceTree = "<group>"; };
+		3A74F95D235CA35194B87046 /* LiveTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTracker.swift; sourceTree = "<group>"; };
 		54627BC3FF0C2B627F7E9D8B /* PushNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationManager.swift; sourceTree = "<group>"; };
 		5A659F3622D8C9A9C448F582 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		5DA3B29F599F6FBA66D82AAA /* WorkViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkViews.swift; sourceTree = "<group>"; };
 		5EA2E289B4C07BF31ACAC251 /* IncomeStatementSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeStatementSheet.swift; sourceTree = "<group>"; };
+		6181C6875F1EC6BA18C4633F /* BountyWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BountyWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		62029D8562DB3F9C7D7719ED /* CryptoCheckoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoCheckoutView.swift; sourceTree = "<group>"; };
 		639DA50C5ED17C063F385A8F /* TwinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwinView.swift; sourceTree = "<group>"; };
 		6879C2F5D256C818DE44FEAE /* JobDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobDisplay.swift; sourceTree = "<group>"; };
@@ -115,6 +145,7 @@
 		9C18A1C5BC0E979DCBE71869 /* LiveReviewProofView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveReviewProofView.swift; sourceTree = "<group>"; };
 		A666B0FB424671C300AF98A9 /* PosterPush.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterPush.swift; sourceTree = "<group>"; };
 		A99FBF0A4E87817C1FE32DE2 /* VerificationPlanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerificationPlanCard.swift; sourceTree = "<group>"; };
+		B585D0C66BB0B1FCB986210F /* JobLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobLiveActivity.swift; sourceTree = "<group>"; };
 		B67D53F052CE5224398EF8F6 /* Bounty.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Bounty.entitlements; sourceTree = "<group>"; };
 		BA10D25328F0FF4EC9CFA6AD /* PaymentsServerAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentsServerAPI.swift; sourceTree = "<group>"; };
 		BE26CC60A4D4BA0F7F17E467 /* WorkerPayments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerPayments.swift; sourceTree = "<group>"; };
@@ -129,6 +160,7 @@
 		EC74DC8BCAE700D156446104 /* JobsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsAPI.swift; sourceTree = "<group>"; };
 		EF3E583821FF7F355811EAC9 /* Bounty.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Bounty.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F570C8F3A67231C4565BDF53 /* PostedJobDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostedJobDetailView.swift; sourceTree = "<group>"; };
+		F8661E20384565E0C632ED95 /* BountyLiveAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BountyLiveAttributes.swift; sourceTree = "<group>"; };
 		FC6DBE4C0FF9BD44AF836A86 /* BountyScreenshots.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BountyScreenshots.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FD212D1E2A78823893D549EB /* ScreenshotTour.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotTour.swift; sourceTree = "<group>"; };
 		FDEE0685875FF28B9B991034 /* Job.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Job.swift; sourceTree = "<group>"; };
@@ -171,6 +203,24 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		0CC7F5DDFB97D376E36F33D8 /* Live */ = {
+			isa = PBXGroup;
+			children = (
+				F8661E20384565E0C632ED95 /* BountyLiveAttributes.swift */,
+				024CEDA5B2E64B01B7489A19 /* LiveSessionCard.swift */,
+				3A74F95D235CA35194B87046 /* LiveTracker.swift */,
+			);
+			path = Live;
+			sourceTree = "<group>";
+		};
+		0DB3DA91016E4947A855A68C /* BountyWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				B585D0C66BB0B1FCB986210F /* JobLiveActivity.swift */,
+			);
+			path = BountyWidgets;
+			sourceTree = "<group>";
+		};
 		149A53991D098BD0D3EC7BE0 /* Offer */ = {
 			isa = PBXGroup;
 			children = (
@@ -184,6 +234,7 @@
 			children = (
 				EF3E583821FF7F355811EAC9 /* Bounty.app */,
 				FC6DBE4C0FF9BD44AF836A86 /* BountyScreenshots.xctest */,
+				6181C6875F1EC6BA18C4633F /* BountyWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -195,6 +246,7 @@
 				0ACAEBBA700E99E7E07D0A61 /* App */,
 				7235CD2904B243EEAF06B4A9 /* Design */,
 				4FB8CB37CE0CB59DA1DD6786 /* Features */,
+				0CC7F5DDFB97D376E36F33D8 /* Live */,
 				C641E77F3707AFA884A49491 /* Models */,
 				8382A70192A562C64ED9AFA4 /* Resources */,
 				C4E8A4CDA6E118A4D674531A /* Services */,
@@ -261,6 +313,7 @@
 			children = (
 				31D185DA9D3C2251ADBCED05 /* Bounty */,
 				C5060A507CAB62D38E8B6BFA /* BountyScreenshots */,
+				0DB3DA91016E4947A855A68C /* BountyWidgets */,
 				5E99CE13E1E0A793BCE2C300 /* Config */,
 				9B382C510A78CB24D8367F76 /* Packages */,
 				14CAADA9C42464F5656FD4C9 /* Products */,
@@ -409,10 +462,12 @@
 				C993DA9255A88FA5CB5ED6E9 /* Sources */,
 				D16124D811F63A0A9DAB6D93 /* Resources */,
 				F9483A308D0E671F2026C6ED /* Frameworks */,
+				2BE9139004B6BABA4D0FF055 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				CFDB0B547A2415460C347333 /* PBXTargetDependency */,
 			);
 			name = Bounty;
 			packageProductDependencies = (
@@ -423,6 +478,23 @@
 			productName = Bounty;
 			productReference = EF3E583821FF7F355811EAC9 /* Bounty.app */;
 			productType = "com.apple.product-type.application";
+		};
+		8BB5FB9FCAF70E648A4A8223 /* BountyWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6374C584382F83EE39B6915E /* Build configuration list for PBXNativeTarget "BountyWidgets" */;
+			buildPhases = (
+				27C400437B859C74E723F68F /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BountyWidgets;
+			packageProductDependencies = (
+			);
+			productName = BountyWidgets;
+			productReference = 6181C6875F1EC6BA18C4633F /* BountyWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -439,6 +511,10 @@
 						TestTargetID = 4E1E8CB3C8969962F03504E6;
 					};
 					4E1E8CB3C8969962F03504E6 = {
+						DevelopmentTeam = DVX8YZ9GG9;
+						ProvisioningStyle = Automatic;
+					};
+					8BB5FB9FCAF70E648A4A8223 = {
 						DevelopmentTeam = DVX8YZ9GG9;
 						ProvisioningStyle = Automatic;
 					};
@@ -465,6 +541,7 @@
 			targets = (
 				4E1E8CB3C8969962F03504E6 /* Bounty */,
 				2D6032709166B4CBDCB68C63 /* BountyScreenshots */,
+				8BB5FB9FCAF70E648A4A8223 /* BountyWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -481,6 +558,15 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		27C400437B859C74E723F68F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E5473F4A8D48BCE02FA9ECBB /* BountyLiveAttributes.swift in Sources */,
+				D79CA793ADCFAA8847D135F2 /* JobLiveActivity.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B0971264702E3CA54A7D93FF /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -498,6 +584,7 @@
 				D2935B4C128BA8403A9A6F7A /* AppServices.swift in Sources */,
 				DBB03E4DF64D7E4FEF117C10 /* BackendJobsAPI.swift in Sources */,
 				27A55C706B72D4F97913F92B /* BountyApp.swift in Sources */,
+				2FDAAF3E7B2B6E6D8FBDF285 /* BountyLiveAttributes.swift in Sources */,
 				2F5AA839D4D7D9194209EB9C /* BountyLogo.swift in Sources */,
 				E77F4702B825C686E26EE94D /* BountyScreen.swift in Sources */,
 				34D8FC0D39B9BDA019E2486B /* BountyTheme.swift in Sources */,
@@ -518,6 +605,8 @@
 				5B1B545EBF77BA68176EAC68 /* JobsView.swift in Sources */,
 				16514389B84EE710DDA78727 /* LaunchView.swift in Sources */,
 				6E85723641B9BC0F24696229 /* LiveReviewProofView.swift in Sources */,
+				7A497472423C688E8D5F2012 /* LiveSessionCard.swift in Sources */,
+				579AFA9F433BC07ED3702B0B /* LiveTracker.swift in Sources */,
 				0A5758126FDDC608B81DB807 /* LocationPicker.swift in Sources */,
 				DD1917C3911F2E20D6E2DCBD /* MarketplaceEarnings.swift in Sources */,
 				2648EB0D8A6753B81B7323A1 /* MockJobsAPI.swift in Sources */,
@@ -549,6 +638,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		CFDB0B547A2415460C347333 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8BB5FB9FCAF70E648A4A8223 /* BountyWidgets */;
+			targetProxy = 666F2AEDB6D8A5B51405BA8B /* PBXContainerItemProxy */;
+		};
 		F4CF4D5B9EA5A1D30BA8382E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 4E1E8CB3C8969962F03504E6 /* Bounty */;
@@ -571,6 +665,17 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		5E356F398A0A3E9EDBBE5DC2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BountyWidgets/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alanroybal.BountyTwin.Widgets;
+				PRODUCT_NAME = BountyWidgets;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -626,6 +731,17 @@
 			};
 			name = Debug;
 		};
+		C9F6776BD39447FE26FAF5F9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BountyWidgets/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alanroybal.BountyTwin.Widgets;
+				PRODUCT_NAME = BountyWidgets;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		D94DD693020319A705ACC3B7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = E667158AA19AD3F89B1E0A67 /* Debug.xcconfig */;
@@ -644,6 +760,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		6374C584382F83EE39B6915E /* Build configuration list for PBXNativeTarget "BountyWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E356F398A0A3E9EDBBE5DC2 /* Debug */,
+				C9F6776BD39447FE26FAF5F9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		6AE01037BF3CC444E4699D3B /* Build configuration list for PBXNativeTarget "Bounty" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

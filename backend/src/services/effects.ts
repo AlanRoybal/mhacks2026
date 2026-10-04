@@ -8,6 +8,7 @@ import { TransitionError } from "../domain/jobMachine.js";
 import { timerName, type TimerPayload } from "../scheduler/index.js";
 import { sendNextOffer } from "./matching.js";
 import { sendJobPush } from "./notify.js";
+import { syncLive } from "./live.js";
 import { runPayout, runRefund } from "./payments.js";
 import { bumpStats } from "./users.js";
 
@@ -74,6 +75,9 @@ async function runEffect(deps: Deps, ledger: LedgerEvent, effect: Effect): Promi
       return;
     case "learn":
       await deps.tasks.run({ kind: "task", name: "learn_rating", jobId: ledger.jobId });
+      return;
+    case "live":
+      await syncLive(deps, ledger);
       return;
     case "offer.next":
       await sendNextOffer(deps, ledger.jobId);

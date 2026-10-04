@@ -8,6 +8,7 @@ import { authRoutes, requireAuth } from "./auth.js";
 import { adminRoutes } from "./routes/admin.js";
 import { demoRoutes } from "./routes/demo.js";
 import { toErrorResponse, type AppEnv } from "./http.js";
+import { liveRoutes } from "./routes/live.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { localBlobRoutes } from "./routes/localBlobs.js";
 import { meRoutes } from "./routes/me.js";
@@ -48,6 +49,7 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   authed.route("/jobs", reviewRoutes(deps));
   authed.route("/offers", offerRoutes(deps));
   authed.route("/jobs", fundingRoutes(deps));
+  authed.route("/jobs", liveRoutes(deps));
   authed.route("/wallet", walletRoutes(deps));
   authed.route("/admin", adminRoutes(deps));
   // The same features in the shape TwinKit (iosA's networking package) expects.

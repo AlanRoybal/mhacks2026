@@ -180,6 +180,8 @@ export interface ProofChecks {
   missingUploads: string[];
   // Photos or videos that weren't taken with the Bounty camera for this job (or were changed since).
   notCapturedInApp?: string[];
+  // In-person jobs: time on site by SpacetimeDB's clock (services/live.ts) when the proof went in.
+  onSite?: { seconds: number; requiredSeconds: number; leftSite: number; tracked: boolean };
 }
 
 export interface ItemVerdict {

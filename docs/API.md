@@ -222,11 +222,39 @@ A 422 lists the problems in `checks`:
 - **`notCapturedInApp`**: photos or videos that weren't taken with the Bounty camera for this job.
 - **`outsideGeofence` and `warnings`**: location problems. These don't block submission; a `CHECK_IN` item blocks only when it's missing. The grader and the poster see the warnings. An in-person photo with no GPS, or taken more than 400 m away (1 km in demo mode), turns a pass into `unclear`.
 
+**Time on site.** For in-person jobs, `checks.onSite` is `{ seconds, requiredSeconds, leftSite, tracked }`, read from the job's [live session](#live-sessions). Too little time on site, or leaving the site, adds a warning and keeps the proof from auto-paying.
+
 **After submitting**, poll the job until it leaves SUBMITTED. Grading usually takes seconds, but can take up to 15 minutes (3 in demo mode) before it times out to the poster.
 
 - **pass:** every required item passes with confidence ≥ 0.7 and the evidence was on site. The job goes to IN_REVIEW with `reviewDeadline` (24 h, or 2 min in demo mode). If the poster doesn't respond, payment releases automatically (US-47).
 - **fail:** the job goes back to IN_PROGRESS with per-item `verdicts`. Read `workerFeedback` from `/proofs`. The worker can retry up to two times, but only before the deadline (US-43).
 - **unclear, failed after the retries or past the deadline, or grading timed out:** the job goes to IN_REVIEW with `review.requiresPosterAction = true`. `reviewDeadline` is then a 48-hour poster decision window (5 min in demo mode), and nothing auto-releases. If the poster stays silent, the job becomes DISPUTED with the money held. An admin resolves it with `POST /jobs/{id}/resolve`. If no admin acts within 72 hours (10 min in demo mode), a `fail` refunds the poster and any other grade pays the worker. The app should check `review.requiresPosterAction`, not just `reviewDeadline`.
+
+## Live sessions
+
+Every job someone is working on is a session in SpacetimeDB (`spacetime/`): the worker's location pings, the on-site clock, "left the site", proof progress and the job's live phase are decided there, in transactional reducers. The backend is the only writer. It opens the session on Start, mirrors every later job transition into it, and reads it back to verify proof (time on site) and to drive both people's Live Activities. With `LIVE_PROVIDER=memory` (the default, and in tests) the same rules run in process.
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/jobs/{id}/live` | poster or worker | The live view below. 404 before Start. |
+| POST | `/jobs/{id}/live/ping` | assigned worker, IN_PROGRESS | `{ latitude, longitude, accuracyM }`. Returns the live view. The app sends one about every 30 s, in the background too. |
+| POST | `/jobs/{id}/live/progress` | assigned worker, IN_PROGRESS | `{ itemsDone }`: checklist items (not counting check-ins) with proof captured. Returns the live view. |
+| POST | `/jobs/{id}/live/activity` | poster or worker | `{ token, env: "sandbox" \| "production", role: "worker" \| "poster" }`: a Live Activity push token. 204. |
+
+```json
+{ "provider": "spacetime", "phase": "on_site", "onSiteSeconds": 146, "timerStartEpoch": 1791116962,
+  "itemsDone": 1, "itemsTotal": 2, "minOnSiteSeconds": 1800, "leftSiteCount": 1,
+  "startedAt": "2026-10-04T12:29:22Z", "lastPingAt": "2026-10-04T12:31:40Z", "lastDistanceM": 10,
+  "signalLostCount": 0, "radiusM": 200,
+  "events": [{ "at": "2026-10-04T12:31:10Z", "kind": "arrived", "detail": "Back on site, 10 m from the address" }] }
+```
+
+- **`phase`:** `started` (remote), `on_site`, `away`, `signal_lost`, then `verifying`, `in_review`, `paid`, `refunded` or `closed` as the job moves on.
+- **The clock:** a ping within `radiusM` (the check-in radius) starts or continues an on-site stretch; one outside it ends the stretch and counts toward `leftSiteCount`. A fix whose accuracy is worse than the radius only refreshes the heartbeat. If pings stop for 90 s, the stretch ends at the last ping (`signal_lost`). Submitting proof stops the clock.
+- **`timerStartEpoch`:** Unix seconds such that now minus it is the total time on site. Set only while on site, so a client can tick the clock locally (`Text(timerInterval:)`). `null` means the clock is paused at `onSiteSeconds`.
+- **`events`:** the last 20, newest first. `kind` is `arrived`, `left`, `signal_lost`, `progress` or `phase`.
+
+**Live Activities.** The first seven fields above are exactly `BountyLiveAttributes.ContentState` (`Bounty/Live/BountyLiveAttributes.swift`). For every registered token, the backend sends an APNs `liveactivity` push (topic `<bundle id>.push-type.liveactivity`) when the phase, `leftSiteCount` or `itemsDone` changes, with a stale date 3 minutes out. Leaving the site adds an alert. When the job is paid, refunded or closed, it sends `event: "end"`, dismissed after 15 minutes. Tokens APNs rejects are dropped.
 
 ## The Job object
 
@@ -299,7 +327,7 @@ Every job carries `verification`: what Bounty checks before paying, and what it 
     { "id": "on_site_start", "stage": "start", "enforcement": "blocks", "title": "On site to start",
       "detail": "Start only works within 200 m of 1200 S University Ave.", "collects": "One GPS reading when the worker taps Start" }
   ],
-  "privacy": "Bounty never tracks location in the background. It reads GPS only when the worker taps Start, checks in, or takes a proof photo." }
+  "privacy": "Bounty reads location only while a job is open: when the worker taps Start, about every 30 seconds while they work (for the on-site clock), at check-in and with proof photos. It stops when the proof is submitted, and the poster sees distances and time on site, never coordinates." }
 ```
 
 - **`stage`:** `start`, `proof` or `review`.
@@ -312,6 +340,7 @@ Every job carries `verification`: what Bounty checks before paying, and what it 
 | `id` | Included when | Enforced by |
 |---|---|---|
 | `on_site_start` | In person | `POST /jobs/{id}/start` returns `too_far` beyond the check-in radius (200 m, or 500 m in demo mode). |
+| `time_on_site` | In person | Proof is checked against the [live session](#live-sessions): less on-site time than 40% of `estMinutes` (capped at 30 min; 1 min in demo mode), or a job with no live session, makes the grade `unclear`. |
 | `on_site_check_in` | The checklist has a `CHECK_IN` item | The server judges the check-in from GPS; the AI isn't involved. |
 | `photo_location` | In person, with photo items | Photos taken beyond twice the check-in radius, or without GPS, make the grade `unclear`. |
 | `fresh_photos` | Photo items | Captures must come after Start, and a photo reused from another job is rejected. |

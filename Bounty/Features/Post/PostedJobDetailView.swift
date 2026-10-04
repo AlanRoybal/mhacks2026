@@ -73,6 +73,11 @@ struct PostedJobDetailView: View {
                     }
                 }
 
+                if [.inProgress, .submitted, .inReview, .disputed].contains(job.status) {
+                    LiveSessionCard(job: job, role: .poster)
+                        .entrance(.rest(0))
+                }
+
                 if let risk = job.risk {
                     EscrowRiskCard(risk: risk)
                         .entrance(.rest(0))

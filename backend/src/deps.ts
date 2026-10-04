@@ -5,6 +5,7 @@ import { createAi, createEmbedder, type Ai, type Embedder } from "./ai/index.js"
 import { createBlobs, type Blobs } from "./blobs/index.js";
 import { loadConfig, type Config } from "./config.js";
 import { createLogger, type Logger } from "./lib/log.js";
+import { createLive, type LiveSessions } from "./live/index.js";
 import { createPayments, type Payments } from "./payments/index.js";
 import { createPushSender, type PushSender } from "./push/index.js";
 import { createScheduler, type Scheduler } from "./scheduler/index.js";
@@ -20,6 +21,8 @@ export interface Deps {
   log: Logger;
   now: () => Date;
   push: PushSender;
+  // Live job sessions in SpacetimeDB (or the in-memory twin).
+  live: LiveSessions;
   scheduler: Scheduler;
   ai: Ai;
   embedder: Embedder;
@@ -38,6 +41,8 @@ export function createDeps(config: Config = loadConfig(), overrides: Partial<Dep
     log,
     now: () => new Date(),
     push: overrides.push ?? createPushSender(config, log),
+    // Reads deps.now lazily, so tests that move the clock move the in-memory twin too.
+    live: overrides.live ?? createLive(config, log, () => deps.now()),
     ai: overrides.ai ?? createAi(config, log),
     embedder: overrides.embedder ?? createEmbedder(config),
     blobs: overrides.blobs ?? createBlobs(config),

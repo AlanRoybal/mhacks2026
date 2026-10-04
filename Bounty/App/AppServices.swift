@@ -213,9 +213,12 @@ final class MarketplaceStore {
     var errorMessage: String?
     /// The server's error code from the last accept or decline, e.g. `offer_expired` (US-26).
     private(set) var lastErrorCode: String?
+    /// For the live session when a job changes outside a request made here (polling, proof).
+    @ObservationIgnored private var liveAPI: APIClient?
 
     func refresh(api: APIClient?) async {
         guard let api, !isLoading else { return }
+        liveAPI = api
         isLoading = true
         defer { isLoading = false }
         do {
@@ -226,6 +229,8 @@ final class MarketplaceStore {
             offeredJob = values.0.job
             workingJobs = values.1
             errorMessage = nil
+            for job in workingJobs { LiveTracker.shared.work(on: job, api: api) }
+            LiveTracker.shared.keepOnly(workerJobIds: Set(workingJobs.map(\.id)))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -267,6 +272,7 @@ final class MarketplaceStore {
             )
             upsert(job)
             errorMessage = nil
+            LiveTracker.shared.work(on: job, api: api)
             return job
         } catch {
             errorMessage = error.localizedDescription
@@ -276,6 +282,7 @@ final class MarketplaceStore {
 
     /// Swaps in a fresher copy of a job (after submitting proof or polling), keeping the list's order.
     func replace(_ job: PostedJob) {
+        LiveTracker.shared.work(on: job, api: liveAPI)
         if let index = workingJobs.firstIndex(where: { $0.id == job.id }) {
             workingJobs[index] = job
         } else {
