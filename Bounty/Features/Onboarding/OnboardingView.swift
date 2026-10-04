@@ -680,6 +680,8 @@ struct WorkPreferencesView: View {
         Task {
             defer { isSaving = false }
             do {
+                // In-person matching measures distance from here; without it no in-person job is offered.
+                let here = workMode == .remote ? nil : await JobLocationProvider().current()
                 try await api.send(.put, "twin/prefs", body: TwinPreferencesUpdate(
                     minPay: minimumPay,
                     maxRadiusMiles: radius,
@@ -687,7 +689,8 @@ struct WorkPreferencesView: View {
                     remoteOk: workMode != .inPerson,
                     inPersonOk: workMode != .remote,
                     tz: TimeZone.current.identifier,
-                    quietHours: quietHours ? QuietHours(start: "22:00", end: "08:00") : nil
+                    quietHours: quietHours ? QuietHours(start: "22:00", end: "08:00") : nil,
+                    base: here.map { Coordinate(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude) }
                 ))
                 try await api.send(.put, "twin/availability", body: TwinAvailabilityUpdate(
                     tz: TimeZone.current.identifier,
@@ -817,6 +820,13 @@ private struct TwinPreferencesUpdate: Encodable, Sendable {
     let inPersonOk: Bool
     let tz: String
     let quietHours: QuietHours?
+    /// Left out (not null) when the location is unavailable, so a saved base isn't erased.
+    let base: Coordinate?
+}
+
+private struct Coordinate: Encodable, Sendable {
+    let latitude: Double
+    let longitude: Double
 }
 
 private struct TwinAvailabilityUpdate: Encodable, Sendable {
