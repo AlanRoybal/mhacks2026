@@ -3,6 +3,7 @@
 import { loadConfig } from "../config.js";
 import { createDeps, type Deps } from "../deps.js";
 import { silentLogger } from "../lib/log.js";
+import { RecordingMessenger } from "../messaging/messenger.js";
 import { RecordingPushSender } from "../push/index.js";
 import { ManualScheduler } from "../scheduler/localScheduler.js";
 import { InlineEffectQueue } from "../services/effectQueue.js";
@@ -15,6 +16,7 @@ export interface TestDeps extends Deps {
   inlineEffects: InlineEffectQueue;
   clock: { now: Date; advance(seconds: number): void };
   push: RecordingPushSender;
+  messenger: RecordingMessenger;
   scheduler: ManualScheduler;
   // Fires due timers and waits for every effect they cause.
   settle(): Promise<void>;
@@ -29,10 +31,12 @@ export function testDeps(env: Record<string, string> = {}): TestDeps {
     },
   };
   const push = new RecordingPushSender();
+  const messenger = new RecordingMessenger();
   const scheduler = new ManualScheduler();
   const deps = createDeps(config, {
     store: new MemoryStore(),
     push,
+    messenger,
     scheduler,
     log: silentLogger,
     now: () => clock.now,
@@ -44,6 +48,7 @@ export function testDeps(env: Record<string, string> = {}): TestDeps {
     inlineEffects,
     clock,
     push,
+    messenger,
     scheduler,
     async settle() {
       await inlineEffects.drain();

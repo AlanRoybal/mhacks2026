@@ -2,7 +2,7 @@
 // for the checklist and ranking tasks, as the fallback when Claude is unavailable.
 
 import type { Category } from "../domain/types.js";
-import type { Ai, ChecklistDraft, GradeInput, GradeResult, JobBrief, ProfileExtraction, ProfileInput, RerankCandidate, RerankPick } from "./ai.js";
+import type { Ai, ChecklistDraft, GradeInput, GradeResult, JobBrief, ProfileExtraction, ProfileInput, RerankCandidate, RerankPick, ThreadInput, ThreadTurn } from "./ai.js";
 
 type DraftItem = ChecklistDraft["items"][number];
 
@@ -163,4 +163,25 @@ export class FakeAi implements Ai {
       model: "fake",
     };
   }
+
+  // Offline twin: a template opener, then "passed it on" replies. Questions go to the worker.
+  async threadTurn(input: ThreadInput): Promise<ThreadTurn> {
+    return fakeThreadTurn(input);
+  }
+}
+
+export function fakeThreadTurn(input: ThreadInput): ThreadTurn {
+  const name = input.workerName;
+  if (input.mode === "open") {
+    return {
+      reply: `Hi, I'm ${name}'s Bounty twin. ${name} accepted "${input.job.title}". Anything ${name} should know before starting, like access, parking or a reference to follow? You can text me here any time.`,
+      forWorker: "",
+      detail: "",
+    };
+  }
+  const text = (input.message ?? "").trim();
+  const isQuestion = text.endsWith("?") || /^(when|what|how|can|could|will|would|do|does|is|are|who|where|why)\b/i.test(text);
+  return isQuestion
+    ? { reply: `Good question. I've asked ${name} and will text you back.`, forWorker: text, detail: "" }
+    : { reply: `Thanks, I've passed that on to ${name}.`, forWorker: "", detail: text.slice(0, 200) };
 }

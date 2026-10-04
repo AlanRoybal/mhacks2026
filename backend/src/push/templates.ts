@@ -29,6 +29,8 @@ export function renderPush(template: PushTemplate, job: Job, offer: Offer | null
     }
     case "offer_closed":
       return { ...base, title: "Offer closed", body: `${t} is no longer available.` };
+    case "job_started":
+      return { ...base, title: "Your job has started", body: `The worker checked in for ${t}.` };
     case "offer_accepted":
       return { ...base, title: "Your job was accepted", body: `A worker accepted ${t}.` };
     case "job_canceled":

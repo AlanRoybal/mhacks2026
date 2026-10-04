@@ -3,10 +3,11 @@
 // - rerank: falls back to the deterministic score order
 // - grade: falls back to "unclear" on every item, which sends the decision to the poster
 // - profile extraction: no fallback; the import is marked failed and the user retries (US-03)
+// - job thread: falls back to the template twin (passes questions on to the worker)
 
 import type { Logger } from "../lib/log.js";
-import type { Ai, ChecklistDraft, GradeInput, GradeResult, JobBrief, ProfileExtraction, ProfileInput, RerankCandidate, RerankPick } from "./ai.js";
-import { heuristicRerank, templateChecklist } from "./fake.js";
+import type { Ai, ChecklistDraft, GradeInput, GradeResult, JobBrief, ProfileExtraction, ProfileInput, RerankCandidate, RerankPick, ThreadInput, ThreadTurn } from "./ai.js";
+import { fakeThreadTurn, heuristicRerank, templateChecklist } from "./fake.js";
 
 export class ResilientAi implements Ai {
   readonly name: string;
@@ -53,6 +54,15 @@ export class ResilientAi implements Ai {
         workerFeedback: "",
         model: "unavailable",
       };
+    }
+  }
+
+  async threadTurn(input: ThreadInput): Promise<ThreadTurn> {
+    try {
+      return await this.inner.threadTurn(input);
+    } catch (error) {
+      this.log.warn("Thread AI failed; using template twin", { error });
+      return fakeThreadTurn(input);
     }
   }
 }

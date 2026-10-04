@@ -16,8 +16,10 @@ import {
   type ProfileInput,
   type RerankCandidate,
   type RerankPick,
+  type ThreadInput,
+  ThreadTurn,
 } from "./ai.js";
-import { CHECKLIST, EXTRACT_PROFILE, gradePrompt, RERANK } from "./prompts.js";
+import { CHECKLIST, EXTRACT_PROFILE, gradePrompt, RERANK, THREAD } from "./prompts.js";
 
 type Effort = "low" | "medium" | "high";
 
@@ -187,5 +189,19 @@ export class ClaudeAi implements Ai {
       timeoutMs: 120_000,
     });
     return { ...result, model: this.model };
+  }
+
+  async threadTurn(input: ThreadInput): Promise<ThreadTurn> {
+    const content: BetaContentBlockParam[] = [
+      { type: "text", text: jobText(input.job) },
+      { type: "text", text: tag("checklist", input.checklist.map((c) => `- ${c}`).join("\n") || "none") },
+      { type: "text", text: tag("worker", input.workerName) },
+      { type: "text", text: tag("status", input.status) },
+      { type: "text", text: tag("details_from_poster", input.details.map((d) => `- ${d}`).join("\n") || "none yet") },
+      { type: "text", text: tag("thread", input.history.map((m) => `${m.from}: ${m.text}`).join("\n") || "empty") },
+    ];
+    if (input.message) content.push({ type: "text", text: tag("poster_message", input.message) });
+    content.push({ type: "text", text: `Mode: ${input.mode}. Write the twin's next text.` });
+    return this.call({ task: "thread", system: THREAD, content, schema: ThreadTurn, effort: "low", maxTokens: 1200, timeoutMs: 20_000 });
   }
 }

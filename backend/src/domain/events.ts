@@ -35,6 +35,7 @@ export type PushTemplate =
   | "offer"
   | "offer_closed"
   | "offer_accepted"
+  | "job_started"
   | "job_canceled"
   | "worker_withdrew"
   | "no_match_yet"
