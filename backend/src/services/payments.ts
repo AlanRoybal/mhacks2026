@@ -129,7 +129,7 @@ export async function connectOnboardingUrl(deps: Deps, user: User, refreshUrl: s
   if (!stripe) throw new AppError(501, "not_configured", "Stripe is not configured; payouts are simulated locally");
   let accountId = user.payouts.stripeAccountId;
   if (!accountId) {
-    const created = await stripe.createExpressAccount(user);
+    const created = await stripe.createConnectAccount(user);
     accountId = created;
     await deps.store.kvPut(`stripe-account:${created}`, user.userId);
     await updateUser(deps, user.userId, (u) => {

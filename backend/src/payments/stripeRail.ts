@@ -88,23 +88,33 @@ export class StripeRail implements PaymentRail {
     return this.stripe.webhooks.constructEvent(rawBody, signature, this.cfg.webhookSecret);
   }
 
-  async createExpressAccount(user: User): Promise<string> {
-    const account = await this.stripe.accounts.create(
+  // Newer Stripe platforms can't create Accounts v1 connected accounts with the legacy `type` field, and a
+  // platform that doesn't take on losses can't use Express or recipient-only accounts. So each worker gets
+  // a full-dashboard account (Standard in v1 terms) through Accounts v2, with Stripe collecting fees and
+  // covering losses. The merchant configuration brings the v1 `transfers` capability with it (the recipient
+  // configuration would also demand a contact email, which demo and hidden-email Apple users lack).
+  // Status checks still read the v1 view of the same account.
+  async createConnectAccount(user: User): Promise<string> {
+    const account = await this.stripe.v2.core.accounts.create(
       {
-        type: "express",
-        country: "US",
-        email: user.email,
-        business_type: "individual",
-        capabilities: { transfers: { requested: true } },
+        ...(user.email ? { contact_email: user.email } : {}),
+        display_name: user.displayName,
+        identity: { country: "us", entity_type: "individual" },
+        configuration: { merchant: { capabilities: { card_payments: { requested: true } } } },
+        defaults: { responsibilities: { fees_collector: "stripe", losses_collector: "stripe" } },
+        dashboard: "full",
         metadata: { userId: user.userId },
       },
-      { idempotencyKey: `account:${user.userId}` },
+      { idempotencyKey: `account-v2:${user.userId}` },
     );
     return account.id;
   }
 
   async onboardingLink(accountId: string, refreshUrl: string, returnUrl: string): Promise<string> {
-    const link = await this.stripe.accountLinks.create({ account: accountId, refresh_url: refreshUrl, return_url: returnUrl, type: "account_onboarding" });
+    const link = await this.stripe.v2.core.accountLinks.create({
+      account: accountId,
+      use_case: { type: "account_onboarding", account_onboarding: { refresh_url: refreshUrl, return_url: returnUrl } },
+    });
     return link.url;
   }
 
