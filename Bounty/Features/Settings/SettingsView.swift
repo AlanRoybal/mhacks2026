@@ -10,6 +10,14 @@ struct MeProfile: Decodable, Sendable {
     let payouts: Payouts
     let pushEnabled: Bool
     let stats: Stats
+    /// Verified number for job texts (Photon iMessage), and whether this server can send texts at all.
+    let phone: Phone?
+    let textsAvailable: Bool?
+
+    struct Phone: Decodable, Sendable {
+        let number: String
+        let jobTexts: Bool
+    }
 
     struct Payouts: Decodable, Sendable {
         let stripeConnected: Bool
@@ -45,6 +53,8 @@ struct SettingsView: View {
     @State private var calendarNote: String?
     @State private var calendarAccessOff = false
     @State private var showsCalendarLink = false
+    @State private var showsPhoneLink = false
+    @State private var confirmsRemovePhone = false
     @State private var confirmsUnlink = false
 
     var body: some View {
@@ -105,6 +115,23 @@ struct SettingsView: View {
                     Text(calendarNote ?? "Only the start and end of busy times leave your phone, never event names.")
                 }
 
+                if me?.textsAvailable == true {
+                    Section {
+                        if let phone = me?.phone {
+                            LabeledContent("Mobile number", value: phone.number)
+                            Toggle("Let workers\u{2019} twins text me", isOn: Binding(get: { phone.jobTexts }, set: { value in Task { await setJobTexts(value) } }))
+                            Button("Change number") { showsPhoneLink = true }
+                            Button("Remove number", role: .destructive) { confirmsRemovePhone = true }
+                        } else {
+                            Button("Add mobile number") { showsPhoneLink = true }
+                        }
+                    } header: {
+                        Text("Text updates")
+                    } footer: {
+                        Text("When someone accepts a job you posted, their Bounty twin texts you over iMessage to sort out details and keep you posted. Approving and paying always happen in the app.")
+                    }
+                }
+
                 Section {
                     LabeledContent("Offer notifications", value: me?.pushEnabled == true ? "On" : "Off")
                     Button("Notification settings") {
@@ -138,6 +165,14 @@ struct SettingsView: View {
             } message: {
                 Text("This can\u{2019}t be undone.")
             }
+            .sheet(isPresented: $showsPhoneLink) {
+                PhoneLinkSheet { profile in me = profile }
+            }
+            .confirmationDialog("Remove your number?", isPresented: $confirmsRemovePhone, titleVisibility: .visible) {
+                Button("Remove number", role: .destructive) { Task { await removePhone() } }
+            } message: {
+                Text("Workers\u{2019} twins will stop texting you. You can still follow jobs in the app.")
+            }
             .sheet(isPresented: $showsCalendarLink) {
                 CalendarLinkSheet { outcome in calendarNote = Self.note(for: outcome) }
             }
@@ -166,6 +201,24 @@ struct SettingsView: View {
             let profile: MeProfile = try await api.request(.get, "me")
             me = profile
             name = profile.displayName
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    private func setJobTexts(_ on: Bool) async {
+        guard let api = services.api else { return }
+        do {
+            me = try await api.request(.patch, "me/phone", body: ["jobTexts": on])
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    private func removePhone() async {
+        guard let api = services.api else { return }
+        do {
+            me = try await api.request(.delete, "me/phone")
         } catch {
             message = error.localizedDescription
         }

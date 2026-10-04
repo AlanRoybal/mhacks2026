@@ -128,7 +128,15 @@ struct RootTabView: View {
         }
         guard defaults.string(forKey: PushRoute.destinationKey) == "jobs" else { return }
         router.reset(to: .jobs)
-        defaults.removeObject(forKey: PushRoute.destinationKey)
+        let jobID = defaults.string(forKey: PushRoute.jobIDKey)
+        let opensJob = defaults.string(forKey: PushRoute.actionKey) == "open"
+        [PushRoute.destinationKey, PushRoute.actionKey, PushRoute.jobIDKey].forEach(defaults.removeObject(forKey:))
+        // A tapped update about a job you're working (e.g. a question from the poster) opens that job.
+        guard opensJob, let jobID else { return }
+        Task {
+            await marketplace.refresh(api: services.api)
+            if marketplace.workingJobs.contains(where: { $0.id == jobID }) { router.open(.jobDetail, workerJob: jobID) }
+        }
     }
 }
 

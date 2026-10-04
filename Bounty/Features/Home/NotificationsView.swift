@@ -162,7 +162,8 @@ private struct NotificationRow: View {
         switch item.type {
         case "offer": (.sparkles, BountyColor.yellow)
         case "offer_closed", "job_canceled", "worker_withdrew", "no_match_yet": (.hourglass, BountyColor.pill)
-        case "offer_accepted": (.userRound, BountyColor.lavenderSoft)
+        case "offer_accepted", "job_started": (.userRound, BountyColor.lavenderSoft)
+        case "thread_message": (.mail, BountyColor.sky)
         case "proof_ready", "proof_needs_decision", "proof_passed", "proof_escalated": (.shieldCheck, BountyColor.mint)
         case "proof_failed", "work_rejected": (.camera, BountyColor.cream)
         case "disputed", "resolved": (.flag, BountyColor.lavenderSoft)
