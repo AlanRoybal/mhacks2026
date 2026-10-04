@@ -60,6 +60,12 @@
 		F512E1F58EE4B3BF3293D44C /* GmailConnector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 983C07B6422F2BDF5703C0B9 /* GmailConnector.swift */; };
 		F5B1419706DA28BA5C504DB1 /* Job.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDEE0685875FF28B9B991034 /* Job.swift */; };
 		F60EC55A8E92B9A8A66F0C4D /* CoinbaseWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = A26A85414D248B6E3F7DD153 /* CoinbaseWalletSDK */; };
+		BD000000000000000000030B /* BountyLiveAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0000000000000000000301 /* BountyLiveAttributes.swift */; };
+		BD000000000000000000030C /* BountyLiveAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0000000000000000000301 /* BountyLiveAttributes.swift */; };
+		BD000000000000000000030D /* LiveTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0000000000000000000302 /* LiveTracker.swift */; };
+		BD000000000000000000030E /* LiveSessionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0000000000000000000303 /* LiveSessionCard.swift */; };
+		BD000000000000000000030F /* JobLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0000000000000000000304 /* JobLiveActivity.swift */; };
+		BD0000000000000000000310 /* BountyWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BD0000000000000000000306 /* BountyWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -118,7 +124,37 @@
 		F570C8F3A67231C4565BDF53 /* PostedJobDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostedJobDetailView.swift; sourceTree = "<group>"; };
 		FDEE0685875FF28B9B991034 /* Job.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Job.swift; sourceTree = "<group>"; };
 		FE4CCB7A0CC7D40B4A484826 /* MarketplaceEarnings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketplaceEarnings.swift; sourceTree = "<group>"; };
+		BD0000000000000000000301 /* BountyLiveAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BountyLiveAttributes.swift; sourceTree = "<group>"; };
+		BD0000000000000000000302 /* LiveTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTracker.swift; sourceTree = "<group>"; };
+		BD0000000000000000000303 /* LiveSessionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSessionCard.swift; sourceTree = "<group>"; };
+		BD0000000000000000000304 /* JobLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobLiveActivity.swift; sourceTree = "<group>"; };
+		BD0000000000000000000305 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BD0000000000000000000306 /* BountyWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BountyWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXContainerItemProxy section */
+		BD0000000000000000000324 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 209C86035F696DCD6A8B3A57 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BD000000000000000000031F;
+			remoteInfo = BountyWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		BD0000000000000000000323 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				BD0000000000000000000310 /* BountyWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		F9483A308D0E671F2026C6ED /* Frameworks */ = {
@@ -128,6 +164,13 @@
 				F60EC55A8E92B9A8A66F0C4D /* CoinbaseWalletSDK in Frameworks */,
 				B04F46213A684C485B7CA242 /* TwinKit in Frameworks */,
 				D2E427E75BB9E360579A53C7 /* StripePaymentSheet in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BD0000000000000000000321 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -168,6 +211,7 @@
 			isa = PBXGroup;
 			children = (
 				EF3E583821FF7F355811EAC9 /* Bounty.app */,
+				BD0000000000000000000306 /* BountyWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -180,6 +224,7 @@
 				7235CD2904B243EEAF06B4A9 /* Design */,
 				4FB8CB37CE0CB59DA1DD6786 /* Features */,
 				C641E77F3707AFA884A49491 /* Models */,
+				BD0000000000000000000315 /* Live */,
 				8382A70192A562C64ED9AFA4 /* Resources */,
 				C4E8A4CDA6E118A4D674531A /* Services */,
 			);
@@ -246,6 +291,7 @@
 			isa = PBXGroup;
 			children = (
 				31D185DA9D3C2251ADBCED05 /* Bounty */,
+				BD0000000000000000000316 /* BountyWidgets */,
 				5E99CE13E1E0A793BCE2C300 /* Config */,
 				9B382C510A78CB24D8367F76 /* Packages */,
 				14CAADA9C42464F5656FD4C9 /* Products */,
@@ -355,6 +401,25 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		BD0000000000000000000315 /* Live */ = {
+			isa = PBXGroup;
+			children = (
+				BD0000000000000000000301 /* BountyLiveAttributes.swift */,
+				BD0000000000000000000303 /* LiveSessionCard.swift */,
+				BD0000000000000000000302 /* LiveTracker.swift */,
+			);
+			path = Live;
+			sourceTree = "<group>";
+		};
+		BD0000000000000000000316 /* BountyWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				BD0000000000000000000305 /* Info.plist */,
+				BD0000000000000000000304 /* JobLiveActivity.swift */,
+			);
+			path = BountyWidgets;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -365,10 +430,12 @@
 				C993DA9255A88FA5CB5ED6E9 /* Sources */,
 				D16124D811F63A0A9DAB6D93 /* Resources */,
 				F9483A308D0E671F2026C6ED /* Frameworks */,
+				BD0000000000000000000323 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				BD0000000000000000000325 /* PBXTargetDependency */,
 			);
 			name = Bounty;
 			packageProductDependencies = (
@@ -380,6 +447,23 @@
 			productReference = EF3E583821FF7F355811EAC9 /* Bounty.app */;
 			productType = "com.apple.product-type.application";
 		};
+		BD000000000000000000031F /* BountyWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BD0000000000000000000329 /* Build configuration list for PBXNativeTarget "BountyWidgets" */;
+			buildPhases = (
+				BD0000000000000000000320 /* Sources */,
+				BD0000000000000000000321 /* Frameworks */,
+				BD0000000000000000000322 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BountyWidgets;
+			productName = BountyWidgets;
+			productReference = BD0000000000000000000306 /* BountyWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -389,6 +473,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					BD000000000000000000031F = {
+						DevelopmentTeam = DVX8YZ9GG9;
+						ProvisioningStyle = Automatic;
+					};
 					4E1E8CB3C8969962F03504E6 = {
 						DevelopmentTeam = DVX8YZ9GG9;
 						ProvisioningStyle = Automatic;
@@ -415,6 +503,7 @@
 			projectRoot = "";
 			targets = (
 				4E1E8CB3C8969962F03504E6 /* Bounty */,
+				BD000000000000000000031F /* BountyWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -428,6 +517,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BD0000000000000000000322 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -436,6 +532,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				85B63159010D69B7AE220FF5 /* AppRouter.swift in Sources */,
+				BD000000000000000000030B /* BountyLiveAttributes.swift in Sources */,
+				BD000000000000000000030D /* LiveTracker.swift in Sources */,
+				BD000000000000000000030E /* LiveSessionCard.swift in Sources */,
 				D2935B4C128BA8403A9A6F7A /* AppServices.swift in Sources */,
 				DBB03E4DF64D7E4FEF117C10 /* BackendJobsAPI.swift in Sources */,
 				27A55C706B72D4F97913F92B /* BountyApp.swift in Sources */,
@@ -487,7 +586,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BD0000000000000000000320 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BD000000000000000000030C /* BountyLiveAttributes.swift in Sources */,
+				BD000000000000000000030F /* JobLiveActivity.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BD0000000000000000000325 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BD000000000000000000031F /* BountyWidgets */;
+			targetProxy = BD0000000000000000000324 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		342FE7AA4E463D44F67F96EB /* Debug */ = {
@@ -552,6 +668,42 @@
 			};
 			name = Debug;
 		};
+		BD000000000000000000032A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BountyWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.alanroybal.BountyTwin.Widgets;
+				PRODUCT_NAME = BountyWidgets;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		BD000000000000000000032B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BountyWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.alanroybal.BountyTwin.Widgets;
+				PRODUCT_NAME = BountyWidgets;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -569,6 +721,15 @@
 			buildConfigurations = (
 				342FE7AA4E463D44F67F96EB /* Debug */,
 				8F2383395277C5B2EA3E06E5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BD0000000000000000000329 /* Build configuration list for PBXNativeTarget "BountyWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BD000000000000000000032A /* Debug */,
+				BD000000000000000000032B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
