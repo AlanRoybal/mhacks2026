@@ -60,17 +60,21 @@ About 130 tests run in a few seconds with no network. They cover:
 cd backend
 cp .env.example .env   # set JWT_SECRET, DEMO_MODE, AI and payment keys
 npx cdk bootstrap      # once per AWS account and region
-npx cdk deploy -c stage=dev
+npx cdk deploy -c stage=dev Bounty-dev
+scripts/deploy-payments.sh dev   # payments-server on EC2 behind CloudFront (BountyPayments-dev)
 ```
+
+Optional `backend/.env.aws` and `payments-server/.env.aws` hold deploy-only overrides (read before `.env`), such as the webhook secret of a Stripe dashboard endpoint, which differs from the `stripe listen` one used locally.
 
 Each stage name gets its own stack, so teammates can deploy `-c stage=alan` and `-c stage=vedansh` side by side. The outputs include:
 - `ApiUrl`: give it to the app.
 - `StripeWebhookUrl`: add it in the Stripe dashboard.
 - `LinkedInRedirectUrl`: add it to the LinkedIn app.
+- `PaymentsUrl` (BountyPayments stack): the app's `BOUNTY_SETTLEMENTS_BASE_URL`. Its Stripe webhook is `PaymentsWebhookUrl`.
 
 Watch the `EffectsDlqAlarm`. A message in that queue means a payout, refund, push, timer or grade failed every retry.
 
-The stack has not been deployed yet. [infra/README.md](infra/README.md) has handoff notes for whoever owns AWS: every setting, and what is still open.
+The `dev` stage is deployed in us-east-1. [infra/README.md](infra/README.md) has handoff notes for whoever owns AWS: every setting, and what is still open.
 
 ## How it fits together
 

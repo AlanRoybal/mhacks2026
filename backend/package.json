@@ -12,7 +12,8 @@
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "seed": "tsx scripts/seed.ts",
     "synth": "cdk synth",
-    "deploy": "cdk deploy --require-approval never"
+    "deploy": "cdk deploy --require-approval never \"Bounty-*\"",
+    "deploy:payments": "scripts/deploy-payments.sh"
   },
   "dependencies": {
     "@anthropic-ai/bedrock-sdk": "^0.34.2",

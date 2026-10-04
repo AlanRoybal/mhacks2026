@@ -1,10 +1,10 @@
 # AWS deployment: handoff notes
 
-This CDK app is a starting point for whoever owns AWS. `npm run synth` builds it cleanly, but it has never been deployed. Below is what it creates, what it needs, and what is still open.
+This CDK app is a starting point for whoever owns AWS. `npm run synth` builds it cleanly, and the `dev` stage is deployed. Below is what it creates, what it needs, and what is still open.
 
 ## What one stack creates
 
-Each stage gets its own stack (`npx cdk deploy -c stage=<name>`), so several people can deploy side by side.
+Each stage gets its own stack (`npx cdk deploy -c stage=<name> Bounty-<name>`), so several people can deploy side by side.
 
 | Resource | Purpose |
 |---|---|
@@ -24,7 +24,7 @@ The stack outputs `ApiUrl`, `StripeWebhookUrl`, `LinkedInRedirectUrl` and `Effec
 cd backend
 cp .env.example .env    # fill in the settings below
 npx cdk bootstrap       # once per account and region
-npx cdk deploy -c stage=dev
+npx cdk deploy -c stage=dev Bounty-dev
 ```
 
 `infra/app.ts` reads `backend/.env` and copies the settings listed in `PASSTHROUGH` (in `stack.ts`) into both Lambdas' environment. `PUBLIC_BASE_URL` is not among them, since it is the laptop's address; the stack uses the API's own URL instead.
@@ -57,4 +57,5 @@ After the deploy:
    - re-register the Stripe webhook and the LinkedIn redirect
 5. **Removal policy.** Any stage other than `prod` deletes its tables and bucket on `cdk destroy`. `prod` keeps them and turns on point-in-time recovery.
 6. **The stream starts at `LATEST`.** Ledger rows written before the worker's event source exists are not replayed. The sweep recovers timers, stalled matching, grading, payouts and refunds, but a lost push is not resent.
-7. **`payments-server/` is not deployed.** That is Caleb's standalone Stripe sandbox server. The main API serves the same checkout routes (`POST /payment-sheet`, `GET /jobs/{uuid}`), so the app only needs `ApiUrl`.
+7. **`payments-server/` runs on one EC2 instance** (`BountyPayments-<stage>`, `infra/payments-stack.ts`): a t4g.micro with an Elastic IP whose port 4242 accepts only CloudFront, which supplies HTTPS. Deploy and update it with `scripts/deploy-payments.sh <stage>`. Its settings live in the SecureString parameter `/bounty/<stage>/payments-server/env`, never in the template. SQLite sits in `/var/lib/bounty-payments` on the instance's EBS volume and has no backups; snapshot the volume before anything matters. Shell access is through Session Manager (`aws ssm start-session --target <InstanceId>`); there is no SSH.
+8. **Bedrock models.** This account can't invoke Claude Opus 4.7 or later on Bedrock, so `.env` uses the inference profile `us.anthropic.claude-opus-4-5-20251101-v1:0`. `src/ai/index.ts` picks the InvokeModel client for inference-profile IDs and Mantle for the rest.
