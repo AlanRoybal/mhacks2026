@@ -22,7 +22,7 @@ test("profile: read, edit the skill list, import a LinkedIn export, sync availab
   const edited = await api.call("PUT", "/profile/twin/skills", token, {
     skills: [{ id: "tmp", name: "Logo design", confidence: 0.9, source: "user", years_of_experience: null }],
   });
-  assert.deepEqual(edited.body.skills, [{ id: "logo design", name: "Logo design", confidence: 0.9, source: "user", years_of_experience: null }]);
+  assert.deepEqual(edited.body.skills, [{ id: "logo design", name: "Logo design", confidence: 0.9, source: "user", years_of_experience: null, track_record: null }]);
 
   // Upload a LinkedIn export the way ProfileIngestionService does.
   const target = await api.call("POST", "/profile/upload-url", token, {

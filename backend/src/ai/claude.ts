@@ -16,8 +16,10 @@ import {
   type ProfileInput,
   type RerankCandidate,
   type RerankPick,
+  RatingInsight,
+  type RatingInput,
 } from "./ai.js";
-import { CHECKLIST, EXTRACT_PROFILE, GRADE, RERANK } from "./prompts.js";
+import { CHECKLIST, EXTRACT_PROFILE, GRADE, RATING, RERANK } from "./prompts.js";
 
 type Effort = "low" | "medium" | "high";
 
@@ -188,5 +190,18 @@ export class ClaudeAi implements Ai {
       timeoutMs: 120_000,
     });
     return { ...result, model: this.model };
+  }
+
+  async assessRating(input: RatingInput): Promise<RatingInsight> {
+    const content: BetaContentBlockParam[] = [
+      { type: "text", text: jobText(input.job) },
+      { type: "text", text: tag("checklist", input.checklist.map((c) => `- ${c}`).join("\n") || "none") },
+      { type: "text", text: tag("rating", `${input.stars} of 5 stars`) },
+      { type: "text", text: tag("poster_comment", input.comment || "none") },
+      { type: "text", text: tag("proof_review", input.gradeSummary || "none") },
+      { type: "text", text: tag("worker_skills", input.workerSkills.join(", ") || "none yet") },
+      { type: "text", text: "Which skills did this job exercise, and what does the rating say about each?" },
+    ];
+    return this.call({ task: "rating", system: RATING, content, schema: RatingInsight, effort: "low", maxTokens: 1500, timeoutMs: 30_000 });
   }
 }

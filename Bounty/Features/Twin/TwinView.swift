@@ -348,7 +348,13 @@ private struct SkillRow: View {
                     .bountyType(.bodyStrong)
                     .foregroundStyle(BountyColor.inkPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Chip(label: sourceName, tone: skill.source == .linkedIn ? .lavender : .sky)
+                Chip(label: sourceName, tone: skill.source == .rating ? .mint : skill.source == .linkedIn ? .lavender : .sky)
+            }
+            if let record = skill.trackRecord, record.jobs > 0 {
+                // Like a rideshare rating, but per skill: what posters said about real jobs.
+                Text("\(record.averageStars.map { "\($0.formatted(.number.precision(.fractionLength(1))))\u{2605} · " } ?? "")\(record.jobs) rated job\(record.jobs == 1 ? "" : "s")")
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.mintInk)
             }
             HStack(spacing: 10) {
                 Meter(value: skill.confidence)
@@ -366,6 +372,7 @@ private struct SkillRow: View {
         case .resume: "Résumé"
         case .email: "Email"
         case .user: "Added by you"
+        case .rating: "Proven"
         }
     }
 }

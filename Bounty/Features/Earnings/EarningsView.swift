@@ -11,6 +11,7 @@ struct EarningsView: View {
     @State private var selected: EarningItem?
     @State private var showsSettings = false
     @State private var showsIncomeStatement = false
+    @State private var trust: WorkerTrustScore?
     private func amount(_ cents: Int) -> String { (Decimal(cents) / 100).formatted(.number.precision(.fractionLength(2))) }
     private func usd(_ value: Decimal?) -> String { (value ?? 0).formatted(.currency(code: "USD")) }
 
@@ -60,6 +61,11 @@ struct EarningsView: View {
                 BalanceTile(label: "USDC pending", amount: amount(usdcPendingCents), background: BountyColor.cream, foreground: BountyColor.creamInk)
             }
             .entrance(.rest(0))
+
+            if let trust {
+                TrustCard(trust: trust)
+                    .entrance(.rest(1))
+            }
 
             payoutPanel
                 .entrance(.rest(1))
@@ -158,6 +164,7 @@ struct EarningsView: View {
         async let marketplace: Void = earnings.refresh(api: services.api)
         async let usdc: Void = payments.refresh()
         _ = await (marketplace, usdc)
+        if let api = services.api { trust = try? await api.request(.get, "me/trust") }
     }
 }
 
@@ -321,4 +328,28 @@ private struct ActivityRow: View {
     EarningsView()
         .environment(AppServices())
         .environmentObject(WorkerPayments())
+}
+
+/// The worker's trust score and escrow limit: like a credit limit, it grows with rated work.
+private struct TrustCard: View {
+    let trust: WorkerTrustScore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("Trust score", icon: .badgeCheck)
+                    .bountyType(.bodyStrong)
+                Spacer()
+                Text(trust.score, format: .percent.precision(.fractionLength(0)))
+                    .bountyType(.bodyStrong)
+            }
+            .foregroundStyle(BountyColor.inkPrimary)
+            Meter(value: min(1, trust.openExposure / max(trust.exposureLimit, 1)))
+            Text("Suggested escrow limit \(trust.exposureLimit.formatted(.currency(code: "USD"))), with \(trust.openExposure.formatted(.currency(code: "USD"))) in jobs right now. Well-rated jobs for different people raise it.")
+                .bountyType(.footnote)
+                .foregroundStyle(BountyColor.inkSecondary)
+        }
+        .padding(16)
+        .borderedCard(radius: BountyRadius.row)
+    }
 }

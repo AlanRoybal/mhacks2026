@@ -5,8 +5,8 @@
 // - profile extraction: no fallback; the import is marked failed and the user retries (US-03)
 
 import type { Logger } from "../lib/log.js";
-import type { Ai, ChecklistDraft, GradeInput, GradeResult, JobBrief, ProfileExtraction, ProfileInput, RerankCandidate, RerankPick } from "./ai.js";
-import { heuristicRerank, templateChecklist } from "./fake.js";
+import type { Ai, ChecklistDraft, GradeInput, GradeResult, RatingInput, RatingInsight, JobBrief, ProfileExtraction, ProfileInput, RerankCandidate, RerankPick } from "./ai.js";
+import { heuristicRerank, templateChecklist, fakeRatingInsight } from "./fake.js";
 
 export class ResilientAi implements Ai {
   readonly name: string;
@@ -51,6 +51,15 @@ export class ResilientAi implements Ai {
         workerFeedback: "",
         model: "unavailable",
       };
+    }
+  }
+
+  async assessRating(input: RatingInput): Promise<RatingInsight> {
+    try {
+      return await this.inner.assessRating(input);
+    } catch (error) {
+      this.log.warn("Rating AI failed; crediting the job's category", { error });
+      return fakeRatingInsight(input);
     }
   }
 }

@@ -14,12 +14,13 @@ import type { Actor, Job, Offer, User } from "../domain/types.js";
 import { applyEvent } from "./jobs.js";
 import { briefOf } from "./postings.js";
 import { activeSkills, readiness, twinDocument } from "./twin.js";
+import { averageStars } from "./trackRecord.js";
 import { reliability } from "./users.js";
 
 const SYSTEM: Actor = { kind: "system", source: "matching" };
 const RERANK_POOL = 8;
 const MIN_FIT = 40;
-const SOURCE_LABEL = { linkedin: "LinkedIn", resume: "résumé", email: "email", user: "self-reported" } as const;
+const SOURCE_LABEL = { linkedin: "LinkedIn", resume: "résumé", email: "email", user: "self-reported", rating: "rated jobs" } as const;
 
 const jobDocument = (job: Job) => `${job.title}\n${job.category.toLowerCase().replace("_", " ")}\n${job.description}`;
 
@@ -58,7 +59,11 @@ export function rerankCandidate(user: User, score: number, distanceKm?: number):
     summary: user.twin.summary,
     skills: activeSkills(user.twin)
       .slice(0, 8)
-      .map((s) => `${s.name} (${s.sources.map((src) => SOURCE_LABEL[src.kind]).join(", ")})`),
+      .map((s) => {
+        const from = [...new Set(s.sources.map((src) => SOURCE_LABEL[src.kind]))].join(", ");
+        const record = s.record?.jobs ? `; ${s.record.jobs} rated job${s.record.jobs === 1 ? "" : "s"}, avg ${averageStars(s)}\u2605` : "";
+        return `${s.name} (${from}${record})`;
+      }),
     distanceKm,
     reliability: reliability(user.stats).score,
     score,

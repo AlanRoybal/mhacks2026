@@ -36,6 +36,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var me: MeProfile?
+    /// Risk metrics (`GET /me/trust`): trust score and suggested escrow limit, shown as one row.
+    @State private var trust: WorkerTrustScore?
     @State private var name = ""
     @State private var message: String?
     @State private var isWorking = false
@@ -65,10 +67,14 @@ struct SettingsView: View {
                         LabeledContent("Jobs completed", value: "\(stats.jobsCompleted)")
                         if let rating = stats.workerRating { LabeledContent("Rating as a worker", value: "★ \(rating.formatted())") }
                         if let rating = stats.posterRating { LabeledContent("Rating as a poster", value: "★ \(rating.formatted())") }
+                        if let trust {
+                            LabeledContent("Risk", value: "Trust \(trust.score.formatted(.percent.precision(.fractionLength(0)))) · \(trust.openExposure.formatted(.currency(code: "USD").precision(.fractionLength(0)))) of \(trust.exposureLimit.formatted(.currency(code: "USD").precision(.fractionLength(0)))) limit")
+                                .accessibilityLabel("Risk: trust score \(trust.score.formatted(.percent.precision(.fractionLength(0)))), \(trust.openExposure.formatted(.currency(code: "USD"))) held of a \(trust.exposureLimit.formatted(.currency(code: "USD"))) suggested escrow limit")
+                        }
                     } header: {
                         Text("Your stats")
                     } footer: {
-                        Text("Expired offers, withdrawals and failed jobs lower reliability, which affects matching.")
+                        Text("Expired offers, withdrawals and failed jobs lower reliability, which affects matching. Risk is your trust score from rated work and how much escrow you hold against the suggested limit; it doesn\u{2019}t affect matching.")
                     }
                 }
 
@@ -166,6 +172,7 @@ struct SettingsView: View {
             let profile: MeProfile = try await api.request(.get, "me")
             me = profile
             name = profile.displayName
+            trust = try? await api.request(.get, "me/trust")
         } catch {
             message = error.localizedDescription
         }

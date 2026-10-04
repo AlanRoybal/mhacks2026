@@ -2,7 +2,7 @@
 // for the checklist and ranking tasks, as the fallback when Claude is unavailable.
 
 import type { Category } from "../domain/types.js";
-import type { Ai, ChecklistDraft, GradeInput, GradeResult, JobBrief, ProfileExtraction, ProfileInput, RerankCandidate, RerankPick } from "./ai.js";
+import type { Ai, ChecklistDraft, GradeInput, GradeResult, RatingInput, RatingInsight, JobBrief, ProfileExtraction, ProfileInput, RerankCandidate, RerankPick } from "./ai.js";
 
 type DraftItem = ChecklistDraft["items"][number];
 
@@ -161,4 +161,31 @@ export class FakeAi implements Ai {
       model: "fake",
     };
   }
+
+  async assessRating(input: RatingInput): Promise<RatingInsight> {
+    return fakeRatingInsight(input);
+  }
+}
+
+const CATEGORY_SKILL: Record<Category, { name: string; category: string }> = {
+  DESIGN: { name: "Graphic design", category: "design" },
+  HOME: { name: "Home repair", category: "home" },
+  YARD_WORK: { name: "Yard work", category: "yard work" },
+  MOVING: { name: "Moving help", category: "moving" },
+  TUTORING: { name: "Tutoring", category: "tutoring" },
+  PHOTOGRAPHY: { name: "Photography", category: "photography" },
+  TECHNOLOGY: { name: "Tech help", category: "technology" },
+  ERRANDS: { name: "Errands", category: "errands" },
+  OTHER: { name: "General help", category: "other" },
+};
+
+// Offline: credit the worker's existing skill that the job's title mentions, or the job's category,
+// with a verdict straight from the stars.
+export function fakeRatingInsight(input: RatingInput): RatingInsight {
+  const verdict = input.stars >= 4 ? "strong" : input.stars === 3 ? "adequate" : "weak";
+  const words = `${input.job.title} ${input.job.description}`.toLowerCase();
+  const existing = input.workerSkills.find((s) => s.toLowerCase().split(/\s+/).some((w) => w.length > 3 && words.includes(w)));
+  const fallback = CATEGORY_SKILL[input.job.category];
+  const evidence = input.comment?.trim() ? `${input.stars} stars: "${input.comment.trim().slice(0, 60)}"` : `${input.stars} stars from the poster`;
+  return { skills: [{ name: existing ?? fallback.name, category: fallback.category, verdict, evidence }] };
 }

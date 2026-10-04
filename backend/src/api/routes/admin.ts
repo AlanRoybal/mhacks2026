@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Deps } from "../../deps.js";
 import { forbidden } from "../../lib/errors.js";
+import { riskReport } from "../../services/risk.js";
 import { isAdmin } from "../auth.js";
 import type { AppEnv } from "../http.js";
 import { jobWire, WireContext } from "../wire.js";
@@ -23,6 +24,10 @@ export function adminRoutes(deps: Deps): Hono<AppEnv> {
       .sort((a, b) => (a.dispute?.openedAt ?? "").localeCompare(b.dispute?.openedAt ?? ""));
     return c.json(await Promise.all(jobs.map((j) => jobWire(ctx, j, user))));
   });
+
+  // The platform's escrow risk: exposure, Monte Carlo expected loss, VaR and the reserve to hold
+  // (99% Expected Shortfall), concentration, possible rating rings and the riskiest escrows.
+  app.get("/risk", async (c) => c.json(await riskReport(deps)));
 
   return app;
 }

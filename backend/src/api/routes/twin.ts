@@ -8,13 +8,14 @@ import { Category, type SkillSourceKind, type User } from "../../domain/types.js
 import { AppError, badRequest, notFound } from "../../lib/errors.js";
 import { activeSkills, deleteSkill, normName, readiness, refreshEmbedding, upsertSkill } from "../../services/twin.js";
 import { exchangeGoogleCode, readSentMail, revokeGoogleToken } from "../../services/gmail.js";
+import { averageStars } from "../../services/trackRecord.js";
 import { updateUser } from "../../services/users.js";
 import { parseBody, type AppEnv } from "../http.js";
 import { kmToMiles, milesToKm, wireDate } from "../wire.js";
 import { ownedUploadKey } from "./uploads.js";
 
 // Labels the app shows next to each skill ("From LinkedIn").
-const SOURCE_LABEL: Record<SkillSourceKind, string> = { linkedin: "LinkedIn", resume: "Résumé", email: "Email", user: "Added by you" };
+const SOURCE_LABEL: Record<SkillSourceKind, string> = { linkedin: "LinkedIn", resume: "Résumé", email: "Email", user: "Added by you", rating: "Rated work" };
 
 const UploadKind = z.enum(["resume_pdf", "linkedin_pdf", "linkedin_zip"]);
 
@@ -51,6 +52,7 @@ export function twinView(deps: Deps, user: User) {
       confidence: s.confidence,
       userEdited: s.userEdited,
       sources: s.sources.map((src) => ({ kind: src.kind, label: SOURCE_LABEL[src.kind], evidence: src.evidence })),
+      trackRecord: s.record ? { jobs: s.record.jobs, averageStars: averageStars(s) } : null,
     })),
     roles: t.roles,
     education: t.education,

@@ -11,6 +11,7 @@ import { newId } from "../../domain/ids.js";
 import type { User } from "../../domain/types.js";
 import { badRequest } from "../../lib/errors.js";
 import { activeSkills, refreshEmbedding, replaceSkills } from "../../services/twin.js";
+import { averageStars } from "../../services/trackRecord.js";
 import { updateUser } from "../../services/users.js";
 import { parseBody, type AppEnv } from "../http.js";
 import { wireDate } from "../wire.js";
@@ -32,8 +33,10 @@ export function twinProfileDto(user: User) {
       id: s.normName,
       name: s.name,
       confidence: s.confidence,
-      source: s.sources[0]?.kind ?? "user",
+      // A track record from rated work outranks where the skill was first found.
+      source: s.record ? "rating" : (s.sources[0]?.kind ?? "user"),
       years_of_experience: null,
+      track_record: s.record ? { jobs: s.record.jobs, average_stars: averageStars(s) } : null,
     })),
     roles: t.roles.map((r) => (r.org ? `${r.title}, ${r.org}` : r.title)),
     education: t.education.map((e) => [e.degree, e.field, e.school].filter(Boolean).join(", ")),

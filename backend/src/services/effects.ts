@@ -72,6 +72,9 @@ async function runEffect(deps: Deps, ledger: LedgerEvent, effect: Effect): Promi
     case "match":
       await deps.tasks.run({ kind: "task", name: "match_job", jobId: ledger.jobId });
       return;
+    case "learn":
+      await deps.tasks.run({ kind: "task", name: "learn_rating", jobId: ledger.jobId });
+      return;
     case "offer.next":
       await sendNextOffer(deps, ledger.jobId);
       return;

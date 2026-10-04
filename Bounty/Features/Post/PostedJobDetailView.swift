@@ -73,6 +73,11 @@ struct PostedJobDetailView: View {
                     }
                 }
 
+                if let risk = job.risk {
+                    EscrowRiskCard(risk: risk)
+                        .entrance(.rest(0))
+                }
+
                 // Step 9: paid or refunded jobs ask for a rating, then show the one given.
                 RateWorkerCard(job: job)
                     .entrance(.rest(0))
@@ -378,4 +383,46 @@ private struct StatusTimeline: View {
     PostedJobDetailView()
         .environment(AppRouter())
         .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))
+}
+
+/// What's at risk in this escrow, the way a lender would put it: the chance of a loss, how much of the
+/// money that loss would take, and the expected loss, plus the worker's trust behind those numbers.
+private struct EscrowRiskCard: View {
+    let risk: EscrowRisk
+
+    private func percent(_ x: Double) -> String { x.formatted(.percent.precision(.fractionLength(x < 0.1 ? 1 : 0))) }
+
+    private var tone: ChipTone {
+        switch risk.tier {
+        case "A", "B": .mint
+        case "C": .cream
+        default: .coral
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Escrow risk", icon: .shieldCheck)
+                    .bountyType(.bodyStrong)
+                    .foregroundStyle(BountyColor.inkPrimary)
+                Spacer()
+                Chip(label: "Tier \(risk.tier)", tone: tone)
+            }
+            Text("Expected loss \(risk.expectedLoss.formatted(.currency(code: "USD"))) on \(risk.exposure.formatted(.currency(code: "USD"))): \(percent(risk.probabilityOfLoss)) chance \u{00D7} \(percent(risk.lossGivenDefault)) of the escrow.")
+                .bountyType(.footnote)
+                .foregroundStyle(BountyColor.inkSecondary)
+            if let worker = risk.worker {
+                Text("Worker trust \(percent(worker.trust)) (at least \(percent(worker.conservative)) with 95% confidence, from \(worker.ratedJobs.formatted()) weighted jobs).")
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.inkSecondary)
+            }
+            Text(risk.rail == "usdc" ? "Paid in USDC: a release can\u{2019}t be charged back." : "Paid by card: refunds keep the processing fee, and payouts can be charged back.")
+                .bountyType(.caption)
+                .foregroundStyle(BountyColor.inkTertiary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .borderedCard(radius: BountyRadius.row)
+    }
 }
