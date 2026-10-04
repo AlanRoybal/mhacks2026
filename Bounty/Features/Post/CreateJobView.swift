@@ -146,23 +146,24 @@ struct CreateJobView: View {
                 }
             }
             .entrance(.rest(3))
-        } bottom: {
-            VStack(spacing: 10) {
-                if let problem = draft.problem {
-                    // The bottom bar is see-through, so the hint gets its own backing.
+
+            // Says what's missing while the checklist button is disabled.
+            if let problem = draft.problem {
+                HStack(spacing: 8) {
+                    IconGlyph(icon: .pencil, size: 16)
                     Text(problem)
                         .bountyType(.footnote)
-                        .foregroundStyle(BountyColor.creamInk)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(BountyColor.cream, in: Capsule())
-                        .transition(.opacity)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                PillButton(title: "Draft the proof checklist", icon: .sparkles) { router.open(.proofChecklist) }
-                    .disabled(draft.problem != nil)
-                    .opacity(draft.problem == nil ? 1 : 0.4)
+                .foregroundStyle(BountyColor.creamInk)
+                .padding(12)
+                .tintedPanel(BountyColor.cream, radius: BountyRadius.row)
+                .transition(.opacity)
             }
-            .animation(Motion.pressTint, value: draft.problem)
+        } bottom: {
+            PillButton(title: "Draft the proof checklist", icon: .sparkles) { router.open(.proofChecklist) }
+                .disabled(draft.problem != nil)
+                .opacity(draft.problem == nil ? 1 : 0.4)
         }
         .sheet(isPresented: $pickingLocation) {
             LocationPicker(location: Binding(
