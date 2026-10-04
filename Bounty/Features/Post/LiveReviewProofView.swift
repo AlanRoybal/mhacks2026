@@ -155,7 +155,8 @@ struct LiveReviewProofView: View {
                     .disabled(isApproving)
                 }
             } else {
-                PillButton(title: "Done") {
+                // Grey while the rating card's button is the main action, so two yellows don't stack.
+                PillButton(title: "Done", style: job?.canRateWorker == true ? .secondary : .primary) {
                     router.jobsSegment = .posted
                     router.finish(on: .jobs)
                 }
