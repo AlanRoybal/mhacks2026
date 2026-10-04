@@ -5,6 +5,9 @@ options:
     iOS: "17.0"
   createIntermediateGroups: true
 packages:
+  CoinbaseWallet:
+    url: https://github.com/MobileWalletProtocol/wallet-mobile-sdk
+    exactVersion: 1.1.2
   TwinKit:
     path: Packages/TwinKit
   Stripe:
@@ -35,6 +38,8 @@ targets:
         excludes:
           - Info.plist
     dependencies:
+      - package: CoinbaseWallet
+        product: CoinbaseWalletSDK
       - package: TwinKit
         product: TwinKit
       - package: Stripe
@@ -67,6 +72,8 @@ targets:
         BountyLinkedInClientID: 86rcq1bjy06k5g
         # Set in Config/*.xcconfig (Local.xcconfig for your machine).
         BountyAPIBaseURL: $(BOUNTY_API_BASE_URL)
+        LSApplicationQueriesSchemes: [cbwallet, "mwp+1.1"]
+        BountySettlementsBaseURL: $(BOUNTY_SETTLEMENTS_BASE_URL)
         BountyPaymentsBaseURL: $(BOUNTY_PAYMENTS_BASE_URL)
         BountyApplePayMerchantIdentifier: $(BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER)
         NSAppTransportSecurity:

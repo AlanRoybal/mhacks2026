@@ -43,6 +43,9 @@
 		A10000000000000000000001 /* PaymentCheckoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* PaymentCheckoutView.swift */; };
 		A10000000000000000000003 /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000004 /* StripePaymentSheet */; };
 		BD0000000000000000000001 /* PostDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0000000000000000000002 /* PostDraft.swift */; };
+		A20000000000000000000001 /* CryptoCheckoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002; };
+		A20000000000000000000003 /* WorkerPayments.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004; };
+		A20000000000000000000005 /* CoinbaseWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000006; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -87,6 +90,8 @@
 		A10000000000000000000008 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000009 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		BD0000000000000000000002 /* PostDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDraft.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* CryptoCheckoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoCheckoutView.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* WorkerPayments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerPayments.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,6 +101,7 @@
 			files = (
 				F60EC55A8E92B9A8A66F0C4D /* TwinKit in Frameworks */,
 				A10000000000000000000003 /* StripePaymentSheet in Frameworks */,
+				A20000000000000000000005 /* CoinbaseWalletSDK in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -236,6 +242,7 @@
 			isa = PBXGroup;
 			children = (
 				125590A634C7CB2F1390755A /* EarningsView.swift */,
+				A20000000000000000000004 /* WorkerPayments.swift */,
 			);
 			path = Earnings;
 			sourceTree = "<group>";
@@ -268,6 +275,7 @@
 				C02843E421DAC584DB3C2101 /* RateWorkerCard.swift */,
 				7F611717A4A9F0276C3E9675 /* CreateJobView.swift */,
 				A10000000000000000000002 /* PaymentCheckoutView.swift */,
+				A20000000000000000000002 /* CryptoCheckoutView.swift */,
 				BD0000000000000000000002 /* PostDraft.swift */,
 			);
 			path = Post;
@@ -312,6 +320,7 @@
 			packageProductDependencies = (
 				58A11A2658EE3AFE68C27C79 /* TwinKit */,
 				A10000000000000000000004 /* StripePaymentSheet */,
+				A20000000000000000000006 /* CoinbaseWalletSDK */,
 			);
 			productName = Bounty;
 			productReference = EF3E583821FF7F355811EAC9 /* Bounty.app */;
@@ -345,6 +354,7 @@
 			packageReferences = (
 				69A3EBA9E352469FFF140541 /* XCLocalSwiftPackageReference "Packages/TwinKit" */,
 				A10000000000000000000005 /* XCRemoteSwiftPackageReference "stripe-ios-spm" */,
+				A20000000000000000000007 /* XCRemoteSwiftPackageReference "wallet-mobile-sdk" */,
 			);
 			preferredProjectObjectVersion = 54;
 			projectDirPath = "";
@@ -373,6 +383,8 @@
 			files = (
 				85B63159010D69B7AE220FF5 /* AppRouter.swift in Sources */,
 				A10000000000000000000001 /* PaymentCheckoutView.swift in Sources */,
+				A20000000000000000000001 /* CryptoCheckoutView.swift in Sources */,
+				A20000000000000000000003 /* WorkerPayments.swift in Sources */,
 				BD0000000000000000000001 /* PostDraft.swift in Sources */,
 				D2935B4C128BA8403A9A6F7A /* AppServices.swift in Sources */,
 				27A55C706B72D4F97913F92B /* BountyApp.swift in Sources */,
@@ -511,6 +523,7 @@
 				version = 26.12.1;
 			};
 		};
+		A20000000000000000000007 /* wallet-mobile-sdk */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/MobileWalletProtocol/wallet-mobile-sdk"; requirement = {kind = exactVersion; version = 1.1.2; }; };
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -523,6 +536,7 @@
 			package = A10000000000000000000005 /* XCRemoteSwiftPackageReference "stripe-ios-spm" */;
 			productName = StripePaymentSheet;
 		};
+		A20000000000000000000006 /* CoinbaseWalletSDK */ = {isa = XCSwiftPackageProductDependency; package = A20000000000000000000007; productName = CoinbaseWalletSDK; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 209C86035F696DCD6A8B3A57 /* Project object */;

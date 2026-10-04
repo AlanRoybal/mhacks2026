@@ -1,7 +1,12 @@
 import SwiftUI
+import SafariServices
 
 /// 17 Earnings.
 struct EarningsView: View {
+    @EnvironmentObject private var payments: WorkerPayments
+    @State private var onboarding: PayoutSetup?
+    private func amount(_ cents: Int) -> String { (Decimal(cents) / 100).formatted(.number.precision(.fractionLength(2))) }
+
     var body: some View {
         BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 360)) {
             ScreenTitle(title: "Earnings") {
@@ -11,14 +16,14 @@ struct EarningsView: View {
 
             StackCard(tone: .yellow, height: 180, bandTop: 135) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("This week")
+                    Text("Transferred")
                         .bountyType(.subheadStrong)
-                    Text("$124.00")
+                    Text("$\(amount(payments.earnings?.totals.usd.releasedCents ?? 0))")
                         .bountyType(.moneyL)
-                    Text("USD $99 · USDC $25")
+                    Text("USDC \(amount(payments.earnings?.totals.usdc.releasedCents ?? 0)) to your wallet")
                         .bountyType(.footnote)
                         .foregroundStyle(BountyColor.inkPill)
-                    Chip(label: "+$60 since Monday", tone: .dark)
+                    Chip(label: "USD and USDC", tone: .dark)
                         .padding(.top, 6)
                 }
                 .foregroundStyle(BountyColor.inkPrimary)
@@ -34,26 +39,51 @@ struct EarningsView: View {
             .entrance(.top)
 
             HStack(spacing: 10) {
-                BalanceTile(label: "In escrow", amount: "$50", background: BountyColor.grey, foreground: BountyColor.navy)
-                BalanceTile(label: "Releasing", amount: "$15", background: BountyColor.cream, foreground: BountyColor.creamInk)
-                BalanceTile(label: "Paid out", amount: "$74", background: BountyColor.mint, foreground: BountyColor.mintInk)
+                BalanceTile(label: "USD pending", amount: "$\(amount(payments.earnings?.totals.usd.pendingCents ?? 0))", background: BountyColor.grey, foreground: BountyColor.navy)
+                BalanceTile(label: "USDC pending", amount: amount(payments.earnings?.totals.usdc.pendingCents ?? 0), background: BountyColor.cream, foreground: BountyColor.creamInk)
             }
-            .entrance(.top)
-
-            SectionHeader(title: "Activity", trailing: "Bank ••4821")
-                .entrance(.rest(0))
-
-            VStack(spacing: 0) {
-                ActivityRow(sticker: .poster, tile: BountyColor.lavender, title: "Event poster concepts", detail: "Stripe · paid out Oct 1", amount: "+$60.00", settled: true)
-                ActivityRow(sticker: .book, tile: BountyColor.sky, title: "Calculus worksheet", detail: "USDC · Base Sepolia · 0x8f3…a21", amount: "+$25.00", settled: true)
-                ActivityRow(sticker: .coffee, tile: BountyColor.cream, title: "Coffee shop logo", detail: "Stripe · releases in 1h 58m", amount: "$15.00", settled: false)
+            Text("Stripe transfers credit your connected account. Bank payouts happen separately.")
+                .bountyType(.footnote)
+            SectionHeader(title: "Activity")
+            if let earnings = payments.earnings {
+                if earnings.entries.isEmpty { Text("No earnings yet.").bountyType(.footnote) }
+                ForEach(earnings.entries) { entry in
+                    VStack(alignment: .leading, spacing: 6) {
+                        ActivityRow(sticker: .coins, tile: BountyColor.mint, title: entry.title,
+                            detail: JobStatus.api(entry.status).rawValue,
+                            amount: "\(amount(entry.amountCents)) \(entry.rail.uppercased())", settled: entry.status == "released")
+                        if let issue = entry.issue { Text(issue).bountyType(.footnote) }
+                        if entry.rail == "usdc", let hash = entry.reference,
+                           let url = URL(string: "https://sepolia.basescan.org/tx/\(hash)") {
+                            Link("View transaction", destination: url).bountyType(.footnote)
+                        }
+                    }.padding(14).borderedCard()
+                }
+            } else if payments.busy { ProgressView("Loading earnings…") }
+            SectionHeader(title: "Payout setup")
+            PillButton(title: "Set up Stripe payouts") {
+                Task { if let url = await payments.onboardingURL() { onboarding = PayoutSetup(url: url) } }
+            }.disabled(payments.busy)
+            PillButton(title: "Connect USDC payout wallet", style: .secondary) {
+                Task { await payments.connectWallet() }
+            }.disabled(payments.busy)
+            if let address = payments.profile?.walletAddress { Text(address).font(.caption.monospaced()).textSelection(.enabled) }
+            if let message = payments.message {
+                Text(message).bountyType(.footnote)
+                Button("Try again") { Task { await payments.refresh() } }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 4)
-            .borderedCard()
-            .entrance(.rest(1))
         }
+        .task { await payments.refresh() }
+        .refreshable { await payments.refresh() }
+        .sheet(item: $onboarding, onDismiss: { Task { await payments.refresh() } }) { setup in PayoutBrowser(url: setup.url) }
     }
+}
+
+private struct PayoutSetup: Identifiable { let id = UUID(); let url: URL }
+private struct PayoutBrowser: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> SFSafariViewController { SFSafariViewController(url: url) }
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
 
 private struct BalanceTile: View {
@@ -97,5 +127,5 @@ private struct ActivityRow: View {
 }
 
 #Preview {
-    EarningsView()
+    EarningsView().environmentObject(WorkerPayments())
 }

@@ -10,15 +10,17 @@ struct JobsView: View {
     @Environment(AppRouter.self) private var router
     // Jobs funded through Stripe checkout (real data) come before the sample cards.
     @EnvironmentObject private var postedJobs: PostedJobsStore
+    @EnvironmentObject private var workerPayments: WorkerPayments
+    @State private var selectedJob: Job?
     // The poster's jobs from the backend (GET /jobs/mine), or sample jobs when it isn't running.
     @Environment(PosterStore.self) private var posterStore
 
     private func jobs(for segment: JobsSegment) -> [Job] {
         switch segment {
-        case .working: SampleJobs.working
+        case .working: workerPayments.jobs.filter { ![.paid, .refunded].contains($0.status) }
         // Checkout jobs the backend hasn't listed yet; normally they all come through `posterStore`.
         case .posted: postedJobs.fundedJobs.map(\.job).filter { posterStore.job($0.id) == nil }
-        case .done: SampleJobs.working.filter { $0.status == .paid }
+        case .done: workerPayments.jobs.filter { [.paid, .refunded].contains($0.status) }
         }
     }
 
@@ -60,6 +62,8 @@ struct JobsView: View {
                     .foregroundStyle(BountyColor.inkTertiary)
             }
         }
+        .sheet(item: $selectedJob) { job in NavigationStack { FundedJobDetailView(job: job) } }
+        .task { await postedJobs.refresh(); await workerPayments.refresh() }
         .task(id: router.jobsSegment) {
             // Keep the Posted list live while it's on screen; push alerts take over once wired up.
             guard router.jobsSegment == .posted else { return }
@@ -70,18 +74,8 @@ struct JobsView: View {
         }
     }
 
-    private func open(_ job: Job) {
-        if router.jobsSegment == .posted {
-            // A job that is only funded has no proof to review yet.
-            if job.status != .funded { router.open(.reviewProof) }
-            return
-        }
-        switch job.status {
-        case .offered: router.open(.offer)
-        case .accepted, .inProgress: router.open(.jobDetail)
-        case .funded, .inReview, .paid: break
-        }
-    }
+    private func open(_ job: Job) { selectedJob = job }
+
 }
 
 private struct JobCard: View {
@@ -90,11 +84,11 @@ private struct JobCard: View {
     let action: () -> Void
 
     private var detail: String {
-        isPosted ? "Jordan · submitted proof" : "\(job.location) · \(job.deadline)"
+        "\(job.location) · \(job.deadline)"
     }
 
     private var statusLabel: String {
-        isPosted ? "Needs your review" : job.status.rawValue
+        job.status.rawValue
     }
 
     var body: some View {
@@ -108,11 +102,11 @@ private struct JobCard: View {
                     Text(detail)
                         .bountyType(.footnote)
                         .foregroundStyle(BountyColor.inkSecondary)
-                    Chip(label: statusLabel, tone: isPosted ? .yellow : job.status.chipTone)
+                    Chip(label: statusLabel, tone: job.status.chipTone)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .multilineTextAlignment(.leading)
-                Text("$\(job.pay)")
+                Text(job.displayPay)
                     .bountyType(.moneyM)
                     .foregroundStyle(BountyColor.inkPrimary)
             }
@@ -243,6 +237,7 @@ private struct SampleReviewProofView: View {
 #Preview("Jobs") {
     JobsView()
         .environment(AppRouter())
+        .environmentObject(WorkerPayments())
         .environmentObject(PostedJobsStore())
         .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))
 }
@@ -250,5 +245,82 @@ private struct SampleReviewProofView: View {
 #Preview("Review proof") {
     ReviewProofView()
         .environment(AppRouter())
+        .environmentObject(WorkerPayments())
         .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))
+}
+
+struct FundedJobDetailView: View {
+    @EnvironmentObject private var postedJobs: PostedJobsStore
+    @EnvironmentObject private var workerPayments: WorkerPayments
+    @State private var refundBusy = false
+    @State private var refundMessage: String?
+    let job: Job
+    private var currentStatus: JobStatus {
+        workerPayments.jobs.first(where: { $0.id == job.id })?.status
+            ?? postedJobs.fundedJobs.first(where: { $0.id.uuidString.lowercased() == job.id }).map { JobStatus.api($0.status) } ?? job.status
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(job.displayPay)
+                        .font(.system(size: 42, weight: .bold, design: .rounded))
+                    Text(job.title)
+                        .font(.title2.bold())
+                    Label(currentStatus.rawValue, systemImage: "clock.fill")
+                        .foregroundStyle(BountyColor.greenInk)
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Job details")
+                        .font(.headline)
+                    Text(postedJobs.fundedJobs.first { $0.id.uuidString.lowercased() == job.id }?.details ?? job.location)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(16)
+                .borderedCard()
+
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Proof checklist")
+                        .font(.headline)
+                    Label("Show the finished work clearly", systemImage: "checkmark.circle")
+                    Label("Include the one-time code", systemImage: "checkmark.circle")
+                    Label("Submit before \(job.deadline)", systemImage: "checkmark.circle")
+                }
+                .padding(16)
+                .borderedCard()
+
+                if let posted = postedJobs.fundedJobs.first(where: { $0.id.uuidString.lowercased() == job.id }), posted.fundingRail == "usdc",
+                   !["released", "refunded"].contains(posted.status),
+                   (posted.deadlineDate ?? .distantFuture) <= Date() {
+                    Button(refundBusy ? "Confirming refund…" : "Refund expired job") { Task { await refund(posted) } }
+                        .buttonStyle(.bordered)
+                        .disabled(refundBusy)
+                }
+                if let refundMessage { Text(refundMessage).font(.footnote).foregroundStyle(.secondary) }
+            }
+            .padding()
+        }
+        .background(Color(uiColor: .systemGroupedBackground))
+        .navigationTitle("Job")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+    @MainActor
+    private func refund(_ posted: FundedJob) async {
+        refundBusy = true; refundMessage = nil
+        defer { refundBusy = false }
+        do {
+            let api = PaymentAPI(baseURLKey: "BountySettlementsBaseURL")
+            let transaction: CryptoTransaction = try await api.request(path: "crypto/jobs/\(posted.id.uuidString.lowercased())/refund-transaction", method: "GET")
+            let wallet = BountyWallet.shared
+            try await wallet.connect()
+            guard wallet.address?.lowercased() == posted.posterWallet?.lowercased() else { throw PaymentAPIError(message: "Connect the wallet that funded this job.") }
+            let hash = try await wallet.send(to: transaction.to, data: transaction.data)
+            let confirmed: FundedJob = try await api.request(path: "crypto/jobs/\(posted.id.uuidString.lowercased())/confirm", method: "POST",
+                body: JSONEncoder().encode(["transactionHash": hash]))
+            postedJobs.record(confirmed)
+            refundMessage = confirmed.status == "refunded" ? "USDC refunded to your wallet." : "Refund is still being confirmed."
+        } catch { refundMessage = error.localizedDescription }
+    }
 }

@@ -7,18 +7,26 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "node --env-file-if-exists=.env --watch server.mjs",
-    "start": "node --env-file-if-exists=.env server.mjs",
-    "test": "node --test payments.test.mjs",
+    "dev": "node --env-file-if-exists=.env --env-file-if-exists=.env.chain --watch server.mjs",
+    "start": "node --env-file-if-exists=.env --env-file-if-exists=.env.chain server.mjs",
+    "test": "node --test payments.test.mjs settlements.test.mjs",
+    "test:contracts": "forge test --root ../contracts",
+    "test:chain": "forge build --root ../contracts && node chain-smoke-test.mjs",
+    "test:settlements": "node --env-file=.env settlement-smoke-test.mjs",
+    "setup:chain": "node setup-test-env.mjs",
+    "deploy:sepolia": "forge build --root ../contracts && node --env-file=.env.chain deploy-escrow.mjs",
     "test:sandbox": "node --env-file=.env smoke-test.mjs",
     "test:webhook": "node --env-file=.env smoke-test.mjs --webhook",
-    "webhooks": "stripe --config .stripe/config.toml listen --events payment_intent.succeeded,payment_intent.payment_failed,payment_intent.processing,payment_intent.canceled --forward-to http://127.0.0.1:4242/stripe/webhook"
+    "webhooks": "node --env-file=.env webhook-listener.mjs"
   },
   "dependencies": {
     "express": "^5.2.1",
-    "stripe": "^23.0.0"
+    "stripe": "^23.0.0",
+    "viem": "^2.57.2"
   },
   "devDependencies": {
+    "@foundry-rs/anvil": "^1.7.1",
+    "@foundry-rs/forge": "^1.7.1",
     "@stripe/cli": "^1.53.0"
   }
 }

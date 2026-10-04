@@ -56,6 +56,9 @@ export class JobStore {
         BEGIN SELECT RAISE(ABORT, 'LedgerEvents is append-only'); END;
       CREATE TRIGGER IF NOT EXISTS ledger_events_no_delete BEFORE DELETE ON LedgerEvents
         BEGIN SELECT RAISE(ABORT, 'LedgerEvents is append-only'); END;
+      CREATE TABLE IF NOT EXISTS workers (id TEXT PRIMARY KEY, token_hash TEXT UNIQUE NOT NULL, record TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS SettlementOperations (job_id TEXT PRIMARY KEY REFERENCES jobs(id), record TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS ChainWrites (id TEXT PRIMARY KEY, record TEXT NOT NULL);
     `);
   }
   get(id) {
@@ -78,21 +81,39 @@ export class JobStore {
       throw error;
     }
   }
-  appendFunding(job, { source, stripeEventID }) {
-    const event = {
-      id: randomUUID(), jobID: job.id, type: 'JOB_FUNDED',
-      fromStatus: 'draft', toStatus: 'funded',
-      paymentIntentID: job.paymentIntentID, stripeEventID, source,
+  appendFunding(job, { source, stripeEventID, reference }) {
+    this.appendLedger(job, 'JOB_FUNDED', { fromStatus: 'draft', toStatus: 'funded', stripeEventID, source, reference });
+  }
+  appendLedger(job, type, details = {}) {
+    const event = { id: randomUUID(), jobID: job.id, type, paymentIntentID: job.paymentIntentID ?? null,
+      fundingRail: job.fundingRail ?? 'stripe', workerID: job.workerID ?? null,
       amountCents: job.amountCents, feeCents: job.feeCents, totalCents: job.totalCents,
-      currency: job.currency, createdAt: new Date().toISOString(),
-    };
+      currency: job.currency, createdAt: new Date().toISOString(), ...details };
     this.db.prepare(`INSERT INTO LedgerEvents
       (id, job_id, type, payment_intent_id, stripe_event_id, record) VALUES (?, ?, ?, ?, ?, ?)`)
-      .run(event.id, event.jobID, event.type, event.paymentIntentID, stripeEventID, JSON.stringify(event));
+      .run(event.id, event.jobID, event.type, job.paymentIntentID ?? job.chainJobID, event.stripeEventID ?? null, JSON.stringify(event));
   }
   ledgerEvents(id) {
     return this.db.prepare('SELECT record FROM LedgerEvents WHERE job_id = ? ORDER BY rowid')
       .all(id).map(row => JSON.parse(row.record));
+  }
+  list() { return this.db.prepare('SELECT record FROM jobs ORDER BY rowid DESC').all().map(row => JSON.parse(row.record)); }
+  operation(id) {
+    const row = this.db.prepare('SELECT record FROM SettlementOperations WHERE job_id = ?').get(id);
+    return row ? JSON.parse(row.record) : null;
+  }
+  saveOperation(operation) {
+    this.db.prepare('INSERT INTO SettlementOperations (job_id, record) VALUES (?, ?) ON CONFLICT(job_id) DO UPDATE SET record = excluded.record')
+      .run(operation.jobID, JSON.stringify(operation));
+    return operation;
+  }
+  chainWrite(id) {
+    const row = this.db.prepare('SELECT record FROM ChainWrites WHERE id = ?').get(id);
+    return row ? JSON.parse(row.record) : null;
+  }
+  saveChainWrite(id, record) {
+    this.db.prepare('INSERT INTO ChainWrites (id, record) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET record = excluded.record')
+      .run(id, JSON.stringify(record));
   }
   close() { this.db.close(); }
 }
@@ -118,13 +139,14 @@ export class Payments {
 
   async createSheet(draft) {
     let job = this.store.get(draft.id);
+    if (job?.fundingRail === 'usdc') throw new PaymentError(409, 'This checkout already uses USDC. Start a new checkout to pay by card.');
     if (job && JSON.stringify(job.draft) !== JSON.stringify(draft)) {
       throw new PaymentError(409, 'This checkout already belongs to another job. Start a new checkout.');
     }
     if (!job) {
       const feeCents = Math.round(draft.amountCents * 0.10);
       job = this.store.save({ ...draft, draft, feeCents, totalCents: draft.amountCents + feeCents,
-        currency: 'usd', status: 'draft', paymentIntentID: null });
+        currency: 'usd', fundingRail: 'stripe', status: 'draft', paymentIntentID: null });
     }
     const intent = job.paymentIntentID
       ? await this.stripe.paymentIntents.retrieve(job.paymentIntentID)
@@ -174,7 +196,7 @@ export class Payments {
   async status(id) {
     const job = this.store.get(id.toLowerCase());
     if (!job) throw new PaymentError(404, 'Job not found.');
-    if (job.paymentIntentID) {
+    if (job.paymentIntentID && job.status === 'draft') {
       const intent = await this.stripe.paymentIntents.retrieve(job.paymentIntentID);
       return this.publicJob(this.applyIntent(intent));
     }

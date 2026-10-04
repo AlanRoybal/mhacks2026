@@ -1,5 +1,5 @@
 {
-  "originHash" : "1f06cf3c639532d286c470e81158af666944da378de62a4c136590c22991b051",
+  "originHash" : "691e3918051e45e8c5fd4cef18286f233fbff013e3980a8bb67d13c63c3ab949",
   "pins" : [
     {
       "identity" : "stripe-ios-spm",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "db9ec52a0579b42763038f2396de7669f3d363e7",
         "version" : "26.12.1"
+      }
+    },
+    {
+      "identity" : "wallet-mobile-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/MobileWalletProtocol/wallet-mobile-sdk",
+      "state" : {
+        "revision" : "4293df51d3500b8e876ca4bf0d7548adf097569a",
+        "version" : "1.1.2"
       }
     }
   ],
