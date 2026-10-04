@@ -8,3 +8,6 @@ BOUNTY_PAYMENTS_BASE_URL = http:/$()/192.168.1.100:8787
 // set the ID and uncomment the entitlement selection below.
 BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER =
 // BOUNTY_CODE_SIGN_ENTITLEMENTS = Config/ApplePay.entitlements
+
+// Crypto funding, Connect onboarding and worker settlements.
+BOUNTY_SETTLEMENTS_BASE_URL = http:/$()/192.168.1.100:4242

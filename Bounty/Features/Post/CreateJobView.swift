@@ -339,13 +339,13 @@ struct FundJobView: View {
             .entrance(.top)
 
             VStack(spacing: 12) {
-                priceRow("Job payment", money(draft.payCents))
-                priceRow("Platform fee (10%)", money(draft.feeCents))
+                priceRow("Job payment", method == .card ? money(draft.payCents) : "\(usdc(draft.payCents)) USDC")
+                if method == .card { priceRow("Platform fee (10%)", money(draft.feeCents)) }
                 BountyColor.divider.frame(height: 1)
                 HStack {
                     Text("Total").bountyType(.bodyStrong)
                     Spacer()
-                    Text(money(draft.totalCents)).bountyType(.moneyM)
+                    Text(method == .card ? money(draft.totalCents) : "\(usdc(draft.payCents)) USDC").bountyType(.moneyM)
                 }
                 .foregroundStyle(BountyColor.inkPrimary)
             }
@@ -376,31 +376,31 @@ struct FundJobView: View {
         } bottom: {
             VStack(spacing: 12) {
                 PillButton(
-                    title: method == .card ? "Pay \(money(draft.totalCents))" : "Pay \(usdc(draft.totalCents)) USDC",
+                    title: method == .card ? "Pay \(money(draft.totalCents))" : "Pay \(usdc(draft.payCents)) USDC",
                     icon: method == .card ? .apple : nil,
                     style: .dark
                 ) {
-                    if method == .card {
-                        checkout = draft.fundingDraft()
-                    } else {
-                        // USDC escrow isn't built yet; this keeps the original simulated flow.
-                        router.jobsSegment = .posted
-                        router.finish(on: .jobs)
-                    }
+                    checkout = draft.fundingDraft()
                 }
                 .disabled(!draft.canFund)
-                Text("Test mode · card 4242 4242 4242 4242")
+                Text(method == .card ? "Test mode · card 4242 4242 4242 4242" : "Test USDC · Base Sepolia")
                     .bountyType(.footnote)
                     .foregroundStyle(BountyColor.inkTertiary)
             }
         }
         .sheet(item: $checkout) { funding in
-            PaymentCheckoutView(draft: funding) {
-                draft.reset()
-                router.jobsSegment = .posted
-                router.finish(on: .jobs)
+            if method == .usdc {
+                CryptoCheckoutView(draft: funding, onFunded: finishFunding)
+            } else {
+                PaymentCheckoutView(draft: funding, onFunded: finishFunding)
             }
         }
+    }
+
+    private func finishFunding() {
+        draft.reset()
+        router.jobsSegment = .posted
+        router.finish(on: .jobs)
     }
 
     private func money(_ cents: Int) -> String {

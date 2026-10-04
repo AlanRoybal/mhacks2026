@@ -9,7 +9,13 @@ struct Job: Identifiable, Hashable {
     let deadline: String
     let sticker: Sticker
     let tileColor: Color
-    let status: JobStatus
+    var status: JobStatus
+    var currency = "USD"
+    var payCents: Int? = nil
+    var displayPay: String {
+        let amount = Decimal(payCents ?? pay * 100) / 100
+        return currency == "USDC" ? "\(amount.formatted()) USDC" : amount.formatted(.currency(code: currency))
+    }
 }
 
 enum JobStatus: String, CaseIterable, Identifiable {
@@ -20,14 +26,34 @@ enum JobStatus: String, CaseIterable, Identifiable {
     case inReview = "In review"
     case paid = "Paid"
 
+    case refunded = "Refunded"
+    case releasePending = "Payment pending"
+    case refundPending = "Refund pending"
+    case settlementIssue = "Payment needs review"
+
+    static func api(_ value: String) -> JobStatus {
+        switch value {
+        case "accepted": .accepted
+        case "in_progress": .inProgress
+        case "in_review": .inReview
+        case "released": .paid
+        case "refunded": .refunded
+        case "release_pending": .releasePending
+        case "refund_pending": .refundPending
+        case "settlement_issue": .settlementIssue
+        default: .funded
+        }
+    }
+
     var id: String { rawValue }
 
     var chipTone: ChipTone {
         switch self {
-        case .funded: .grey
+        case .funded, .refunded: .grey
         case .offered: .yellow
         case .accepted, .inProgress: .lavender
-        case .inReview: .cream
+        case .inReview, .releasePending, .refundPending: .cream
+        case .settlementIssue: .yellow
         case .paid: .mint
         }
     }

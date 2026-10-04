@@ -68,5 +68,12 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>cbwallet</string>
+		<string>mwp+1.1</string>
+	</array>
+	<key>BountySettlementsBaseURL</key>
+	<string>$(BOUNTY_SETTLEMENTS_BASE_URL)</string>
 </dict>
 </plist>

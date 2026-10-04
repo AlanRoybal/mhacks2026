@@ -3,6 +3,7 @@ import SwiftUI
 /// 06 Home.
 struct HomeView: View {
     @Environment(AppRouter.self) private var router
+    @EnvironmentObject private var workerPayments: WorkerPayments
 
     var body: some View {
         BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 380), spacing: 18) {
@@ -39,14 +40,15 @@ struct HomeView: View {
             SectionHeader(title: "Your jobs", trailing: "See all") { router.select(.jobs) }
                 .entrance(.rest(0))
 
-            Button { router.open(.jobDetail) } label: {
-                HomeJobRow(job: SampleJobs.vintageDesk, detail: "Accepted · Tomorrow, 2 PM")
+            if workerPayments.jobs.isEmpty {
+                Text("No assigned jobs yet.").bountyType(.footnote)
             }
-            .buttonStyle(PressableStyle())
-            .entrance(.rest(1))
-
-            HomeJobRow(job: SampleJobs.poster, detail: "In review · releases in 1h 12m")
-                .entrance(.rest(2))
+            ForEach(workerPayments.jobs.prefix(3)) { job in
+                Button { router.select(.jobs) } label: {
+                    HomeJobRow(job: job, detail: "\(job.status.rawValue) · \(job.deadline)")
+                }
+                .buttonStyle(PressableStyle())
+            }
         }
     }
 }
@@ -127,7 +129,7 @@ struct HomeJobRow: View {
             StickerTile(sticker: job.sticker, background: job.tileColor)
             TitleSubtitle(title: job.title, subtitle: detail)
                 .multilineTextAlignment(.leading)
-            Text("$\(job.pay)")
+            Text(job.displayPay)
                 .bountyType(.moneyM)
                 .foregroundStyle(BountyColor.inkPrimary)
         }
@@ -153,4 +155,5 @@ struct OfferCountdown<Label: View>: View {
 #Preview {
     HomeView()
         .environment(AppRouter())
+        .environmentObject(WorkerPayments())
 }

@@ -6,6 +6,7 @@ struct RootTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     // Jobs funded through Stripe checkout (payments branch), shown under Jobs > Posted.
     @StateObject private var postedJobs = PostedJobsStore()
+    @StateObject private var workerPayments = WorkerPayments()
     // The job being posted, shared by Post a job → Proof checklist → Fund.
     @State private var postDraft = PostDraft()
     /// The tab bar steps aside while typing, instead of riding up on the keyboard.
@@ -34,10 +35,11 @@ struct RootTabView: View {
         .environment(\.screenExiting, router.transition.isExiting)
         .preferredColorScheme(router.route?.usesDarkStatusBar == true ? .dark : .light)
         .environmentObject(postedJobs)
+        .environmentObject(workerPayments)
         .environment(postDraft)
         // Re-check pending checkouts whenever the app comes back to the foreground.
         .task(id: scenePhase) {
-            if scenePhase == .active { await postedJobs.refresh() }
+            if scenePhase == .active { await postedJobs.refresh(); await workerPayments.refresh() }
         }
         .onAppear(perform: consumePendingPushRoute)
         .onReceive(NotificationCenter.default.publisher(for: .pushRouteChanged)) { _ in

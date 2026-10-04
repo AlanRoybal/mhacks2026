@@ -5,4 +5,6 @@ BOUNTY_API_BASE_URL =
 BOUNTY_PAYMENTS_BASE_URL = http:/$()/127.0.0.1:8787
 BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER =
 BOUNTY_CODE_SIGN_ENTITLEMENTS = Bounty/Bounty.entitlements
+// Escrow, worker earnings and settlement service (payments-server/).
+BOUNTY_SETTLEMENTS_BASE_URL = http:/$()/127.0.0.1:4242
 #include? "Local.xcconfig"
