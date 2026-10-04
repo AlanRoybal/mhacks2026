@@ -14,8 +14,6 @@
 		1506E89A595E9BD62C89C674 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 00653F176E5F56A7F9330976 /* Assets.xcassets */; };
 		16514389B84EE710DDA78727 /* LaunchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73000EEB1A791B50A761F983 /* LaunchView.swift */; };
 		1726AD4BE8F617078320C48C /* CryptoCheckoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62029D8562DB3F9C7D7719ED /* CryptoCheckoutView.swift */; };
-		18B459FC1151C16A3855E24B /* JobThreadCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D886F3D6A6B5DE86BD1527D6 /* JobThreadCard.swift */; };
-		1F283D3FE8121149629F4C82 /* PhoneLinkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E075415268B7F3A3914081CC /* PhoneLinkSheet.swift */; };
 		2648EB0D8A6753B81B7323A1 /* MockJobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A1732769B738D037D975B56 /* MockJobsAPI.swift */; };
 		27A55C706B72D4F97913F92B /* BountyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B75E78AC19B705475CC363 /* BountyApp.swift */; };
 		2F5AA839D4D7D9194209EB9C /* BountyLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B881345578D9442C60B1C2B /* BountyLogo.swift */; };
@@ -101,11 +99,9 @@
 		BA10D25328F0FF4EC9CFA6AD /* PaymentsServerAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentsServerAPI.swift; sourceTree = "<group>"; };
 		BE26CC60A4D4BA0F7F17E467 /* WorkerPayments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerPayments.swift; sourceTree = "<group>"; };
 		C9A15692336B82CDFFD4D2BF /* DebugLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLaunch.swift; sourceTree = "<group>"; };
-		D886F3D6A6B5DE86BD1527D6 /* JobThreadCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobThreadCard.swift; sourceTree = "<group>"; };
 		DAB57653DB8B9887EEBBA102 /* CalendarLinkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarLinkSheet.swift; sourceTree = "<group>"; };
 		DC8624359FB1F5B608B1CFE0 /* PostDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDraft.swift; sourceTree = "<group>"; };
 		DEF56E5E9A62A25EF28F5955 /* RateWorkerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateWorkerCard.swift; sourceTree = "<group>"; };
-		E075415268B7F3A3914081CC /* PhoneLinkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLinkSheet.swift; sourceTree = "<group>"; };
 		E15A4CB086181C42A230B992 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		E667158AA19AD3F89B1E0A67 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		EBA4291A1097864BCB54653E /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
@@ -186,7 +182,6 @@
 			isa = PBXGroup;
 			children = (
 				DAB57653DB8B9887EEBBA102 /* CalendarLinkSheet.swift */,
-				E075415268B7F3A3914081CC /* PhoneLinkSheet.swift */,
 				6B7535BD8DAFC6469AF250FA /* SettingsView.swift */,
 			);
 			path = Settings;
@@ -229,7 +224,6 @@
 		637DD341A0BD6B614CE087F1 /* Work */ = {
 			isa = PBXGroup;
 			children = (
-				D886F3D6A6B5DE86BD1527D6 /* JobThreadCard.swift */,
 				2679EADF798F7C549A97F3EA /* ProofFlow.swift */,
 				5DA3B29F599F6FBA66D82AAA /* WorkViews.swift */,
 			);
@@ -448,7 +442,6 @@
 				F5B1419706DA28BA5C504DB1 /* Job.swift in Sources */,
 				A510F93D352ADCF910D48AE0 /* JobDisplay.swift in Sources */,
 				F01C9A9668DA7DF4E35ACAC2 /* JobFundingSheet.swift in Sources */,
-				18B459FC1151C16A3855E24B /* JobThreadCard.swift in Sources */,
 				362CD1ACFCAB84CCFE11B112 /* JobsAPI.swift in Sources */,
 				5B1B545EBF77BA68176EAC68 /* JobsView.swift in Sources */,
 				16514389B84EE710DDA78727 /* LaunchView.swift in Sources */,
@@ -461,7 +454,6 @@
 				5E9F407B368D43CF613B0AF1 /* OfferViews.swift in Sources */,
 				495A213982B7EC87F9AE6604 /* OnboardingView.swift in Sources */,
 				F2D014C6F39EE17DFC1D4D52 /* PaymentsServerAPI.swift in Sources */,
-				1F283D3FE8121149629F4C82 /* PhoneLinkSheet.swift in Sources */,
 				6E929825A20BCAB2B2C3F1FF /* PostDraft.swift in Sources */,
 				89EB37923DCD14C625896A87 /* PostedJob.swift in Sources */,
 				6D9A16F3B9A74710F67B974F /* PostedJobDetailView.swift in Sources */,

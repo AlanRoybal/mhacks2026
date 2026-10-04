@@ -40,10 +40,6 @@ const schema = z.object({
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
   // iOS-type Google OAuth client for the Gmail import. Public (no secret); the app sends PKCE codes.
   GOOGLE_CLIENT_ID: z.string().optional(),
-  // The messenger service (messenger/, Photon Spectrum iMessage). Both set: texting is on. The secret also
-  // authenticates the service's calls to POST /internal/imessage.
-  MESSENGER_URL: z.string().url().optional(),
-  MESSENGER_SECRET: z.string().min(16).optional(),
   // Comma-separated user IDs allowed to resolve disputes.
   ADMIN_USER_IDS: z.string().default(""),
 

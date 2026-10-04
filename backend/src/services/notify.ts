@@ -1,10 +1,8 @@
 import type { Deps } from "../deps.js";
 import type { Effect } from "../domain/events.js";
 import { newId } from "../domain/ids.js";
-import type { InboxItem, User } from "../domain/types.js";
-import type { PushMessage } from "../push/push.js";
+import type { InboxItem } from "../domain/types.js";
 import { renderPush } from "../push/templates.js";
-import { onPosterPush } from "./thread.js";
 import { updateUser } from "./users.js";
 
 export const INBOX_LIMIT = 50;
@@ -19,15 +17,7 @@ export async function sendJobPush(deps: Deps, jobId: string, effect: Extract<Eff
   if (!job || !user) return;
   // An offer push that runs late (retries, a slow stream) must not advertise an offer that moved on.
   if (effect.template === "offer" && job.currentOffer?.offerId !== effect.offerId) return;
-  await deliver(deps, user, renderPush(effect.template, job, offer));
-  // The worker's twin keeps the poster's text thread in step (Photon iMessage).
-  if (user.userId === job.posterId) {
-    await onPosterPush(deps, job, user, effect.template).catch((error) => deps.log.warn("Thread update failed", { jobId, template: effect.template, error }));
-  }
-}
-
-/** Records a notification on the user's notifications page and pushes it to their devices. */
-export async function deliver(deps: Deps, user: User, message: PushMessage): Promise<void> {
+  const message = renderPush(effect.template, job, offer);
   // Kept even when the user has no device, so the notifications page shows everything we tried to send.
   const item: InboxItem = {
     id: newId(deps.now().getTime()),

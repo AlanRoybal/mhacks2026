@@ -309,10 +309,6 @@ export interface User {
   inbox?: InboxItem[];
   // Items created after this are unread.
   inboxReadAt?: string;
-  // Verified mobile number (E.164). jobTexts: workers' twins may text the poster about their jobs.
-  phone?: { number: string; verifiedAt: string; jobTexts: boolean };
-  // A code texted to `number` and not yet entered. Only the hash is kept.
-  phoneVerification?: { number: string; codeHash: string; expiresAt: string; attempts: number; sentAt: string };
   createdAt: string;
   updatedAt: string;
 }

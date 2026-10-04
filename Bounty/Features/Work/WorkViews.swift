@@ -80,11 +80,6 @@ struct JobDetailView: View {
             .borderedCard()
             .entrance(.rest(0))
 
-            if let job {
-                JobThreadCard(jobId: job.id, role: .worker, counterpartName: job.poster?.name)
-                    .entrance(.rest(1))
-            }
-
             if !history.isEmpty {
                 JobHistoryCard(entries: history, payment: job?.payment)
                     .entrance(.rest(1))

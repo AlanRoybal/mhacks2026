@@ -280,7 +280,7 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
           fail("too_far", `You are ${meters} m from the job. Check in within ${ctx.rules.checkInRadiusM} m.`);
         }
       }
-      return { to: "IN_PROGRESS", patch: { startedAt: now, challenge: { code: ev.code, issuedAt: now } }, effects: [push(job.posterId, "job_started")] };
+      return { to: "IN_PROGRESS", patch: { startedAt: now, challenge: { code: ev.code, issuedAt: now } }, effects: [] };
     }
 
     case "WITHDRAW": {

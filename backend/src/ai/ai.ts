@@ -53,31 +53,6 @@ export const GradeResult = z.object({
 });
 export type GradeResult = z.infer<typeof GradeResult> & { model: string };
 
-// One turn of the job thread: what the worker's twin texts the poster.
-export const ThreadTurn = z.object({
-  // The text to send the poster. Plain, under 320 characters.
-  reply: z.string(),
-  // A question only the worker can answer, to pass on in the app. "" when none.
-  forWorker: z.string(),
-  // A fact the poster gave that the worker should see on the job (access, parking, preferences). "" when none.
-  detail: z.string(),
-});
-export type ThreadTurn = z.infer<typeof ThreadTurn>;
-
-export interface ThreadInput {
-  // open: the first text after the worker accepts. reply: answer the poster's latest text.
-  mode: "open" | "reply";
-  job: JobBrief;
-  checklist: string[];
-  workerName: string;
-  // Where the job stands, e.g. "Accepted 10 minutes ago, not started yet".
-  status: string;
-  // Facts already collected from the poster.
-  details: string[];
-  history: { from: "twin" | "poster" | "worker"; text: string }[];
-  message?: string;
-}
-
 export type ProfileSourceKind = "resume_pdf" | "linkedin_pdf" | "linkedin_zip" | "gmail_sent";
 
 export interface ProfileInput {
@@ -131,7 +106,6 @@ export interface Ai {
   generateChecklist(job: JobBrief): Promise<ChecklistDraft>;
   rerank(job: JobBrief, candidates: RerankCandidate[]): Promise<RerankPick[]>;
   grade(input: GradeInput): Promise<GradeResult>;
-  threadTurn(input: ThreadInput): Promise<ThreadTurn>;
 }
 
 export class AiUnavailableError extends Error {

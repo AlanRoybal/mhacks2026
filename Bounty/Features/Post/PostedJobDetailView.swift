@@ -60,9 +60,6 @@ struct PostedJobDetailView: View {
                     .padding(.vertical, 14)
                     .borderedCard(radius: BountyRadius.row)
                     .entrance(.rest(0))
-
-                    JobThreadCard(jobId: job.id, role: .poster, counterpartName: worker.name)
-                        .entrance(.rest(0))
                 }
 
                 // Step 9: paid or refunded jobs ask for a rating, then show the one given.

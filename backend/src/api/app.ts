@@ -17,7 +17,6 @@ import { fundingRoutes, publicPaymentRoutes, walletRoutes } from "./routes/payme
 import { proofRoutes } from "./routes/proof.js";
 import { reviewRoutes } from "./routes/review.js";
 import { twinRoutes } from "./routes/twin.js";
-import { messengerRoutes, threadRoutes } from "./routes/messaging.js";
 import { twinKitRoutes } from "./routes/twinkit.js";
 import { fileRoutes, uploadRoutes } from "./routes/uploads.js";
 
@@ -37,8 +36,6 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   app.route("/", publicPaymentRoutes(deps));
   // The payments checkout's endpoints (its own error format; optional session).
   app.route("/", paymentSheetRoutes(deps));
-  // The messenger service's inbound iMessages (shared-secret auth).
-  app.route("/internal", messengerRoutes(deps));
 
   // Everything below needs a session token.
   const authed = new Hono<AppEnv>();
@@ -51,7 +48,6 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   authed.route("/jobs", reviewRoutes(deps));
   authed.route("/offers", offerRoutes(deps));
   authed.route("/jobs", fundingRoutes(deps));
-  authed.route("/jobs", threadRoutes(deps));
   authed.route("/wallet", walletRoutes(deps));
   authed.route("/admin", adminRoutes(deps));
   // The same features in the shape TwinKit (iosA's networking package) expects.

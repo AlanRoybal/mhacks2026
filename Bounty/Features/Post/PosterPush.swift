@@ -12,7 +12,7 @@ import Foundation
 enum PosterPush {
     /// Push types the backend sends only to the poster.
     static let posterTypes: Set<String> = [
-        "offer_accepted", "job_started", "no_match_yet", "proof_ready", "proof_needs_decision",
+        "offer_accepted", "no_match_yet", "proof_ready", "proof_needs_decision",
         "worker_withdrew", "unmatched_refund", "refunded", reviewClosingType,
     ]
 
