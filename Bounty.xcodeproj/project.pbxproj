@@ -22,6 +22,7 @@
 		3E079D1C27E6C781A1F698AE /* WorkViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA3B29F599F6FBA66D82AAA /* WorkViews.swift */; };
 		495A213982B7EC87F9AE6604 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1406EF46384922539D8BA3BC /* OnboardingView.swift */; };
 		4D295C77E60A3E16F14B00EC /* RateWorkerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEF56E5E9A62A25EF28F5955 /* RateWorkerCard.swift */; };
+		59293C4BEC733AAEB2C058A9 /* TwinSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E03DB252793796851AC0AF /* TwinSources.swift */; };
 		5B1B545EBF77BA68176EAC68 /* JobsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC90A7ACD84995DB726CAAA /* JobsView.swift */; };
 		5E9F407B368D43CF613B0AF1 /* OfferViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3603C166E2B033C894391DD7 /* OfferViews.swift */; };
 		691999A29A6A649083EE701E /* TwinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 639DA50C5ED17C063F385A8F /* TwinView.swift */; };
@@ -72,6 +73,7 @@
 		2679EADF798F7C549A97F3EA /* ProofFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProofFlow.swift; sourceTree = "<group>"; };
 		2A1732769B738D037D975B56 /* MockJobsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockJobsAPI.swift; sourceTree = "<group>"; };
 		2C1D3B1A55C4BCEE3995A847 /* TwinKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TwinKit; path = Packages/TwinKit; sourceTree = SOURCE_ROOT; };
+		30E03DB252793796851AC0AF /* TwinSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwinSources.swift; sourceTree = "<group>"; };
 		350B074C9ED028478228FAEF /* BountyScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BountyScreen.swift; sourceTree = "<group>"; };
 		35CE03AB2F0785B5586A1119 /* BountyTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BountyTheme.swift; sourceTree = "<group>"; };
 		3603C166E2B033C894391DD7 /* OfferViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferViews.swift; sourceTree = "<group>"; };
@@ -127,6 +129,7 @@
 		0A402854BB9C2234CA090DE6 /* Twin */ = {
 			isa = PBXGroup;
 			children = (
+				30E03DB252793796851AC0AF /* TwinSources.swift */,
 				639DA50C5ED17C063F385A8F /* TwinView.swift */,
 			);
 			path = Twin;
@@ -461,6 +464,7 @@
 				4D295C77E60A3E16F14B00EC /* RateWorkerCard.swift in Sources */,
 				78AB2F56177B8016949DA2C6 /* RootTabView.swift in Sources */,
 				72ADE8E3DD17FCABABCB7084 /* SettingsView.swift in Sources */,
+				59293C4BEC733AAEB2C058A9 /* TwinSources.swift in Sources */,
 				691999A29A6A649083EE701E /* TwinView.swift in Sources */,
 				3E079D1C27E6C781A1F698AE /* WorkViews.swift in Sources */,
 				A8B0B68E701E6FC2B59A7756 /* WorkerPayments.swift in Sources */,

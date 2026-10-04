@@ -1,7 +1,6 @@
 import AuthenticationServices
 import SwiftUI
 import TwinKit
-import UniformTypeIdentifiers
 
 /// 01 Welcome → 02 Profile import → 03 Building your twin → 05 Availability.
 /// Finishing lands on 04 Twin review in the Twin tab.
@@ -161,33 +160,13 @@ private struct WelcomeView: View {
     }
 }
 
-@MainActor
-private final class PresentationAnchor: NSObject, ASWebAuthenticationPresentationContextProviding {
-    static let shared = PresentationAnchor()
-
-    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        return scenes.flatMap(\.windows).first(where: \.isKeyWindow) ?? ASPresentationAnchor()
-    }
-}
-
 // MARK: - 02 Profile import
 
 private struct ProfileImportView: View {
-    @Environment(AppServices.self) private var services
     let onBack: () -> Void
     let onContinue: () -> Void
 
-    @State private var addedGmail = false
-    @State private var addedLinkedIn = false
-    @State private var addedCalendar = false
-    @State private var isLinkingCalendar = false
-    @State private var isPickingLinkedIn = false
-    @State private var addedResume = false
-    @State private var isPickingResume = false
     @State private var isImporting = false
-    @State private var isConnectingGmail = false
-    @State private var importError: String?
 
     var body: some View {
         BountyScreen {
@@ -203,49 +182,18 @@ private struct ProfileImportView: View {
                 .foregroundStyle(BountyColor.inkPrimary)
                 .entrance(.top)
 
-            Text("Add what you’ve done. Your twin keeps the skills it finds, not your files.")
+            Text("Add what you\u{2019}ve done. Your twin keeps the skills it finds, not your files.")
                 .bountyType(.body)
                 .foregroundStyle(BountyColor.inkSecondary)
                 .entrance(.top)
 
-            VStack(spacing: 12) {
-                SourceRow(title: "Gmail", detail: isConnectingGmail ? "Reading sent mail…" : "Read-only · sent mail", isAdded: addedGmail) {
-                    StickerTile(sticker: .mail, background: BountyColor.sky)
-                } onAdd: {
-                    connectGmail()
-                }
-                SourceRow(title: "LinkedIn profile PDF", detail: isImporting ? "Importing…" : "Profile → Save to PDF", isAdded: addedLinkedIn) {
-                    IconGlyph(icon: .linkedin, size: 24)
-                        .foregroundStyle(BountyColor.lavenderInk)
-                        .frame(width: 52, height: 52)
-                        .background(BountyColor.lavenderSoft, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                } onAdd: {
-                    isPickingLinkedIn = true
-                }
-                SourceRow(title: "Résumé", detail: isImporting ? "Importing…" : "PDF", isAdded: addedResume) {
-                    StickerTile(sticker: .book, background: BountyColor.mint)
-                } onAdd: {
-                    isPickingResume = true
-                }
-                SourceRow(title: "Calendar", detail: "Free/busy, stays on device", isAdded: addedCalendar) {
-                    StickerTile(sticker: .calendar, background: BountyColor.cream)
-                } onAdd: {
-                    connectCalendar()
-                }
-            }
-            .entrance(.rest(0))
-
-            if let importError {
-                Text(importError)
-                    .bountyType(.footnote)
-                    .foregroundStyle(BountyColor.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            TwinSourcesList(isBusy: $isImporting)
+                .entrance(.rest(0))
 
             HStack(alignment: .top, spacing: 10) {
                 IconGlyph(icon: .lock, size: 18)
                     .foregroundStyle(BountyColor.lavenderInk)
-                Text("LinkedIn sign-in only shares your name and photo. The profile PDF adds your experience.")
+                Text("LinkedIn sign-in only shares your name and photo. The profile PDF adds your experience. You can add or sync any of these later from the Twin tab.")
                     .bountyType(.footnote)
                     .foregroundStyle(BountyColor.lavenderInk)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -255,102 +203,8 @@ private struct ProfileImportView: View {
             .entrance(.rest(1))
         } bottom: {
             PillButton(title: "Build my twin", icon: .sparkles, action: onContinue)
-                .disabled(isImporting || isConnectingGmail)
+                .disabled(isImporting)
         }
-        .sheet(isPresented: $isLinkingCalendar) {
-            CalendarLinkSheet { _ in withAnimation(Motion.press) { addedCalendar = true } }
-        }
-        .onAppear { addedCalendar = addedCalendar || services.isCalendarLinked }
-        .fileImporter(isPresented: $isPickingLinkedIn, allowedContentTypes: [.pdf, .zip]) { result in
-            importDocument(result, isResume: false)
-        }
-        .background {
-            // A second file importer on the same view replaces the first, so this one hangs off a background view.
-            Color.clear.fileImporter(isPresented: $isPickingResume, allowedContentTypes: [.pdf]) { result in
-                importDocument(result, isResume: true)
-            }
-        }
-    }
-
-    private func importDocument(_ result: Result<URL, Error>, isResume: Bool) {
-        guard case .success(let url) = result else {
-            if case .failure(let error) = result { importError = error.localizedDescription }
-            return
-        }
-        let markAdded = { withAnimation(Motion.press) { if isResume { addedResume = true } else { addedLinkedIn = true } } }
-        guard let ingestion = services.profileIngestion else {
-            markAdded()
-            return
-        }
-        isImporting = true
-        importError = nil
-        Task {
-            defer { isImporting = false }
-            do {
-                let source: ProfileDocumentSource = isResume ? .resume : url.pathExtension.lowercased() == "zip" ? .linkedInExport : .linkedInPDF
-                _ = try await ingestion.ingest(fileURL: url, source: source)
-                markAdded()
-            } catch {
-                importError = error.localizedDescription
-            }
-        }
-    }
-
-    private func connectGmail() {
-        guard services.api != nil else {
-            withAnimation(Motion.press) { addedGmail = true }
-            return
-        }
-        guard let gmail = services.gmail else {
-            importError = "Gmail isn\u{2019}t set up in this build yet."
-            return
-        }
-        isConnectingGmail = true
-        importError = nil
-        Task {
-            defer { isConnectingGmail = false }
-            do {
-                try await gmail.connect(presentationContextProvider: PresentationAnchor.shared)
-                withAnimation(Motion.press) { addedGmail = true }
-            } catch GmailConnector.ConnectError.cancelled {
-                return
-            } catch {
-                importError = error.localizedDescription
-            }
-        }
-    }
-
-    private func connectCalendar() {
-        guard services.availability != nil else {
-            withAnimation(Motion.press) { addedCalendar = true }
-            return
-        }
-        importError = nil
-        isLinkingCalendar = true
-    }
-}
-
-private struct SourceRow<Tile: View>: View {
-    let title: String
-    let detail: String
-    let isAdded: Bool
-    @ViewBuilder let tile: Tile
-    let onAdd: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            tile
-            TitleSubtitle(title: title, subtitle: detail)
-            if isAdded {
-                Chip(label: "Connected", tone: .mint)
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
-            } else {
-                IconButton(icon: .plus, label: "Add \(title)", size: 36, iconSize: 18, action: onAdd)
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
-            }
-        }
-        .padding(14)
-        .borderedCard(radius: BountyRadius.row)
     }
 }
 
@@ -810,6 +664,8 @@ struct TwinSettings: Decodable, Sendable {
         /// `idle`, `processing`, `done` or `failed`.
         let status: String
         let error: String?
+        /// Every import so far, e.g. "resume_pdf", "linkedin_pdf", "gmail_sent".
+        let sources: [String]?
     }
 
     let prefs: Prefs

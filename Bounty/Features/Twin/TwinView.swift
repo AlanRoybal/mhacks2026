@@ -14,6 +14,9 @@ struct TwinView: View {
     @State private var isEditing = false
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var isAddingSource = false
+    /// Bumped when an import starts, so the progress poller restarts.
+    @State private var importRun = 0
 
     private let sampleSkills = [
         TwinKit.TwinSkill(id: "logo-design", name: "Logo & brand design", confidence: 0.94, source: .email),
@@ -82,7 +85,7 @@ struct TwinView: View {
             }
 
             if skills.isEmpty {
-                Text("No skills yet. Import a résumé or LinkedIn PDF, or add them yourself.")
+                Text("No skills yet. Add a source below, or add skills yourself.")
                     .bountyType(.footnote)
                     .foregroundStyle(BountyColor.inkSecondary)
                     .entrance(.rest(1))
@@ -106,12 +109,30 @@ struct TwinView: View {
             }
             .entrance(.rest(2))
 
+            SectionHeader(title: "Sources")
+                .entrance(.rest(3))
+
+            if let ingest = settings?.ingest, ingest.status == "processing" || (ingest.status == "failed" && importRun > 0) {
+                ImportStatusBanner(ingest: ingest)
+                    .transition(.opacity.combined(with: .offset(y: -6)))
+            }
+
+            TwinSourcesList(
+                importedSources: Set(settings?.ingest.sources ?? []),
+                allowsResync: true,
+                isBusy: $isAddingSource,
+                onImportStarted: { importRun += 1 }
+            )
+            .entrance(.rest(3))
+
             if let stats = me?.stats {
                 ReliabilityCard(stats: stats)
-                    .entrance(.rest(3))
+                    .entrance(.rest(4))
             }
         }
         .task { await load() }
+        // While the server reads an import, check every 2 s and show the new skills when it's done.
+        .task(id: importRun) { await followImport() }
         .refreshable { await load() }
         .sheet(isPresented: $showsSettings, onDismiss: { Task { await load() } }) { SettingsView() }
         .sheet(isPresented: $isEditing) {
@@ -139,6 +160,22 @@ struct TwinView: View {
         if let api = services.api {
             settings = try? await api.request(.get, "twin")
             me = try? await api.request(.get, "me")
+        }
+        // An import from setup (or another screen) is still running: follow it here too.
+        if settings?.ingest.status == "processing" { importRun += 1 }
+    }
+
+    private func followImport() async {
+        guard let api = services.api, importRun > 0 else { return }
+        while !Task.isCancelled {
+            if let fresh: TwinSettings = try? await api.request(.get, "twin") {
+                withAnimation(Motion.press) { settings = fresh }
+                if fresh.ingest.status != "processing" {
+                    await load()
+                    return
+                }
+            }
+            try? await Task.sleep(for: .seconds(2))
         }
     }
 
@@ -185,6 +222,31 @@ struct TwinView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+/// Progress of the latest import, or why it failed.
+private struct ImportStatusBanner: View {
+    let ingest: TwinSettings.Ingest
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            if ingest.status == "processing" {
+                ProgressView()
+            } else {
+                IconGlyph(icon: .refresh, size: 18)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(ingest.status == "processing" ? "Reading your new source\u{2026}" : "That import didn\u{2019}t work")
+                    .bountyType(.subheadStrong)
+                Text(ingest.status == "processing" ? "New skills show up above, usually within a minute." : ingest.error ?? "Try again or use a different file.")
+                    .bountyType(.footnote)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .foregroundStyle(ingest.status == "processing" ? BountyColor.lavenderInk : BountyColor.creamInk)
+        .padding(14)
+        .tintedPanel(ingest.status == "processing" ? BountyColor.lavenderSoft : BountyColor.cream, radius: BountyRadius.row)
     }
 }
 
