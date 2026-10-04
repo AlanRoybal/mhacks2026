@@ -429,7 +429,8 @@ struct ProofCaptureView: View {
     private func addPhoto(_ image: UIImage, item: ChecklistItem, phase: String, job: PostedJob, draft: ProofDraft) async {
         let capturedAt = CaptureSignature.captureTime()
         // In-person photos carry GPS; the server flags photos taken away from the job.
-        let coordinate = job.isRemote ? nil : await location.current()?.coordinate
+        // A quick fix: the photo shouldn't wait long on GPS. The server warns the poster if it's off site.
+        let coordinate = job.isRemote ? nil : await location.current(accuracy: 100, timeout: 4)?.coordinate
         if !job.isRemote, coordinate == nil {
             draft.message = "Location wasn\u{2019}t available for that photo, so the reviewer will see it without GPS. Turn on Location for Bounty."
         }
@@ -472,7 +473,8 @@ struct ProofCaptureView: View {
 
     private func addVideo(_ url: URL, item: ChecklistItem, phase: String, job: PostedJob, draft: ProofDraft) async {
         let capturedAt = CaptureSignature.captureTime()
-        let coordinate = job.isRemote ? nil : await location.current()?.coordinate
+        // A quick fix: the photo shouldn't wait long on GPS. The server warns the poster if it's off site.
+        let coordinate = job.isRemote ? nil : await location.current(accuracy: 100, timeout: 4)?.coordinate
         if !job.isRemote, coordinate == nil {
             draft.message = "Location wasn\u{2019}t available for that video, so the reviewer will see it without GPS. Turn on Location for Bounty."
         }
@@ -556,7 +558,7 @@ struct ProofCaptureView: View {
     }
 
     private func checkIn(_ item: ChecklistItem, job: PostedJob, draft: ProofDraft) async {
-        guard let coordinate = await location.current()?.coordinate else {
+        guard let coordinate = await location.current(accuracy: 50, timeout: 15)?.coordinate else {
             draft.message = "Location access is needed to check in. Turn it on in Settings."
             return
         }
