@@ -1,4 +1,4 @@
-import { randomBytes, randomInt } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -16,12 +16,8 @@ export function newId(now = Date.now()): string {
   return time + rand;
 }
 
-// No 0/O, 1/I/L, 2/Z, 5/S, 8/B: the code is read off handwritten paper by a vision model.
-const CODE_ALPHABET = "ACDEFHJKMNPRTUVWXY3479";
-
-// One-time code shown to the worker and required in proof photos, e.g. "K7Q-4MX".
-export function challengeCode(): string {
-  let code = "";
-  for (let i = 0; i < 6; i++) code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
-  return `${code.slice(0, 3)}-${code.slice(3)}`;
+// Per-job secret, issued when the worker starts. The app signs every photo and video it captures with
+// it (services/capture.ts), which is how the server knows proof came from the Bounty camera.
+export function captureKey(): string {
+  return randomBytes(32).toString("base64url");
 }

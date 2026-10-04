@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { hasFreeWindow, isQuietTime, localTime } from "./availability.js";
 import { haversineKm, travelMinutes } from "./geo.js";
-import { challengeCode, newId } from "./ids.js";
+import { captureKey, newId } from "./ids.js";
 import { formatUsd, hourlyCents, quote } from "./money.js";
 import type { Availability } from "./types.js";
 
@@ -24,7 +24,8 @@ test("ids are 26 chars and sortable by time", () => {
   const b = newId(1_700_000_000_001);
   assert.equal(a.length, 26);
   assert.ok(a < b);
-  assert.match(challengeCode(), /^[A-Z0-9]{3}-[A-Z0-9]{3}$/);
+  assert.match(captureKey(), /^[A-Za-z0-9_-]{43}$/);
+  assert.notEqual(captureKey(), captureKey());
 });
 
 test("haversine and travel time", () => {

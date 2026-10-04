@@ -1,7 +1,7 @@
 // Proof of work: server-side evidence checks (US-39) and submission (US-41).
 //
 // Blocking problems (the app must fix them before submitting): a required item has no evidence,
-// an upload is missing or too large, a photo predates the one-time code, or a photo was already
+// an upload is missing or too large, a photo predates the start of the job, or a photo was already
 // used as proof before. Location problems are warnings: they are shown to the grader and the
 // poster, and a CHECK_IN item outside the job site fails grading.
 
@@ -13,7 +13,7 @@ import type { EvidenceItem, Job, Proof, ProofChecks, User } from "../domain/type
 import { conflict, forbidden } from "../lib/errors.js";
 import { applyEvent, getJobOrThrow } from "./jobs.js";
 
-// Photos may be taken a little before the server clock says the code was issued (device clock skew).
+// Photos may be stamped a little before the server clock says the job started (device clock skew).
 const CLOCK_SKEW_MS = 2 * 60_000;
 
 export interface Checks extends ProofChecks {
@@ -75,8 +75,8 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
     if (item.required && !covered) missingRequired.push(item.id);
   }
 
-  // 3. Time and place: photos and check-ins after the one-time code was issued, at the job.
-  const issuedAt = Date.parse(job.challenge?.issuedAt ?? "");
+  // 3. Time and place: photos and check-ins after the worker started, at the job.
+  const issuedAt = Date.parse(job.capture?.issuedAt ?? job.challenge?.issuedAt ?? job.startedAt ?? "");
   for (const e of items) {
     if (e.kind === "photo" || e.kind === "location") {
       const at = Date.parse(e.capturedAt ?? "");

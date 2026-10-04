@@ -45,8 +45,6 @@ export const RerankResult = z.object({
 export type RerankPick = z.infer<typeof RerankResult>["picks"][number];
 
 export const GradeResult = z.object({
-  codeVisible: z.boolean(),
-  codeReadAs: z.string(),
   items: z.array(z.object({ itemId: z.string(), verdict: z.enum(["pass", "fail", "unclear"]), confidence: z.number(), reason: z.string() })),
   posterSummary: z.string(),
   workerFeedback: z.string(),
@@ -121,7 +119,6 @@ export interface GradeEvidence {
 export interface GradeInput {
   job: JobBrief;
   checklist: ChecklistItem[];
-  challengeCode: string;
   evidence: GradeEvidence[];
 }
 

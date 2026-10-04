@@ -63,5 +63,5 @@ test("grading never passes on a check-in alone when no evidence item is marked r
     { itemId: "c1", verdict: "fail" as const, confidence: 0.99, reason: "" },
     { itemId: "c2", verdict: "pass" as const, confidence: 1, reason: "" },
   ];
-  assert.equal(decide(job, proof, verdicts, true).decision, "fail");
+  assert.equal(decide(job, proof, verdicts).decision, "fail");
 });

@@ -106,7 +106,6 @@ export function proofRoutes(deps: Deps): Hono<AppEnv> {
         verdicts: verdictsWire(p),
         decision: p.grade?.decision ?? null,
         decidedBecause: p.grade?.decidedBecause ?? null,
-        codeVisible: p.grade?.codeVisible ?? null,
         posterSummary: p.grade?.posterSummary ?? null,
         workerFeedback: p.grade?.workerFeedback ?? null,
       })),

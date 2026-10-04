@@ -19,7 +19,7 @@ import {
   type ThreadInput,
   ThreadTurn,
 } from "./ai.js";
-import { CHECKLIST, EXTRACT_PROFILE, gradePrompt, RERANK, THREAD } from "./prompts.js";
+import { CHECKLIST, EXTRACT_PROFILE, GRADE, RERANK, THREAD } from "./prompts.js";
 
 type Effort = "low" | "medium" | "high";
 
@@ -181,7 +181,7 @@ export class ClaudeAi implements Ai {
     content.push({ type: "text", text: "Grade every checklist item." });
     const result = await this.call({
       task: "grade",
-      system: gradePrompt(input.challengeCode),
+      system: GRADE,
       content,
       schema: GradeResult,
       effort: "medium",

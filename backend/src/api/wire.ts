@@ -140,7 +140,8 @@ export async function jobWire(ctx: WireContext, job: Job, viewer: User) {
     job.latestProofId && role !== "offered" ? deps.store.getProof(job.jobId, job.latestProofId) : Promise.resolve(null),
   ]);
   const isPoster = role === "poster" || role === "admin";
-  const showCode = role === "worker" && ["IN_PROGRESS", "SUBMITTED", "IN_REVIEW"].includes(job.state);
+  // Only the assigned worker's app, and only while it can still capture proof.
+  const showCaptureKey = role === "worker" && job.state === "IN_PROGRESS";
 
   return {
     // Fields in Job.swift
@@ -185,7 +186,7 @@ export async function jobWire(ctx: WireContext, job: Job, viewer: User) {
         : isPoster && job.currentOffer
           ? { id: job.currentOffer.offerId, expiresAt: wireDate(job.currentOffer.expiresAt) }
           : null,
-    challengeCode: showCode ? (job.challenge?.code ?? null) : null,
+    captureKey: showCaptureKey ? (job.capture?.key ?? null) : null,
     attempts: { failed: job.failedAttempts, maxRetries: deps.config.rules.maxRetries },
     review: job.review
       ? {

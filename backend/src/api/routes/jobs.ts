@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import type { Deps } from "../../deps.js";
 import type { JobEvent } from "../../domain/events.js";
-import { challengeCode } from "../../domain/ids.js";
+import { captureKey } from "../../domain/ids.js";
 import { MAX_BOUNTY_CENTS, MIN_BOUNTY_CENTS } from "../../domain/money.js";
 import { Category, EvidenceType, type Actor, type Job, type User } from "../../domain/types.js";
 import { badRequest, notFound } from "../../lib/errors.js";
@@ -169,11 +169,11 @@ export function jobRoutes(deps: Deps): Hono<AppEnv> {
     return act(deps, c, { type: "UPDATE_TERMS", deadline, radiusKm: body.radiusMiles === undefined ? undefined : milesToKm(body.radiusMiles) });
   });
 
-  // US-35/36: check in and start. The response carries challengeCode for the proof photos.
+  // US-35/36: check in and start. The response carries captureKey, which the app signs its proof captures with.
   app.post("/:id/start", async (c) => {
     const body = await parseOptionalBody(c, z.object({ latitude: z.number().optional(), longitude: z.number().optional() }));
     const at = body.latitude !== undefined && body.longitude !== undefined ? { lat: body.latitude, lng: body.longitude } : undefined;
-    return act(deps, c, { type: "START", code: challengeCode(), at });
+    return act(deps, c, { type: "START", captureKey: captureKey(), at });
   });
 
   // Product rule 5: the worker can hand the job back before submitting; it re-opens for matching.

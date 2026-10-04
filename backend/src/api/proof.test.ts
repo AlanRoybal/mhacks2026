@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { FakeAi } from "../ai/fake.js";
 import { test } from "node:test";
 import type { Job, Proof } from "../domain/types.js";
-import { codeMatches, decide } from "../services/grading.js";
+import { decide } from "../services/grading.js";
 import { applyEvent, getJobOrThrow } from "../services/jobs.js";
 import { apiClient, isoIn, type Json } from "../testing/api.js";
 import { testDeps, type TestDeps } from "../testing/harness.js";
@@ -28,7 +28,7 @@ async function startedJob(deps: TestDeps, title = "Sketch a logo for a coffee sh
   await api.call("POST", `/offers/${offer?.offerId}/accept`, worker.token);
   const started = await api.call("POST", `/jobs/${created.id}/start`, worker.token, { latitude: SITE.lat, longitude: SITE.lng });
   assert.equal(started.body.status, "IN_PROGRESS");
-  assert.match(started.body.challengeCode, /^[A-Z0-9]{3}-[A-Z0-9]{3}$/);
+  assert.match(started.body.captureKey, /^[A-Za-z0-9_-]{43}$/);
   return { api, poster, worker, job: started.body as Json };
 }
 
@@ -120,7 +120,7 @@ test("a photo used as proof for one job cannot be reused for another", async () 
   assert.ok(res.body.checks.duplicates.length > 0);
 });
 
-test("decision rules: confident fails fail, unsure or missing code goes to the poster", () => {
+test("decision rules: confident fails fail, unsure or away from the job goes to the poster", () => {
   const job = {
     checklist: [
       { id: "c1", text: "a", evidenceType: "PHOTO", photoCount: 1, required: true },
@@ -129,13 +129,12 @@ test("decision rules: confident fails fail, unsure or missing code goes to the p
   } as Job;
   const proof = { items: [{ checklistItemId: "c1", kind: "photo", phase: "single" }], checks: { outsideGeofence: [] } } as unknown as Proof;
   const v = (verdict: "pass" | "fail" | "unclear", confidence: number) => [{ itemId: "c1", verdict, confidence, reason: "" }];
-  assert.equal(decide(job, proof, v("pass", 0.9), true).decision, "pass");
-  assert.equal(decide(job, proof, v("fail", 0.8), true).decision, "fail");
-  assert.equal(decide(job, proof, v("fail", 0.5), true).decision, "unclear");
-  assert.equal(decide(job, proof, v("pass", 0.6), true).decision, "unclear");
-  assert.equal(decide(job, proof, v("pass", 0.95), false).decision, "unclear", "code not visible");
+  assert.equal(decide(job, proof, v("pass", 0.9)).decision, "pass");
+  assert.equal(decide(job, proof, v("fail", 0.8)).decision, "fail");
+  assert.equal(decide(job, proof, v("fail", 0.5)).decision, "unclear");
+  assert.equal(decide(job, proof, v("pass", 0.6)).decision, "unclear");
   const away = { ...proof, checks: { outsideGeofence: ["c1"] } } as unknown as Proof;
-  assert.equal(decide(job, away, v("pass", 0.95), true).decision, "unclear");
+  assert.equal(decide(job, away, v("pass", 0.95)).decision, "unclear");
 });
 
 test("one image can't fill two photo slots or be both before and after", async () => {
@@ -204,13 +203,4 @@ test("a worker who takes over a job doesn't see the previous worker's proofs", a
   await api.call("POST", `/offers/${offer?.offerId}/accept`, next.token);
   assert.deepEqual((await api.call("GET", `/jobs/${job.id}/proofs`, next.token)).body, []);
   assert.equal(((await api.call("GET", `/jobs/${job.id}/proofs`, poster.token)).body as unknown as Json[]).length, 1);
-});
-
-test("the one-time code must actually match what the model read", async () => {
-  assert.equal(codeMatches("K7Q-4MX", "K7Q-4MX"), true);
-  assert.equal(codeMatches("k7q 4mx", "K7Q-4MX"), true, "case and separators don't matter");
-  assert.equal(codeMatches("K7Q4NX", "K7Q-4MX"), true, "one misread character is tolerated");
-  assert.equal(codeMatches("K7Q4M", "K7Q-4MX"), true, "one missing character is tolerated");
-  assert.equal(codeMatches("ABC-DEF", "K7Q-4MX"), false);
-  assert.equal(codeMatches("", "K7Q-4MX"), false);
 });

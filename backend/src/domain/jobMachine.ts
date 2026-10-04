@@ -272,7 +272,7 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
       requireUser(ctx, job.workerId, "assigned worker");
       requireState(job, ev, "ACCEPTED");
       if (pastDeadline(job, ctx.now)) fail("deadline_passed", "The job deadline has passed");
-      if (!ev.code.trim()) fail("bad_request", "Missing one-time code");
+      if (!ev.captureKey.trim()) fail("bad_request", "Missing capture key");
       if (!job.remote) {
         if (!ev.at || !isFiniteLatLng(ev.at) || !job.location) fail("location_required", "Check in with your current location to start");
         const meters = Math.round(haversineKm(ev.at, job.location) * 1000);
@@ -280,7 +280,7 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
           fail("too_far", `You are ${meters} m from the job. Check in within ${ctx.rules.checkInRadiusM} m.`);
         }
       }
-      return { to: "IN_PROGRESS", patch: { startedAt: now, challenge: { code: ev.code, issuedAt: now } }, effects: [push(job.posterId, "job_started")] };
+      return { to: "IN_PROGRESS", patch: { startedAt: now, capture: { key: ev.captureKey, issuedAt: now } }, effects: [push(job.posterId, "job_started")] };
     }
 
     case "WITHDRAW": {
@@ -293,6 +293,7 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
           acceptedAt: undefined,
           startedAt: undefined,
           submittedAt: undefined,
+          capture: undefined,
           challenge: undefined,
           latestProofId: undefined,
           failedAttempts: 0,

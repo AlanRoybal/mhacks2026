@@ -27,7 +27,6 @@ test("a failed grade sends every item to the poster as unclear", async () => {
   const grade = await ai.grade({
     job,
     checklist: [{ id: "c1", text: "Logo visible", evidenceType: "PHOTO", photoCount: 1, required: true }],
-    challengeCode: "ACD-EFH",
     evidence: [],
   });
   assert.deepEqual(
