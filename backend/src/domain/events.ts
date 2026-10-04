@@ -65,7 +65,9 @@ export type Effect =
   | { kind: "grade"; proofId: string }
   | { kind: "payout" }
   | { kind: "refund" }
-  | { kind: "stats"; userId: string; delta: Partial<Record<StatKey, number>> };
+  | { kind: "stats"; userId: string; delta: Partial<Record<StatKey, number>> }
+  // The poster rated the worker: learn which skills the job proved (or didn't).
+  | { kind: "learn" };
 
 // Append-only history of a job. seq equals the job version the event produced.
 export interface LedgerEvent {

@@ -16,10 +16,12 @@ import {
   type ProfileInput,
   type RerankCandidate,
   type RerankPick,
+  RatingInsight,
+  type RatingInput,
   type ThreadInput,
   ThreadTurn,
 } from "./ai.js";
-import { CHECKLIST, EXTRACT_PROFILE, GRADE, RERANK, THREAD } from "./prompts.js";
+import { CHECKLIST, EXTRACT_PROFILE, GRADE, RATING, RERANK, THREAD } from "./prompts.js";
 
 type Effort = "low" | "medium" | "high";
 
@@ -204,5 +206,18 @@ export class ClaudeAi implements Ai {
     if (input.message) content.push({ type: "text", text: tag("poster_message", input.message) });
     content.push({ type: "text", text: `Mode: ${input.mode}. Write the twin's next text.` });
     return this.call({ task: "thread", system: THREAD, content, schema: ThreadTurn, effort: "low", maxTokens: 1200, timeoutMs: 20_000 });
+  }
+
+  async assessRating(input: RatingInput): Promise<RatingInsight> {
+    const content: BetaContentBlockParam[] = [
+      { type: "text", text: jobText(input.job) },
+      { type: "text", text: tag("checklist", input.checklist.map((c) => `- ${c}`).join("\n") || "none") },
+      { type: "text", text: tag("rating", `${input.stars} of 5 stars`) },
+      { type: "text", text: tag("poster_comment", input.comment || "none") },
+      { type: "text", text: tag("proof_review", input.gradeSummary || "none") },
+      { type: "text", text: tag("worker_skills", input.workerSkills.join(", ") || "none yet") },
+      { type: "text", text: "Which skills did this job exercise, and what does the rating say about each?" },
+    ];
+    return this.call({ task: "rating", system: RATING, content, schema: RatingInsight, effort: "low", maxTokens: 1500, timeoutMs: 30_000 });
   }
 }

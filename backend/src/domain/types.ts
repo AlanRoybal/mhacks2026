@@ -210,7 +210,8 @@ export interface Proof {
   gradedAt?: string;
 }
 
-export type SkillSourceKind = "linkedin" | "resume" | "email" | "user";
+// "rating": learned from what posters said about the worker's finished jobs (services/trackRecord.ts).
+export type SkillSourceKind = "linkedin" | "resume" | "email" | "user" | "rating";
 
 export interface Skill {
   // Lowercase, trimmed name. Used to merge the same skill from several sources.
@@ -223,6 +224,8 @@ export interface Skill {
   userEdited: boolean;
   // Tombstone: a deleted skill stays deleted when the résumé is imported again.
   deleted: boolean;
+  // Rated jobs that exercised this skill: proof from real work, not a résumé claim.
+  record?: { jobs: number; starsSum: number; lastAt: string };
 }
 
 export interface Role {

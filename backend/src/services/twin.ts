@@ -49,10 +49,11 @@ export function mergeExtraction(twin: Twin, ex: ProfileExtraction, source: Skill
   }
   // User-edited skills and tombstones always stay; imported skills fill the rest by confidence.
   const merged = [...skills.values()];
-  const pinned = merged.filter((s) => s.deleted || s.userEdited);
+  // Skills proven by rated jobs stay too: a new résumé never pushes out a track record.
+  const pinned = merged.filter((s) => s.deleted || s.userEdited || s.record);
   const room = Math.max(0, MAX_SKILLS - pinned.filter((s) => !s.deleted).length);
   const imported = merged
-    .filter((s) => !s.deleted && !s.userEdited)
+    .filter((s) => !s.deleted && !s.userEdited && !s.record)
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, room);
   // Email is a weaker source: it only fills a summary, roles or education the twin doesn't have yet.
@@ -141,7 +142,10 @@ export function deleteSkill(twin: Twin, key: string, now: string): Twin | null {
 // The text that gets embedded for matching.
 export function twinDocument(user: User): string {
   const t = user.twin;
+  // Skills proven by rated work lead, so the embedding leans toward what the worker has actually done.
+  const proven = (s: { record?: { jobs: number } }) => (s.record?.jobs ? 1 : 0);
   const skills = activeSkills(t)
+    .sort((a, b) => proven(b) - proven(a))
     .slice(0, 30)
     .map((s) => (s.category ? `${s.name} (${s.category})` : s.name));
   return [

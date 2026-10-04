@@ -47,6 +47,20 @@ test("the poster approves, both sides rate, and ratings show up on profiles", as
   assert.equal(job.body.worker.rating, 5);
   assert.equal(job.body.poster.rating, 4);
   assert.deepEqual(job.body.allowedActions, []);
+
+  // The 5-star review teaches the worker's twin: the tutoring skill now carries a rated track record.
+  const twin = await api.call("GET", "/twin", worker.token);
+  const tutoring = (twin.body.skills as Json[]).find((s) => s.normName === "calculus tutoring");
+  assert.deepEqual(tutoring?.trackRecord, { jobs: 1, averageStars: 5 });
+  assert.ok((tutoring?.sources as Json[]).some((s) => s.kind === "rating" && /5★ for "Calc II tutoring, 1 hour"/.test(s.evidence)));
+  const profile = await api.call("GET", "/profile/twin", worker.token);
+  assert.equal((profile.body.skills as Json[]).find((s) => s.id === "calculus tutoring")?.source, "rating");
+
+  // Rating again (a retried task) doesn't count the job twice.
+  await deps.tasks.run({ kind: "task", name: "learn_rating", jobId });
+  await deps.settle();
+  const again = await api.call("GET", "/twin", worker.token);
+  assert.equal((again.body.skills as Json[]).find((s) => s.normName === "calculus tutoring")?.trackRecord.jobs, 1);
 });
 
 test("a dispute names an item; an admin resolves it", async () => {

@@ -6,8 +6,8 @@
 // - job thread: falls back to the template twin (passes questions on to the worker)
 
 import type { Logger } from "../lib/log.js";
-import type { Ai, ChecklistDraft, GradeInput, GradeResult, JobBrief, ProfileExtraction, ProfileInput, RerankCandidate, RerankPick, ThreadInput, ThreadTurn } from "./ai.js";
-import { fakeThreadTurn, heuristicRerank, templateChecklist } from "./fake.js";
+import type { Ai, ChecklistDraft, GradeInput, GradeResult, RatingInput, RatingInsight, JobBrief, ProfileExtraction, ProfileInput, RerankCandidate, RerankPick, ThreadInput, ThreadTurn } from "./ai.js";
+import { fakeThreadTurn, heuristicRerank, templateChecklist, fakeRatingInsight } from "./fake.js";
 
 export class ResilientAi implements Ai {
   readonly name: string;
@@ -61,6 +61,15 @@ export class ResilientAi implements Ai {
     } catch (error) {
       this.log.warn("Thread AI failed; using template twin", { error });
       return fakeThreadTurn(input);
+    }
+  }
+
+  async assessRating(input: RatingInput): Promise<RatingInsight> {
+    try {
+      return await this.inner.assessRating(input);
+    } catch (error) {
+      this.log.warn("Rating AI failed; crediting the job's category", { error });
+      return fakeRatingInsight(input);
     }
   }
 }

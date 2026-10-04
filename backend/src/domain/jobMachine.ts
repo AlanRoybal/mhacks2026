@@ -481,7 +481,7 @@ export function transition(job: Job, ev: JobEvent, ctx: TransitionContext): Tran
         return {
           to: job.state,
           patch: { ratings: { ...job.ratings, byPoster: rating } },
-          effects: [{ kind: "stats", userId: job.workerId, delta: { ratingSum: ev.stars, ratingCount: 1 } }],
+          effects: [{ kind: "stats", userId: job.workerId, delta: { ratingSum: ev.stars, ratingCount: 1 } }, { kind: "learn" }],
         };
       }
       if (ctx.actor.kind === "user" && ctx.actor.userId === job.workerId) {

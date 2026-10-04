@@ -14,7 +14,8 @@ export type Task =
   | { kind: "task"; name: "thread_inbound"; from: string; text: string; messageId: string }
   // Slow, AI-bound effects run as their own invocations so they never hold up the ordered ledger stream.
   | { kind: "task"; name: "grade_proof"; jobId: string; proofId: string }
-  | { kind: "task"; name: "match_job"; jobId: string };
+  | { kind: "task"; name: "match_job"; jobId: string }
+  | { kind: "task"; name: "learn_rating"; jobId: string };
 
 export interface TaskRunner {
   run(task: Task): Promise<void>;

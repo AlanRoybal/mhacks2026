@@ -383,7 +383,7 @@ describe("ratings", () => {
 
   test("each side rates the other once", () => {
     const byPoster = apply(closed, { type: "RATE", stars: 5 }, POSTER);
-    assert.deepEqual(byPoster.effects, [{ kind: "stats", userId: "worker", delta: { ratingSum: 5, ratingCount: 1 } }]);
+    assert.deepEqual(byPoster.effects, [{ kind: "stats", userId: "worker", delta: { ratingSum: 5, ratingCount: 1 } }, { kind: "learn" }]);
     rejects(byPoster.job, { type: "RATE", stars: 4 }, POSTER, "already_done");
     assert.equal(apply(byPoster.job, { type: "RATE", stars: 4 }, WORKER).job.ratings.byWorker?.stars, 4);
     rejects(closed, { type: "RATE", stars: 6 }, POSTER, "bad_request");

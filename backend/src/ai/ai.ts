@@ -124,6 +124,32 @@ export interface GradeInput {
   evidence: GradeEvidence[];
 }
 
+// Learning from a poster's rating: which concrete skills the job exercised, and what the rating says
+// about the worker at each. Code decides how much a skill's confidence moves (services/trackRecord.ts).
+export const RatingInsight = z.object({
+  skills: z.array(
+    z.object({
+      name: z.string(),
+      category: z.string(),
+      // strong: the rating and comment show they're good at this; weak: they fell short on it.
+      verdict: z.enum(["strong", "adequate", "weak"]),
+      evidence: z.string(),
+    }),
+  ),
+});
+export type RatingInsight = z.infer<typeof RatingInsight>;
+
+export interface RatingInput {
+  job: JobBrief;
+  checklist: string[];
+  stars: number;
+  comment?: string;
+  // What the AI grader told the poster about the proof, if anything.
+  gradeSummary?: string;
+  // The worker's current skill names, so the model reuses them instead of inventing near-duplicates.
+  workerSkills: string[];
+}
+
 export interface Ai {
   readonly name: string;
   extractProfile(input: ProfileInput): Promise<ProfileExtraction>;
@@ -131,6 +157,7 @@ export interface Ai {
   rerank(job: JobBrief, candidates: RerankCandidate[]): Promise<RerankPick[]>;
   grade(input: GradeInput): Promise<GradeResult>;
   threadTurn(input: ThreadInput): Promise<ThreadTurn>;
+  assessRating(input: RatingInput): Promise<RatingInsight>;
 }
 
 export class AiUnavailableError extends Error {
