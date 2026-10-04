@@ -144,7 +144,8 @@ export function authRoutes(deps: Deps): Hono<AppEnv> {
     return c.json(await sessionBody(deps, user.userId));
   });
 
-  // Open this URL in ASWebAuthenticationSession. It ends at <scheme>://auth?token=... or ?error=...
+  // Open this URL in ASWebAuthenticationSession (TwinKit LinkedInServerAuthenticator). It ends at
+  // <scheme>://auth?token=...&user_id=...&expires_in=... or ?error=...
   app.get("/linkedin/start", async (c) => {
     if (!deps.config.LINKEDIN_CLIENT_ID) throw badRequest("LinkedIn sign-in is not configured", "not_configured");
     const nonce = randomUUID();
@@ -171,7 +172,8 @@ export function authRoutes(deps: Deps): Hono<AppEnv> {
       const { payload: st } = await jwtVerify(state, secretKey(deps), { algorithms: ["HS256"] });
       if (st.typ !== "oauth_state") throw new Error("bad state");
       const user = await linkedInUser(deps, { code, redirectUri: linkedinRedirectUri, nonce: String(st.nonce) });
-      return c.redirect(appRedirect(deps, { token: await signSession(deps, user.userId) }));
+      const session = await sessionBody(deps, user.userId);
+      return c.redirect(appRedirect(deps, { token: session.token, user_id: session.user_id, expires_in: String(session.expires_in) }));
     } catch (e) {
       deps.log.warn("LinkedIn sign-in failed", { error: e });
       return c.redirect(appRedirect(deps, { error: "linkedin_failed" }));

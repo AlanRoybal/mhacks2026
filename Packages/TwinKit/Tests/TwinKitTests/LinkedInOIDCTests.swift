@@ -39,3 +39,32 @@ final class LinkedInOIDCTests: XCTestCase {
         }
     }
 }
+
+final class LinkedInServerSignInTests: XCTestCase {
+    func testServerCallbackBuildsSession() throws {
+        let callback = URL(string: "bounty://auth?token=abc.def.ghi&user_id=u_123&expires_in=2592000")!
+
+        let session = try LinkedInServerAuthenticator.session(fromCallback: callback)
+
+        XCTAssertEqual(session.accessToken, "abc.def.ghi")
+        XCTAssertEqual(session.userID, "u_123")
+        XCTAssertEqual(session.expiresIn, 2_592_000)
+        XCTAssertNil(session.refreshToken)
+    }
+
+    func testServerCallbackSurfacesFailure() throws {
+        let callback = URL(string: "bounty://auth?error=linkedin_failed")!
+
+        XCTAssertThrowsError(try LinkedInServerAuthenticator.session(fromCallback: callback)) {
+            guard case .authorizationFailed = $0 as? LinkedInOIDCError else { return XCTFail("unexpected \($0)") }
+        }
+    }
+
+    func testServerCallbackRequiresAllValues() throws {
+        let callback = URL(string: "bounty://auth?token=abc")!
+
+        XCTAssertThrowsError(try LinkedInServerAuthenticator.session(fromCallback: callback)) {
+            XCTAssertEqual($0 as? LinkedInOIDCError, .missingCallbackValues)
+        }
+    }
+}
