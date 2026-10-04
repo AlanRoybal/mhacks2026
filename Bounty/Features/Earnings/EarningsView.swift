@@ -2,10 +2,19 @@ import SwiftUI
 
 /// 17 Earnings.
 struct EarningsView: View {
+    @Environment(AppRouter.self) private var router
+    @Environment(ProfileStore.self) private var profileStore
+
     var body: some View {
         BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 360), spacing: 8) {
             ScreenTitle(title: "Earnings", type: .title) {
-                IconButton(icon: .userRound, label: "Account") {}
+                Button { router.open(.profile) } label: {
+                    ProfileAvatar(profile: profileStore.profile)
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityLabel("Your profile")
+                .accessibilityHint("View and edit your personal information")
+                .accessibilityIdentifier("profileButton")
             }
             .entrance(.top)
 
@@ -98,4 +107,6 @@ private struct ActivityRow: View {
 
 #Preview {
     EarningsView()
+        .environment(AppRouter())
+        .environment(ProfileStore())
 }

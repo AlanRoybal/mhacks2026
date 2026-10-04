@@ -19,27 +19,18 @@ struct HomeView: View {
                         .minimumScaleFactor(0.7)
                 }
                 Spacer()
-                HStack(spacing: 8) {
-                    IconButton(icon: .bell, label: "Notifications") { router.open(.notifications) }
-                        .overlay(alignment: .topTrailing) {
-                            if HomeNotification.unreadCount(router: router) > 0 {
-                                Circle()
-                                    .fill(BountyColor.coral)
-                                    .frame(width: 10, height: 10)
-                                    .overlay(Circle().stroke(BountyColor.canvas, lineWidth: 2))
-                                    .offset(x: -2, y: 2)
-                                    .allowsHitTesting(false)
-                            }
+                IconButton(icon: .bell, label: "Notifications") { router.open(.notifications) }
+                    .overlay(alignment: .topTrailing) {
+                        if HomeNotification.unreadCount(router: router) > 0 {
+                            Circle()
+                                .fill(BountyColor.coral)
+                                .frame(width: 10, height: 10)
+                                .overlay(Circle().stroke(BountyColor.canvas, lineWidth: 2))
+                                .offset(x: -2, y: 2)
+                                .allowsHitTesting(false)
                         }
-                        .accessibilityValue("\(HomeNotification.unreadCount(router: router)) unread")
-                    Button { router.open(.profile) } label: {
-                        ProfileAvatar(profile: profileStore.profile)
                     }
-                    .buttonStyle(PressableStyle())
-                    .accessibilityLabel("Your profile")
-                    .accessibilityHint("View and edit your personal information")
-                    .accessibilityIdentifier("profileButton")
-                }
+                    .accessibilityValue("\(HomeNotification.unreadCount(router: router)) unread")
             }
             .entrance(.top)
 
