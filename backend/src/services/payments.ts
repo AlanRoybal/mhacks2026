@@ -9,6 +9,7 @@ import { AppError, conflict, forbidden } from "../lib/errors.js";
 import { RailUnavailableError, type FundingSession } from "../payments/index.js";
 import { VersionConflictError } from "../store/index.js";
 import { applyEvent, getJobOrThrow } from "./jobs.js";
+import { payoutTiming, referenceUrl } from "./money.js";
 import { hasRequiredEvidence } from "./postings.js";
 import { updateUser } from "./users.js";
 
@@ -53,7 +54,17 @@ export async function runPayout(deps: Deps, jobId: string): Promise<void> {
   if (!job || job.state !== "RELEASED" || job.payment.transferId || !job.workerId) return;
   const worker = await deps.store.getUser(job.workerId);
   if (!worker) throw new Error(`Worker ${job.workerId} not found for payout`);
-  const { transferId } = await deps.payments.railFor(job).payout(job, worker);
+  const attemptKey = `payout-attempt:${jobId}`;
+  const attempt = (await deps.store.kvGet<number>(attemptKey)) ?? 0;
+  let transferId: string;
+  try {
+    ({ transferId } = await deps.payments.railFor(job).payout(job, worker, attempt));
+  } catch (error) {
+    // Rejected outright (e.g. the worker's account couldn't receive transfers yet): nothing moved, so the
+    // sweeper's next try may use a fresh idempotency key once the cause is fixed.
+    if ((error as { type?: string }).type === "StripeInvalidRequestError") await deps.store.kvPut(attemptKey, attempt + 1);
+    throw error;
+  }
   await applyEvent(deps, jobId, { type: "PAYOUT_CONFIRMED", transferId }, SYSTEM("payments"));
   deps.log.info("Payout sent", { jobId, transferId, amountCents: job.bountyCents });
 }
@@ -100,8 +111,10 @@ async function onPaymentSucceeded(deps: Deps, intent: Stripe.PaymentIntent): Pro
 
 async function onAccountUpdated(deps: Deps, account: Stripe.Account): Promise<void> {
   const userId = await deps.store.kvGet<string>(`stripe-account:${account.id}`);
-  if (!userId) return;
-  const enabled = account.capabilities?.transfers === "active";
+  const stripe = deps.payments.stripe;
+  if (!userId || !stripe) return;
+  // The v1 event's `transfers` reads active even when v2 transfers aren't; ask the v2 account.
+  const enabled = await stripe.transfersEnabled(account.id);
   await updateUser(deps, userId, (u) => {
     u.payouts.stripeTransfersEnabled = enabled;
   });
@@ -135,6 +148,9 @@ export async function connectOnboardingUrl(deps: Deps, user: User, refreshUrl: s
     await updateUser(deps, user.userId, (u) => {
       u.payouts.stripeAccountId = created;
     });
+  } else {
+    // Older accounts lack the recipient configuration; onboarding then collects what it needs.
+    await stripe.ensureRecipient(accountId);
   }
   return stripe.onboardingLink(accountId, refreshUrl, `${deps.config.PUBLIC_BASE_URL}/wallet/connect/return`);
 }
@@ -144,6 +160,7 @@ export async function syncPayoutStatus(deps: Deps, user: User): Promise<User> {
   const stripe = deps.payments.stripe;
   const accountId = user.payouts.stripeAccountId;
   if (!stripe || !accountId) return user;
+  await stripe.ensureRecipient(accountId);
   const enabled = await stripe.transfersEnabled(accountId);
   return updateUser(deps, user.userId, (u) => {
     u.payouts.stripeTransfersEnabled = enabled;
@@ -157,6 +174,9 @@ export async function earnings(deps: Deps, user: User) {
   const jobs = await deps.store.listJobsByWorker(user.userId);
   const totals = new Map<string, { currency: string; pending: number; releasing: number; paid: number }>();
   const items = [];
+  const yearStart = Date.UTC(deps.now().getUTCFullYear(), 0, 1);
+  let yearToDatePaid = 0;
+  const payoutSeconds: number[] = [];
   for (const job of jobs) {
     const status = PENDING_STATES.has(job.state)
       ? "pending"
@@ -171,6 +191,9 @@ export async function earnings(deps: Deps, user: User) {
     const total = totals.get(job.currency) ?? { currency: job.currency, pending: 0, releasing: 0, paid: 0 };
     if (status !== "refunded") total[status] += job.bountyCents / 100;
     totals.set(job.currency, total);
+    const timing = job.state === "RELEASED" ? payoutTiming(await deps.store.listLedger(job.jobId)) : null;
+    if (timing?.timeToPaidSeconds != null) payoutSeconds.push(timing.timeToPaidSeconds);
+    if (status === "paid" && job.currency === "USD" && timing?.paidAt && Date.parse(timing.paidAt) >= yearStart) yearToDatePaid += job.bountyCents / 100;
     items.push({
       jobId: job.jobId,
       title: job.title,
@@ -180,15 +203,24 @@ export async function earnings(deps: Deps, user: User) {
       jobStatus: job.state,
       rail: job.rail,
       reference: job.payment.transferId ?? null,
+      referenceUrl: referenceUrl(deps, job.payment.transferId),
+      paidAt: timing?.paidAt?.replace(/\.\d{3}Z$/, "Z") ?? null,
+      // Seconds from the release decision (approval or review window) to the payout landing.
+      timeToPaidSeconds: timing?.timeToPaidSeconds ?? null,
       updatedAt: job.updatedAt.replace(/\.\d{3}Z$/, "Z"),
     });
   }
+  const percent = user.taxSetAsidePercent ?? 0;
   const usd = totals.get("USD") ?? { currency: "USD", pending: 0, releasing: 0, paid: 0 };
   return {
     available: usd.paid,
     pending: usd.pending + usd.releasing,
     currencies: [...totals.values()],
     payouts: { stripeConnected: Boolean(user.payouts.stripeAccountId), payoutsEnabled: user.payouts.stripeTransfersEnabled },
+    yearToDatePaid: Math.round(yearToDatePaid * 100) / 100,
+    averageTimeToPaidSeconds: payoutSeconds.length ? Math.round(payoutSeconds.reduce((a, b) => a + b, 0) / payoutSeconds.length) : null,
+    // A tracker, not a withholding: the money stays in the worker's payout account.
+    taxSetAside: { percent, amount: Math.round(yearToDatePaid * percent) / 100 },
     items,
   };
 }

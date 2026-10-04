@@ -16,7 +16,8 @@ export interface PaymentRail {
   // Starts (or resumes) checkout for a draft. Funding is confirmed later by FUND_CONFIRMED.
   startFunding(job: Job, poster: User): Promise<FundingSession>;
   // Sends the bounty to the worker.
-  payout(job: Job, worker: User): Promise<{ transferId: string }>;
+  // attempt > 0 after a payout Stripe rejected outright, so the retry isn't answered from the cached failure.
+  payout(job: Job, worker: User, attempt?: number): Promise<{ transferId: string }>;
   // Returns the full charge (bounty + fee) to the poster.
   refund(job: Job): Promise<{ refundId: string }>;
 }

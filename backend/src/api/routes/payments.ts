@@ -1,9 +1,12 @@
 import { Hono } from "hono";
 import { jwtVerify, SignJWT } from "jose";
 import type { Deps } from "../../deps.js";
+import { z } from "zod";
 import { badRequest } from "../../lib/errors.js";
+import { createIncomeStatement, getIncomeStatement, verificationPage, verifyUrl } from "../../services/income.js";
+import { updateUser } from "../../services/users.js";
 import { connectOnboardingUrl, earnings, handleStripeWebhook, startFunding, syncPayoutStatus } from "../../services/payments.js";
-import type { AppEnv } from "../http.js";
+import { parseBody, type AppEnv } from "../http.js";
 import { jobWire, WireContext } from "../wire.js";
 
 const secret = (deps: Deps) => new TextEncoder().encode(deps.config.JWT_SECRET);
@@ -33,6 +36,22 @@ export function walletRoutes(deps: Deps): Hono<AppEnv> {
 
   app.get("/earnings", async (c) => c.json(await earnings(deps, c.get("user"))));
 
+  // Tax set-aside: the share of each payout the Earnings tab tracks for taxes (0-50%). Nothing is withheld.
+  app.put("/tax", async (c) => {
+    const { percent } = await parseBody(c, z.object({ percent: z.number().int().min(0).max(50) }));
+    const user = await updateUser(deps, c.get("user").userId, (u) => {
+      u.taxSetAsidePercent = percent;
+    });
+    return c.json(await earnings(deps, user));
+  });
+
+  // A verified income statement from the escrow ledger, with a public link anyone can check.
+  app.post("/income-statement", async (c) => {
+    const { period } = await parseBody(c, z.object({ period: z.enum(["year", "90d", "all"]).default("year") }));
+    const statement = await createIncomeStatement(deps, c.get("user"), period);
+    return c.json({ ...statement, verifyUrl: verifyUrl(deps, statement.id) });
+  });
+
   // US-52: open the returned url in SFSafariViewController. Stripe sends the worker back to
   // <scheme>://wallet?status=returned; then call POST /wallet/connect/sync to refresh the status.
   app.post("/connect", async (c) => {
@@ -57,6 +76,12 @@ export function publicPaymentRoutes(deps: Deps): Hono<AppEnv> {
     if (!signature) throw badRequest("Missing Stripe-Signature header");
     await handleStripeWebhook(deps, await c.req.text(), signature);
     return c.json({ received: true });
+  });
+
+  // The page behind an income statement's verification link (no sign-in: the unguessable ID is the key).
+  app.get("/verify/income/:id", async (c) => {
+    const statement = await getIncomeStatement(deps, c.req.param("id"));
+    return c.html(verificationPage(statement), statement ? 200 : 404);
   });
 
   app.get("/wallet/connect/return", (c) => c.redirect(`${deps.config.APP_URL_SCHEME}://wallet?status=returned`));

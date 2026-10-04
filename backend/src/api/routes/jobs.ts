@@ -7,6 +7,7 @@ import { MAX_BOUNTY_CENTS, MIN_BOUNTY_CENTS } from "../../domain/money.js";
 import { Category, EvidenceType, type Actor, type Job, type User } from "../../domain/types.js";
 import { badRequest, notFound } from "../../lib/errors.js";
 import { applyEvent, getJobOrThrow } from "../../services/jobs.js";
+import { moneyTrail } from "../../services/money.js";
 import { createDraft, deleteDraft, regenerateChecklist, setChecklist, updateDetails, validateDeadline, type DraftInput } from "../../services/postings.js";
 import { parseBody, parseOptionalBody, type AppEnv } from "../http.js";
 import { jobWire, milesToKm, roleOf, timelineWire, WireContext } from "../wire.js";
@@ -153,6 +154,13 @@ export function jobRoutes(deps: Deps): Hono<AppEnv> {
   });
 
   // US-17/49: every status change, oldest first.
+  // Follow the money: charged → escrow → released → paid (or refunded), with the reference for each step.
+  app.get("/:id/money", async (c) => {
+    const user = c.get("user");
+    const job = await visibleJob(deps, user, c.req.param("id"));
+    return c.json(moneyTrail(deps, job, await deps.store.listLedger(job.jobId), { isPoster: job.posterId === user.userId }));
+  });
+
   app.get("/:id/timeline", async (c) => {
     const user = c.get("user");
     const job = await visibleJob(deps, user, c.req.param("id"));

@@ -309,6 +309,8 @@ export interface User {
   inbox?: InboxItem[];
   // Items created after this are unread.
   inboxReadAt?: string;
+  // Share of each payout to set aside for taxes (0-50). A budgeting tracker: no money is withheld.
+  taxSetAsidePercent?: number;
   createdAt: string;
   updatedAt: string;
 }

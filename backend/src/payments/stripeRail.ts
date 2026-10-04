@@ -48,7 +48,7 @@ export class StripeRail implements PaymentRail {
     };
   }
 
-  async payout(job: Job, worker: User) {
+  async payout(job: Job, worker: User, attempt = 0) {
     const destination = worker.payouts.stripeAccountId;
     if (!destination) throw new Error(`Worker ${worker.userId} has no Stripe account`);
     const existing = await this.stripe.transfers.list({ transfer_group: job.jobId, limit: 10 });
@@ -64,7 +64,9 @@ export class StripeRail implements PaymentRail {
         ...(job.payment.chargeId ? { source_transaction: job.payment.chargeId } : {}),
         metadata: { jobId: job.jobId },
       },
-      { idempotencyKey: `payout:${job.jobId}` },
+      // Stripe replays a keyed request's saved result (errors too) for 24 h, so each attempt after a
+      // rejection gets its own key. The transfer_group lookup above still prevents paying twice.
+      { idempotencyKey: attempt > 0 ? `payout:${job.jobId}:${attempt}` : `payout:${job.jobId}` },
     );
     return { transferId: transfer.id };
   }
@@ -91,16 +93,20 @@ export class StripeRail implements PaymentRail {
   // Newer Stripe platforms can't create Accounts v1 connected accounts with the legacy `type` field, and a
   // platform that doesn't take on losses can't use Express or recipient-only accounts. So each worker gets
   // a full-dashboard account (Standard in v1 terms) through Accounts v2, with Stripe collecting fees and
-  // covering losses. The merchant configuration brings the v1 `transfers` capability with it (the recipient
-  // configuration would also demand a contact email, which demo and hidden-email Apple users lack).
-  // Status checks still read the v1 view of the same account.
+  // covering losses. Payouts are /v1/transfers into the account, which on v2 accounts needs the recipient
+  // configuration's stripe_balance.stripe_transfers capability (the v1 view's `transfers: active` is not
+  // enough). The recipient configuration needs a contact email, so accounts without one stay merchant-only
+  // until the worker adds an email.
   async createConnectAccount(user: User): Promise<string> {
     const account = await this.stripe.v2.core.accounts.create(
       {
         ...(user.email ? { contact_email: user.email } : {}),
         display_name: user.displayName,
         identity: { country: "us", entity_type: "individual" },
-        configuration: { merchant: { capabilities: { card_payments: { requested: true } } } },
+        configuration: {
+          merchant: { capabilities: { card_payments: { requested: true } } },
+          ...(user.email ? { recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } } } : {}),
+        },
         defaults: { responsibilities: { fees_collector: "stripe", losses_collector: "stripe" } },
         dashboard: "full",
         metadata: { userId: user.userId },
@@ -118,8 +124,21 @@ export class StripeRail implements PaymentRail {
     return link.url;
   }
 
+  // Accounts created before the recipient configuration was requested get it added (idempotent). Returns
+  // false when it can't be added yet (no contact email on the account).
+  async ensureRecipient(accountId: string): Promise<boolean> {
+    const account = await this.stripe.v2.core.accounts.retrieve(accountId, { include: ["configuration.recipient"] });
+    if (account.configuration?.recipient?.capabilities?.stripe_balance?.stripe_transfers) return true;
+    if (!account.contact_email) return false;
+    await this.stripe.v2.core.accounts.update(accountId, {
+      configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } } },
+    });
+    return true;
+  }
+
+  // True once Stripe will accept transfers into the account: the recipient stripe_transfers capability is active.
   async transfersEnabled(accountId: string): Promise<boolean> {
-    const account = await this.stripe.accounts.retrieve(accountId);
-    return account.capabilities?.transfers === "active";
+    const account = await this.stripe.v2.core.accounts.retrieve(accountId, { include: ["configuration.recipient"] });
+    return account.configuration?.recipient?.capabilities?.stripe_balance?.stripe_transfers?.status === "active";
   }
 }
