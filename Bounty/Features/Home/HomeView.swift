@@ -3,23 +3,39 @@ import SwiftUI
 /// 06 Home.
 struct HomeView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(AppServices.self) private var services
+    @Environment(MarketplaceStore.self) private var marketplace
     @EnvironmentObject private var workerPayments: WorkerPayments
+    @State private var name: String?
+    @State private var showsSettings = false
+
+    private var greeting: String {
+        switch Calendar.current.component(.hour, from: .now) {
+        case 5..<12: "Good morning"
+        case 12..<17: "Good afternoon"
+        default: "Good evening"
+        }
+    }
 
     var body: some View {
         BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 380), spacing: 18) {
             HStack {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Good evening")
+                    Text(greeting)
                         .bountyType(.subhead)
                         .foregroundStyle(BountyColor.inkSecondary)
-                    Text("Alan")
+                    Text(name ?? (services.api == nil ? "Alan" : " "))
                         .bountyType(.title)
                         .foregroundStyle(BountyColor.inkPrimary)
                 }
                 Spacer()
                 HStack(spacing: 8) {
                     IconButton(icon: .bell, label: "Notifications") { router.open(.lockScreenOffer) }
-                    InitialsAvatar(initials: "AR")
+                    Button { showsSettings = true } label: {
+                        InitialsAvatar(initials: JobDetailView.initials(name ?? (services.api == nil ? "Alan R" : "?")))
+                    }
+                    .buttonStyle(PressableStyle())
+                    .accessibilityLabel("Account")
                 }
             }
             .entrance(.top)
@@ -27,8 +43,18 @@ struct HomeView: View {
             TwinStatusPill()
                 .entrance(.top)
 
-            if !router.offerDeclined {
+            if let offer = marketplace.currentOffer, let job = marketplace.offeredJob {
                 NewMatchCard(
+                    job: job.displayJob,
+                    expiry: offer.expiresAt ?? .now,
+                    onDecline: { Task { _ = await marketplace.respond(api: services.api, accept: false) } },
+                    onView: { router.open(.offer) }
+                )
+                .transition(.asymmetric(insertion: .identity, removal: .opacity.combined(with: .scale(scale: 0.96))))
+                .entrance(.top)
+            } else if services.api == nil && !router.offerDeclined {
+                NewMatchCard(
+                    job: SampleJobs.coffeeLogo,
                     expiry: router.offerExpiry,
                     onDecline: { withAnimation(Motion.enterRest) { router.offerDeclined = true } },
                     onView: { router.open(.offer) }
@@ -40,51 +66,68 @@ struct HomeView: View {
             SectionHeader(title: "Your jobs", trailing: "See all") { router.select(.jobs) }
                 .entrance(.rest(0))
 
-            if workerPayments.jobs.isEmpty {
+            if marketplace.workingJobs.isEmpty && workerPayments.jobs.isEmpty {
                 Text("No assigned jobs yet.").bountyType(.footnote)
             }
-            ForEach(workerPayments.jobs.prefix(3)) { job in
+            ForEach((marketplace.workingJobs.map(\.displayJob) + workerPayments.jobs).prefix(3)) { job in
                 Button { router.select(.jobs) } label: {
                     HomeJobRow(job: job, detail: "\(job.status.rawValue) · \(job.deadline)")
                 }
                 .buttonStyle(PressableStyle())
             }
         }
+        .sheet(isPresented: $showsSettings) { SettingsView() }
+        .task {
+            guard let api = services.api, let me: MeProfile = try? await api.request(.get, "me") else { return }
+            name = me.displayName
+        }
     }
 }
 
 private struct TwinStatusPill: View {
+    @Environment(AppServices.self) private var services
+    @Environment(AppRouter.self) private var router
     @State private var pulsing = false
+    @State private var readiness: TwinSettings.Readiness?
+
+    private var isReady: Bool { readiness?.ready ?? true }
 
     var body: some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(BountyColor.green)
+                .fill(isReady ? BountyColor.green : BountyColor.coral)
                 .frame(width: 10, height: 10)
                 .background {
                     Circle()
-                        .fill(BountyColor.green.opacity(0.35))
+                        .fill((isReady ? BountyColor.green : BountyColor.coral).opacity(0.35))
                         .scaleEffect(pulsing ? 2.2 : 1)
                         .opacity(pulsing ? 0 : 1)
                 }
                 .onAppear {
                     withAnimation(.easeOut(duration: 1.6).repeatForever(autoreverses: false)) { pulsing = true }
                 }
-            Text("Your twin is searching")
+            Text(isReady ? "Your twin is searching" : "Your twin isn\u{2019}t searching yet")
                 .bountyType(.subheadStrong)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text("27 checked today")
-                .bountyType(.footnote)
+            if let missing = readiness?.missing, !missing.isEmpty {
+                Button("Fix") { router.select(.twin) }
+                    .bountyType(.footnote)
+            }
         }
         .foregroundStyle(BountyColor.lavenderInk)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .tintedPanel(BountyColor.lavenderSoft, radius: 22)
         .accessibilityElement(children: .combine)
+        .task {
+            guard let api = services.api, let twin: TwinSettings = try? await api.request(.get, "twin") else { return }
+            readiness = twin.readiness
+        }
     }
 }
 
 private struct NewMatchCard: View {
+    let job: Job
     let expiry: Date
     let onDecline: () -> Void
     let onView: () -> Void
@@ -95,11 +138,11 @@ private struct NewMatchCard: View {
                 OfferCountdown(expiry: expiry) { remaining in
                     Chip(label: "New match · \(remaining) left", tone: .coral)
                 }
-                Text("$15")
+                Text(job.displayPay)
                     .bountyType(.moneyXL)
-                Text("Sketch a coffee shop logo")
+                Text(job.title)
                     .bountyType(.headline)
-                Text("0.4 mi · about 10 min · Due 6:00 PM")
+                Text("\(job.location) · Due \(job.deadline)")
                     .bountyType(.subhead)
                 HStack(spacing: 10) {
                     PillButton(title: "Decline", style: .outline, action: onDecline)
@@ -112,7 +155,7 @@ private struct NewMatchCard: View {
             .padding(.top, 20)
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(alignment: .topTrailing) {
-                StickerView(sticker: .coffee, size: 100)
+                StickerView(sticker: job.sticker, size: 100)
                     .padding(.top, 14)
                     .padding(.trailing, 17)
             }
@@ -155,5 +198,7 @@ struct OfferCountdown<Label: View>: View {
 #Preview {
     HomeView()
         .environment(AppRouter())
+        .environment(AppServices())
+        .environment(MarketplaceStore())
         .environmentObject(WorkerPayments())
 }

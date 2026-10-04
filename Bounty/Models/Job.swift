@@ -32,10 +32,11 @@ enum JobStatus: String, CaseIterable, Identifiable {
     case settlementIssue = "Payment needs review"
 
     static func api(_ value: String) -> JobStatus {
-        switch value {
+        switch value.lowercased() {
+        case "offered": .offered
         case "accepted": .accepted
         case "in_progress": .inProgress
-        case "in_review": .inReview
+        case "submitted", "in_review", "disputed": .inReview
         case "released": .paid
         case "refunded": .refunded
         case "release_pending": .releasePending

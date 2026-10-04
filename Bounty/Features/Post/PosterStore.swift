@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import TwinKit
 
 /// State for the poster's posted jobs: the Jobs › Posted list, a posted job's timeline, and the
 /// review screen. Posting and funding go through `PostDraft` and Caleb's checkout; this store
@@ -25,12 +26,12 @@ final class PosterStore {
     }
 
     /// The backend when a URL is configured (Config/*.xcconfig), otherwise sample data.
-    static func live(bundle: Bundle = .main) -> PosterStore {
-        let configured = ["BountyAPIBaseURL", "BountyPaymentsBaseURL"]
-            .compactMap { bundle.object(forInfoDictionaryKey: $0) as? String }
-            .compactMap(URL.init(string:))
-            .first { $0.host() != nil }
-        return PosterStore(api: configured.map { BackendJobsAPI(baseURL: $0) } ?? MockJobsAPI())
+    /// Requests use `session`, the same signed-in account the worker screens use.
+    static func live(session: (any AccessTokenProvider)?, bundle: Bundle = .main) -> PosterStore {
+        let configured = (bundle.object(forInfoDictionaryKey: "BountyAPIBaseURL") as? String)
+            .flatMap(URL.init(string:))
+            .flatMap { $0.host() != nil ? $0 : nil }
+        return PosterStore(api: configured.map { BackendJobsAPI(baseURL: $0, tokenProvider: session) } ?? MockJobsAPI())
     }
 
     func loadJobs() async {
@@ -124,6 +125,16 @@ final class PosterStore {
     /// Disputes submitted work. The poster must name the requirement that wasn't met.
     func dispute(_ job: PostedJob, item: ChecklistItem, note: String) async throws {
         upsert(try await api.dispute(jobId: job.id, checklistItemId: item.id, note: note))
+    }
+
+    /// Cancels a funded job before anyone accepts it. The server refunds in full (US-18).
+    func cancel(_ job: PostedJob) async throws {
+        upsert(try await api.cancel(jobId: job.id))
+    }
+
+    /// Every status change for one job, oldest first (US-17/49). Empty if it can't be loaded.
+    func timeline(jobId: String) async -> [TimelineEntry] {
+        (try? await api.timeline(jobId: jobId)) ?? []
     }
 
     /// Rates the worker once the job is closed. `comment` is optional; blank means none.

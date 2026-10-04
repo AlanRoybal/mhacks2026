@@ -3,17 +3,32 @@ import Foundation
 /// Everything the poster app needs from the backend. Screens talk only to this protocol,
 /// so swapping `MockJobsAPI` for the real client is a one-line change at app launch.
 protocol JobsAPI: Sendable {
-    /// `uploads/presign`: returns where to PUT the photo and its final URL.
+    /// `uploads/presign`: returns where to PUT the bytes and the file's stable URL.
     func presignUpload(contentType: String) async throws -> PresignedUpload
 
-    /// `jobs/create`: creates a DRAFT job and returns it with the AI-generated checklist.
+    /// `POST jobs`: creates a DRAFT job and returns it with the AI-generated checklist (US-11/13).
     func createJob(_ draft: NewJobDraft) async throws -> PostedJob
 
-    /// `jobs/{id}/checklist`: saves the poster's edits to the checklist.
+    /// `PATCH jobs/{id}`: changes a draft's details after the poster goes back and edits them.
+    func updateDraft(jobId: String, _ draft: NewJobDraft) async throws -> PostedJob
+
+    /// `DELETE jobs/{id}`: drafts only.
+    func deleteDraft(jobId: String) async throws
+
+    /// `jobs/{id}/checklist`: saves the poster's edits to the checklist (US-14).
     func updateChecklist(jobId: String, checklist: [ChecklistItem]) async throws -> PostedJob
 
-    /// `jobs/fund` (owned by Payments): returns the Stripe PaymentSheet client secret.
-    func startFunding(jobId: String) async throws -> FundingSession
+    /// `jobs/{id}/checklist/regenerate`: asks the AI for a fresh checklist.
+    func regenerateChecklist(jobId: String) async throws -> PostedJob
+
+    /// `jobs/{id}/fund`: a Stripe PaymentSheet session, or an already funded job with the fake rail (US-16).
+    func fund(jobId: String) async throws -> FundingResult
+
+    /// `jobs/{id}/cancel`: before a worker accepts. Full refund (US-18).
+    func cancel(jobId: String) async throws -> PostedJob
+
+    /// `jobs/{id}/timeline`: every status change, oldest first (US-17/49).
+    func timeline(jobId: String) async throws -> [TimelineEntry]
 
     /// `jobs/{id}`: current state, worker, proof and verdicts.
     func job(id: String) async throws -> PostedJob
@@ -27,7 +42,7 @@ protocol JobsAPI: Sendable {
     /// `jobs/{id}/dispute` (stretch).
     func dispute(jobId: String, checklistItemId: String, note: String) async throws -> PostedJob
 
-    /// `jobs/{id}/rating`: the poster rates the worker 1–5 once the job is paid or refunded.
+    /// `jobs/{id}/rating`: rates the other side 1–5 once the job is paid or refunded (US-56/57).
     func rate(jobId: String, stars: Int, comment: String?) async throws -> PostedJob
 
     /// `me/devices`: lets the server push to this device. `token` is the APNs token in hex.
@@ -37,30 +52,52 @@ protocol JobsAPI: Sendable {
 extension JobsAPI {
     /// Sample data has no server to push from.
     func registerDevice(token: String) async throws {}
+
+    /// Presigns, then PUTs the bytes. Returns the file URL to send in other requests.
+    func upload(_ data: Data, contentType: String) async throws -> URL {
+        let target = try await presignUpload(contentType: contentType)
+        try await target.put(data, contentType: contentType)
+        return target.fileURL
+    }
 }
 
+/// `POST /uploads/presign`. PUT the bytes to `uploadURL` with exactly `headers`, then refer to the file by `fileURL`.
 struct PresignedUpload: Codable, Hashable, Sendable {
     let uploadURL: URL
     let fileURL: URL
+    var method: String?
+    var headers: [String: String]?
 
-    init(uploadURL: URL, fileURL: URL) {
+    init(uploadURL: URL, fileURL: URL, method: String? = "PUT", headers: [String: String]? = nil) {
         self.uploadURL = uploadURL
         self.fileURL = fileURL
+        self.method = method
+        self.headers = headers
+    }
+
+    func put(_ data: Data, contentType: String) async throws {
+        // Sample data uploads go nowhere.
+        guard uploadURL.host() != "mock-uploads.invalid" else { return }
+        var request = URLRequest(url: uploadURL)
+        request.httpMethod = method ?? "PUT"
+        request.timeoutInterval = 60
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        for (name, value) in headers ?? [:] { request.setValue(value, forHTTPHeaderField: name) }
+        let (_, response) = try await URLSession.shared.upload(for: request, from: data)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw JobsAPIError.server("The upload didn\u{2019}t go through. Check your connection and try again.")
+        }
     }
 }
 
-struct FundingSession: Codable, Hashable, Sendable {
-    let paymentIntentClientSecret: String
-    let customerId: String?
-    let ephemeralKeySecret: String?
-    let publishableKey: String
+/// `POST /jobs/{id}/fund`. With Stripe, present PaymentSheet; with the fake rail, `job` is already FUNDED.
+struct FundingResult: Codable, Hashable, Sendable {
+    let provider: String
+    let paymentIntentClientSecret: String?
+    let publishableKey: String?
+    let job: PostedJob
 
-    init(paymentIntentClientSecret: String, customerId: String?, ephemeralKeySecret: String?, publishableKey: String) {
-        self.paymentIntentClientSecret = paymentIntentClientSecret
-        self.customerId = customerId
-        self.ephemeralKeySecret = ephemeralKeySecret
-        self.publishableKey = publishableKey
-    }
+    var needsPaymentSheet: Bool { provider == "stripe" && paymentIntentClientSecret != nil }
 }
 
 enum JobsAPIError: Error, LocalizedError, Sendable {

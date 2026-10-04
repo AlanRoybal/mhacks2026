@@ -6,6 +6,10 @@ import SwiftUI
 struct PostedJobDetailView: View {
     @Environment(AppRouter.self) private var router
     @Environment(PosterStore.self) private var store
+    @State private var history: [TimelineEntry] = []
+    @State private var confirmsCancel = false
+    @State private var isCanceling = false
+    @State private var actionError: String?
 
     private var job: PostedJob? { store.job(router.posterJobId) }
 
@@ -69,6 +73,17 @@ struct PostedJobDetailView: View {
                         .entrance(.rest(1))
                 }
 
+                if !history.isEmpty {
+                    JobHistoryCard(entries: history, payment: job.payment)
+                        .entrance(.rest(1))
+                }
+
+                if let actionError {
+                    Text(actionError)
+                        .bountyType(.footnote)
+                        .foregroundStyle(BountyColor.red)
+                }
+
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         Text("What counts as done")
@@ -104,16 +119,54 @@ struct PostedJobDetailView: View {
                         router.open(.reviewProof, posterJob: job.id)
                     }
                 default:
-                    EmptyView()
+                    if job.allows("cancel") {
+                        PillButton(title: isCanceling ? "Canceling\u{2026}" : "Cancel and refund", icon: .x, style: .secondary) {
+                            confirmsCancel = true
+                        }
+                        .disabled(isCanceling)
+                    }
                 }
             }
         }
+        .confirmationDialog("Cancel this job?", isPresented: $confirmsCancel, titleVisibility: .visible) {
+            Button("Cancel job and refund \(refundText)", role: .destructive) {
+                Task { await cancel() }
+            }
+            Button("Keep it", role: .cancel) {}
+        } message: {
+            Text("No one has accepted it yet, so you get a full refund, including the fee.")
+        }
         .task {
             guard let jobId = router.posterJobId else { return }
+            var lastStatus: PostedJobStatus?
             while !Task.isCancelled {
-                await store.refresh(jobId: jobId)
+                let fresh = await store.refresh(jobId: jobId)
+                // The history only changes when the status does.
+                if history.isEmpty || fresh?.status != lastStatus {
+                    history = await store.timeline(jobId: jobId)
+                    lastStatus = fresh?.status
+                }
                 try? await Task.sleep(for: .seconds(2))
             }
+        }
+    }
+
+    /// Everything the poster paid, fee included.
+    private var refundText: String {
+        guard let job = store.job(router.posterJobId) else { return "" }
+        return (job.totalAmount ?? job.payAmount).formatted(.currency(code: "USD"))
+    }
+
+    private func cancel() async {
+        guard let job else { return }
+        isCanceling = true
+        defer { isCanceling = false }
+        do {
+            try await store.cancel(job)
+            history = await store.timeline(jobId: job.id)
+            actionError = nil
+        } catch {
+            actionError = error.localizedDescription
         }
     }
 
@@ -138,7 +191,7 @@ struct PostedJobDetailView: View {
         case .released:
             return StatusNote(text: "Done. \(job.worker?.name ?? "The worker") was paid \(job.payShort).", sticker: .coins, fill: BountyColor.mint, ink: BountyColor.mintInk)
         case .refunded:
-            return StatusNote(text: "Refunded. No one finished by the deadline, so your \(job.payShort) came back.", sticker: .coins, fill: BountyColor.pill, ink: BountyColor.inkPill)
+            return StatusNote(text: "Refunded. Your \((job.totalAmount ?? job.payAmount).formatted(.currency(code: "USD"))) is on its way back.", sticker: .coins, fill: BountyColor.pill, ink: BountyColor.inkPill)
         }
     }
 
@@ -149,6 +202,54 @@ struct PostedJobDetailView: View {
 
     private func initials(_ name: String) -> String {
         name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
+    }
+}
+
+/// Every status change from the server's ledger, newest first, with who did it (US-17/49).
+struct JobHistoryCard: View {
+    let entries: [TimelineEntry]
+    var payment: JobPayment?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("History")
+                    .bountyType(.bodyStrong)
+                    .foregroundStyle(BountyColor.inkPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let payment { Chip(label: payment.displayName, tone: payment.status == "paid" ? .mint : .grey) }
+            }
+            ForEach(entries.reversed()) { entry in
+                HStack(alignment: .top, spacing: 10) {
+                    Circle()
+                        .fill(entry.seq == entries.last?.seq ? BountyColor.lavender : BountyColor.greyBack)
+                        .frame(width: 8, height: 8)
+                        .padding(.top, 6)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(entry.label)
+                            .bountyType(.subhead)
+                            .foregroundStyle(BountyColor.inkPrimary)
+                        Text("\(entry.at.formatted(date: .abbreviated, time: .shortened))\(Self.actorText(entry.actor).map { " · \($0)" } ?? "")")
+                            .bountyType(.caption)
+                            .foregroundStyle(BountyColor.inkSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .padding(16)
+        .borderedCard()
+    }
+
+    static func actorText(_ actor: String?) -> String? {
+        switch actor {
+        case "you": "You"
+        case "poster": "Poster"
+        case "worker": "Worker"
+        case "admin": "Admin"
+        case "platform": "Bounty"
+        default: nil
+        }
     }
 }
 

@@ -52,18 +52,63 @@ actor MockJobsAPI: JobsAPI {
         return job
     }
 
-    func startFunding(jobId: String) async throws -> FundingSession {
+    func updateDraft(jobId: String, _ draft: NewJobDraft) async throws -> PostedJob {
         try await latency()
-        let job = try existing(jobId)
+        var job = try existing(jobId)
         guard job.status == .draft else { throw JobsAPIError.invalidState(job.status) }
-        // Pretend the Stripe webhook arrives shortly after payment, then simulate the rest.
+        job.title = draft.title
+        job.description = draft.description
+        job.category = draft.category
+        job.location = draft.location
+        job.deadline = draft.deadline
+        job.payAmount = draft.payAmount
+        job.posterPhotos = draft.posterPhotos
+        jobs[jobId] = job
+        return job
+    }
+
+    func deleteDraft(jobId: String) async throws {
+        try await latency()
+        jobs[jobId] = nil
+    }
+
+    func regenerateChecklist(jobId: String) async throws -> PostedJob {
+        try await latency(seconds: 1.5)
+        var job = try existing(jobId)
+        guard job.status == .draft else { throw JobsAPIError.invalidState(job.status) }
+        job.checklist = PosterFixtures.checklist(for: NewJobDraft(title: job.title, description: job.description, category: job.category, location: job.location))
+        jobs[jobId] = job
+        return job
+    }
+
+    /// Behaves like the fake rail: the job is funded at once, then the simulation plays it forward.
+    func fund(jobId: String) async throws -> FundingResult {
+        try await latency()
+        var job = try existing(jobId)
+        guard job.status == .draft else { throw JobsAPIError.invalidState(job.status) }
+        job.status = .funded
+        jobs[jobId] = job
         Task { await self.simulateLifecycle(jobId: jobId) }
-        return FundingSession(
-            paymentIntentClientSecret: "pi_mock_secret",
-            customerId: nil,
-            ephemeralKeySecret: nil,
-            publishableKey: "pk_test_mock"
-        )
+        return FundingResult(provider: "fake", paymentIntentClientSecret: nil, publishableKey: nil, job: job)
+    }
+
+    func cancel(jobId: String) async throws -> PostedJob {
+        try await latency()
+        var job = try existing(jobId)
+        guard job.status == .funded || job.status == .offered else { throw JobsAPIError.invalidState(job.status) }
+        job.status = .refunded
+        jobs[jobId] = job
+        return job
+    }
+
+    func timeline(jobId: String) async throws -> [TimelineEntry] {
+        try await latency(seconds: 0.2)
+        let job = try existing(jobId)
+        let reached = PostedJobStatus.allCases.prefix { $0 != job.status } + [job.status]
+        return reached.enumerated().map { index, status in
+            TimelineEntry(seq: index + 1, type: status.rawValue, status: status.rawValue, label: status.displayName,
+                          actor: "platform", at: job.createdAt.addingTimeInterval(Double(index) * 60))
+        }
     }
 
     func job(id: String) async throws -> PostedJob {

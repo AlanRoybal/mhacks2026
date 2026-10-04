@@ -2,11 +2,15 @@ import SwiftUI
 
 struct RootTabView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(AppServices.self) private var services
     @Environment(PosterStore.self) private var posterStore
     @Environment(\.scenePhase) private var scenePhase
     // Jobs funded through Stripe checkout (payments branch), shown under Jobs > Posted.
     @StateObject private var postedJobs = PostedJobsStore()
     @StateObject private var workerPayments = WorkerPayments()
+    @State private var marketplace = MarketplaceStore()
+    /// Proof evidence per job, kept across retries.
+    @State private var proofStore = ProofStore()
     // The job being posted, shared by Post a job → Proof checklist → Fund.
     @State private var postDraft = PostDraft()
     /// The tab bar steps aside while typing, instead of riding up on the keyboard.
@@ -37,9 +41,18 @@ struct RootTabView: View {
         .environmentObject(postedJobs)
         .environmentObject(workerPayments)
         .environment(postDraft)
+        .environment(marketplace)
+        .environment(proofStore)
         // Re-check pending checkouts whenever the app comes back to the foreground.
         .task(id: scenePhase) {
-            if scenePhase == .active { await postedJobs.refresh(); await workerPayments.refresh() }
+            if scenePhase == .active {
+                #if DEBUG
+                if !(await services.session.isSignedIn) { try? await services.signInForDemo() }
+                #endif
+                await postedJobs.refresh()
+                await workerPayments.refresh()
+                await marketplace.refresh(api: services.api)
+            }
         }
         .onAppear(perform: consumePendingPushRoute)
         .onReceive(NotificationCenter.default.publisher(for: .pushRouteChanged)) { _ in
@@ -50,11 +63,15 @@ struct RootTabView: View {
         .task {
             if let token = UserDefaults.standard.string(forKey: PushRegistration.deviceTokenKey) {
                 await posterStore.registerForPush(token: token)
+                await registerWorkerPush(token)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .didRegisterPushToken)) { note in
             guard let token = note.object as? String else { return }
-            Task { await posterStore.registerForPush(token: token) }
+            Task {
+                await posterStore.registerForPush(token: token)
+                await registerWorkerPush(token)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             isKeyboardShown = true
@@ -90,6 +107,16 @@ struct RootTabView: View {
         }
     }
 
+    private func registerWorkerPush(_ token: String) async {
+        guard let api = services.api else { return }
+        #if DEBUG
+        let environment = "sandbox"
+        #else
+        let environment = "production"
+        #endif
+        try? await api.send(.post, "me/devices", body: WorkerDeviceRegistration(token: token, env: environment))
+    }
+
     private func consumePendingPushRoute() {
         let defaults = UserDefaults.standard
         if defaults.string(forKey: PushRoute.destinationKey) == PushRoute.postedJobDestination,
@@ -103,6 +130,11 @@ struct RootTabView: View {
         router.reset(to: .jobs)
         defaults.removeObject(forKey: PushRoute.destinationKey)
     }
+}
+
+private struct WorkerDeviceRegistration: Encodable, Sendable {
+    let token: String
+    let env: String
 }
 
 extension RootTabView {
@@ -174,5 +206,6 @@ struct BountyTabBar: View {
 #Preview {
     RootTabView()
         .environment(AppRouter())
+        .environment(AppServices())
         .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))
 }

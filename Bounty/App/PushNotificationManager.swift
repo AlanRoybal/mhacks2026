@@ -1,4 +1,5 @@
 import UIKit
+import TwinKit
 @preconcurrency import UserNotifications
 
 enum PushNotificationDefinition {
@@ -54,12 +55,15 @@ final class PushNotificationManager: NSObject, UIApplicationDelegate, UNUserNoti
     ) async {
         let userInfo = response.notification.request.content.userInfo
         let jobID = userInfo["jobId"] as? String
+        let offerID = userInfo["offerId"] as? String
         let type = userInfo["type"] as? String
 
         switch response.actionIdentifier {
         case PushNotificationDefinition.acceptActionIdentifier:
+            if let offerID { _ = await respond(to: offerID, decision: .accept) }
             await routeToJobs(jobID: jobID, action: "accept")
         case PushNotificationDefinition.declineActionIdentifier:
+            if let offerID { _ = await respond(to: offerID, decision: .decline) }
             await MainActor.run {
                 NotificationCenter.default.post(name: .offerDeclined, object: jobID)
             }
@@ -93,6 +97,21 @@ final class PushNotificationManager: NSObject, UIApplicationDelegate, UNUserNoti
             options: [.customDismissAction]
         )
         notificationCenter.setNotificationCategories([offerCategory])
+    }
+
+    private func respond(to offerID: String, decision: OfferDecision) async -> Bool {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "BountyAPIBaseURL") as? String,
+              let baseURL = URL(string: value), baseURL.host != nil else { return false }
+        do {
+            let api = APIClient(baseURL: baseURL, tokenProvider: SessionStore())
+            _ = try await OfferService(api: api).respond(to: offerID, decision: decision)
+            return true
+        } catch {
+            await MainActor.run {
+                NotificationCenter.default.post(name: .offerActionFailed, object: error.localizedDescription)
+            }
+            return false
+        }
     }
 
     private func routeToPostedJob(jobID: String, type: String) async {
@@ -135,4 +154,5 @@ extension Notification.Name {
     static let pushRegistrationFailed = Notification.Name("pushRegistrationFailed")
     static let pushRouteChanged = Notification.Name("pushRouteChanged")
     static let offerDeclined = Notification.Name("offerDeclined")
+    static let offerActionFailed = Notification.Name("offerActionFailed")
 }

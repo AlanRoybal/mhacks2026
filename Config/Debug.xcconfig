@@ -1,10 +1,10 @@
-// Main backend (backend/). Empty keeps the app on its built-in sample data; set it in Local.xcconfig.
-BOUNTY_API_BASE_URL =
+// Main backend (backend/). Local.xcconfig can override this for a phone or deployed stage.
+BOUNTY_API_BASE_URL = https:/$()/w1ubo01mvh.execute-api.us-east-1.amazonaws.com
 // Checkout. The main backend serves /payment-sheet too, so funded jobs become real, matchable jobs.
 // Caleb's standalone server (payments-server/, port 4242) still works if you point this at it.
-BOUNTY_PAYMENTS_BASE_URL = http:/$()/127.0.0.1:8787
+BOUNTY_PAYMENTS_BASE_URL = https:/$()/w1ubo01mvh.execute-api.us-east-1.amazonaws.com
 BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER =
 BOUNTY_CODE_SIGN_ENTITLEMENTS = Bounty/Bounty.entitlements
 // Escrow, worker earnings and settlement service (payments-server/).
-BOUNTY_SETTLEMENTS_BASE_URL = http:/$()/127.0.0.1:4242
+BOUNTY_SETTLEMENTS_BASE_URL = https:/$()/d3k80b9wnl3rft.cloudfront.net
 #include? "Local.xcconfig"

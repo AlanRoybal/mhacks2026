@@ -1,26 +1,36 @@
 import SwiftUI
 import SafariServices
 
-/// 17 Earnings.
+/// 17 Earnings. USD marketplace earnings and Stripe payouts come from the main backend
+/// (`MarketplaceEarnings`); the USDC wallet and its settlements come from the payments server (`WorkerPayments`).
 struct EarningsView: View {
+    @Environment(AppServices.self) private var services
     @EnvironmentObject private var payments: WorkerPayments
+    @State private var earnings = MarketplaceEarnings()
     @State private var onboarding: PayoutSetup?
+    @State private var selected: EarningItem?
+    @State private var showsSettings = false
     private func amount(_ cents: Int) -> String { (Decimal(cents) / 100).formatted(.number.precision(.fractionLength(2))) }
+    private func usd(_ value: Decimal?) -> String { (value ?? 0).formatted(.currency(code: "USD")) }
+
+    private var usdTotals: EarningsSummary.CurrencyTotals? { earnings.summary?.totals(for: "USD") }
+    private var usdcReleasedCents: Int { payments.earnings?.totals.usdc.releasedCents ?? 0 }
+    private var usdcPendingCents: Int { payments.earnings?.totals.usdc.pendingCents ?? 0 }
 
     var body: some View {
         BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 360)) {
             ScreenTitle(title: "Earnings") {
-                IconButton(icon: .userRound, label: "Account") {}
+                IconButton(icon: .userRound, label: "Account") { showsSettings = true }
             }
             .entrance(.top)
 
             StackCard(tone: .yellow, height: 180, bandTop: 135) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Transferred")
+                    Text("Paid to you")
                         .bountyType(.subheadStrong)
-                    Text("$\(amount(payments.earnings?.totals.usd.releasedCents ?? 0))")
+                    Text(usd(usdTotals?.paid))
                         .bountyType(.moneyL)
-                    Text("USDC \(amount(payments.earnings?.totals.usdc.releasedCents ?? 0)) to your wallet")
+                    Text("USDC \(amount(usdcReleasedCents)) to your wallet")
                         .bountyType(.footnote)
                         .foregroundStyle(BountyColor.inkPill)
                     Chip(label: "USD and USDC", tone: .dark)
@@ -39,43 +49,143 @@ struct EarningsView: View {
             .entrance(.top)
 
             HStack(spacing: 10) {
-                BalanceTile(label: "USD pending", amount: "$\(amount(payments.earnings?.totals.usd.pendingCents ?? 0))", background: BountyColor.grey, foreground: BountyColor.navy)
-                BalanceTile(label: "USDC pending", amount: amount(payments.earnings?.totals.usdc.pendingCents ?? 0), background: BountyColor.cream, foreground: BountyColor.creamInk)
+                BalanceTile(label: "USD in escrow", amount: usd(usdTotals?.pending), background: BountyColor.grey, foreground: BountyColor.navy)
+                BalanceTile(label: "USD paying out", amount: usd(usdTotals?.releasing), background: BountyColor.mint, foreground: BountyColor.mintInk)
+                BalanceTile(label: "USDC pending", amount: amount(usdcPendingCents), background: BountyColor.cream, foreground: BountyColor.creamInk)
             }
-            Text("Stripe transfers credit your connected account. Bank payouts happen separately.")
-                .bountyType(.footnote)
+            .entrance(.rest(0))
+
+            payoutPanel
+                .entrance(.rest(1))
+
             SectionHeader(title: "Activity")
-            if let earnings = payments.earnings {
-                if earnings.entries.isEmpty { Text("No earnings yet.").bountyType(.footnote) }
-                ForEach(earnings.entries) { entry in
-                    VStack(alignment: .leading, spacing: 6) {
-                        ActivityRow(sticker: .coins, tile: BountyColor.mint, title: entry.title,
-                            detail: JobStatus.api(entry.status).rawValue,
-                            amount: "\(amount(entry.amountCents)) \(entry.rail.uppercased())", settled: entry.status == "released")
-                        if let issue = entry.issue { Text(issue).bountyType(.footnote) }
-                        if entry.rail == "usdc", let hash = entry.reference,
-                           let url = URL(string: "https://sepolia.basescan.org/tx/\(hash)") {
-                            Link("View transaction", destination: url).bountyType(.footnote)
-                        }
-                    }.padding(14).borderedCard()
+            if let items = earnings.summary?.items {
+                if items.isEmpty && (payments.earnings?.entries.isEmpty ?? true) {
+                    Text("No earnings yet. Accepted jobs show up here.").bountyType(.footnote)
                 }
-            } else if payments.busy { ProgressView("Loading earnings…") }
-            SectionHeader(title: "Payout setup")
-            PillButton(title: "Set up Stripe payouts") {
-                Task { if let url = await payments.onboardingURL() { onboarding = PayoutSetup(url: url) } }
-            }.disabled(payments.busy)
+                ForEach(items) { item in
+                    Button { selected = item } label: {
+                        ActivityRow(sticker: .coins, tile: item.status == "paid" ? BountyColor.mint : BountyColor.grey, title: item.title,
+                                    detail: item.statusText, amount: item.amountText, settled: item.status == "paid")
+                    }
+                    .buttonStyle(PressableStyle())
+                }
+            } else if earnings.isLoading { ProgressView("Loading earnings…") }
+
+            // USDC jobs settle through the payments server.
+            ForEach(payments.earnings?.entries ?? []) { entry in
+                VStack(alignment: .leading, spacing: 6) {
+                    ActivityRow(sticker: .coins, tile: BountyColor.cream, title: entry.title,
+                        detail: JobStatus.api(entry.status).rawValue,
+                        amount: "\(amount(entry.amountCents)) \(entry.rail.uppercased())", settled: entry.status == "released")
+                    if let issue = entry.issue { Text(issue).bountyType(.footnote) }
+                    if entry.rail == "usdc", let hash = entry.reference,
+                       let url = URL(string: "https://sepolia.basescan.org/tx/\(hash)") {
+                        Link("View transaction", destination: url).bountyType(.footnote)
+                    }
+                }.padding(14).borderedCard()
+            }
+
+            SectionHeader(title: "USDC payouts")
             PillButton(title: "Connect USDC payout wallet", style: .secondary) {
                 Task { await payments.connectWallet() }
             }.disabled(payments.busy)
             if let address = payments.profile?.walletAddress { Text(address).font(.caption.monospaced()).textSelection(.enabled) }
-            if let message = payments.message {
-                Text(message).bountyType(.footnote)
-                Button("Try again") { Task { await payments.refresh() } }
+            ForEach([earnings.message, payments.message].compactMap { $0 }, id: \.self) { message in
+                Text(message).bountyType(.footnote).foregroundStyle(BountyColor.red)
             }
         }
-        .task { await payments.refresh() }
-        .refreshable { await payments.refresh() }
-        .sheet(item: $onboarding, onDismiss: { Task { await payments.refresh() } }) { setup in PayoutBrowser(url: setup.url) }
+        .task { await reload() }
+        .refreshable { await reload() }
+        .sheet(item: $onboarding, onDismiss: { Task { await earnings.syncPayouts(api: services.api) } }) { setup in PayoutBrowser(url: setup.url) }
+        .sheet(item: $selected) { item in TransactionDetailView(item: item) }
+        .sheet(isPresented: $showsSettings) { SettingsView() }
+        // Stripe sends the worker back to bounty://wallet when onboarding ends.
+        .onReceive(NotificationCenter.default.publisher(for: .payoutSetupReturned)) { _ in onboarding = nil }
+    }
+
+    @ViewBuilder
+    private var payoutPanel: some View {
+        let status = earnings.summary?.payouts
+        if status?.payoutsEnabled == true {
+            Label("Stripe payouts are on. Approved jobs transfer to your Stripe account; bank payouts follow Stripe\u{2019}s schedule.",
+                  systemImage: "checkmark.seal.fill")
+                .bountyType(.footnote)
+                .foregroundStyle(BountyColor.mintInk)
+                .padding(14)
+                .tintedPanel(BountyColor.mint, radius: BountyRadius.row)
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(status?.stripeConnected == true ? "Finish payout setup" : "Set up payouts to get offers").bountyType(.bodyStrong)
+                Text("Your twin only gets matched with paid jobs once Stripe can pay you. It takes a few minutes in Stripe\u{2019}s secure form.")
+                    .bountyType(.footnote)
+                PillButton(title: status?.stripeConnected == true ? "Continue Stripe setup" : "Set up Stripe payouts", icon: .wallet, style: .dark) {
+                    Task { if let url = await earnings.onboardingURL(api: services.api) { onboarding = PayoutSetup(url: url) } }
+                }
+            }
+            .foregroundStyle(BountyColor.creamInk)
+            .padding(16)
+            .tintedPanel(BountyColor.cream, radius: BountyRadius.row)
+        }
+    }
+
+    private func reload() async {
+        async let marketplace: Void = earnings.refresh(api: services.api)
+        async let usdc: Void = payments.refresh()
+        _ = await (marketplace, usdc)
+    }
+}
+
+extension Notification.Name {
+    /// Posted when the app opens `bounty://wallet…` after Stripe Connect onboarding.
+    static let payoutSetupReturned = Notification.Name("payoutSetupReturned")
+}
+
+/// One earning's job, rail, reference and status history (US-55).
+struct TransactionDetailView: View {
+    @Environment(AppServices.self) private var services
+    @Environment(\.dismiss) private var dismiss
+    let item: EarningItem
+    @State private var timeline: [TimelineEntry] = []
+    @State private var message: String?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    LabeledContent("Amount", value: item.amountText)
+                    LabeledContent("Status", value: item.statusText)
+                    LabeledContent("Rail", value: item.railText)
+                    if let reference = item.reference {
+                        LabeledContent("Reference") {
+                            Text(reference).font(.caption.monospaced()).textSelection(.enabled)
+                        }
+                    }
+                    LabeledContent("Updated", value: item.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                } header: {
+                    Text(item.title)
+                }
+                Section("History") {
+                    if timeline.isEmpty, message == nil { ProgressView() }
+                    ForEach(timeline) { entry in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.label)
+                            Text(entry.at.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if let message { Text(message).foregroundStyle(.secondary) }
+                }
+            }
+            .navigationTitle("Earning")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .task {
+                guard let api = services.api else { return }
+                do { timeline = try await api.request(.get, "jobs/\(item.jobId)/timeline") } catch { message = error.localizedDescription }
+            }
+        }
     }
 }
 
@@ -127,5 +237,7 @@ private struct ActivityRow: View {
 }
 
 #Preview {
-    EarningsView().environmentObject(WorkerPayments())
+    EarningsView()
+        .environment(AppServices())
+        .environmentObject(WorkerPayments())
 }

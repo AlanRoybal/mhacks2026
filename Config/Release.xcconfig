@@ -1,7 +1,7 @@
-BOUNTY_API_BASE_URL =
-BOUNTY_PAYMENTS_BASE_URL =
+BOUNTY_API_BASE_URL = https:/$()/w1ubo01mvh.execute-api.us-east-1.amazonaws.com
+BOUNTY_PAYMENTS_BASE_URL = https:/$()/w1ubo01mvh.execute-api.us-east-1.amazonaws.com
 BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER =
 BOUNTY_CODE_SIGN_ENTITLEMENTS = Bounty/Bounty.entitlements
 // Escrow, worker earnings and settlement service (payments-server/).
-BOUNTY_SETTLEMENTS_BASE_URL =
+BOUNTY_SETTLEMENTS_BASE_URL = https:/$()/d3k80b9wnl3rft.cloudfront.net
 #include? "Local.xcconfig"

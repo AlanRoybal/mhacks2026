@@ -8,6 +8,8 @@ enum JobsSegment: Hashable {
 
 struct JobsView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(AppServices.self) private var services
+    @Environment(MarketplaceStore.self) private var marketplace
     // Jobs funded through Stripe checkout (real data) come before the sample cards.
     @EnvironmentObject private var postedJobs: PostedJobsStore
     @EnvironmentObject private var workerPayments: WorkerPayments
@@ -16,11 +18,12 @@ struct JobsView: View {
     @Environment(PosterStore.self) private var posterStore
 
     private func jobs(for segment: JobsSegment) -> [Job] {
-        switch segment {
-        case .working: workerPayments.jobs.filter { ![.paid, .refunded].contains($0.status) }
+        let workerJobs = marketplace.workingJobs.map(\.displayJob) + workerPayments.jobs
+        return switch segment {
+        case .working: workerJobs.filter { ![.paid, .refunded].contains($0.status) }
         // Checkout jobs the backend hasn't listed yet; normally they all come through `posterStore`.
         case .posted: postedJobs.fundedJobs.map(\.job).filter { posterStore.job($0.id) == nil }
-        case .done: workerPayments.jobs.filter { [.paid, .refunded].contains($0.status) }
+        case .done: workerJobs.filter { [.paid, .refunded].contains($0.status) }
         }
     }
 
@@ -67,7 +70,11 @@ struct JobsView: View {
             }
         }
         .sheet(item: $selectedJob) { job in NavigationStack { FundedJobDetailView(job: job) } }
-        .task { await postedJobs.refresh(); await workerPayments.refresh() }
+        .task {
+            await postedJobs.refresh()
+            await workerPayments.refresh()
+            await marketplace.refresh(api: services.api)
+        }
         .task(id: router.jobsSegment) {
             // Keep the Posted list live while it's on screen; push alerts take over once wired up.
             guard router.jobsSegment == .posted else { return }
@@ -78,7 +85,13 @@ struct JobsView: View {
         }
     }
 
-    private func open(_ job: Job) { selectedJob = job }
+    private func open(_ job: Job) {
+        if marketplace.workingJobs.contains(where: { $0.id == job.id }) {
+            router.open(.jobDetail, workerJob: job.id)
+        } else {
+            selectedJob = job
+        }
+    }
 
 }
 
@@ -298,6 +311,8 @@ private struct SampleReviewProofView: View {
 #Preview("Jobs") {
     JobsView()
         .environment(AppRouter())
+        .environment(AppServices())
+        .environment(MarketplaceStore())
         .environmentObject(WorkerPayments())
         .environmentObject(PostedJobsStore())
         .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))

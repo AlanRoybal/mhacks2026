@@ -30,9 +30,22 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
     var matchReason: String?
     /// Distance from the worker, in miles. `nil` for remote jobs or the poster's own view.
     var distanceMiles: Double?
+    var poster: WorkerSummary?
+    var challengeCode: String?
+    var allowedActions: [String]?
 
     /// Ratings left after the job closed. `nil` until the backend sends them.
     var ratings: JobRatings?
+
+    // Extension fields (`docs/API.md`, "The Job object"). Optional so sample data and older payloads decode.
+    /// `poster`, `worker`, `offered` or `admin`.
+    var myRole: String?
+    var estMinutes: Int?
+    var feeAmount: Decimal?
+    var totalAmount: Decimal?
+    var attempts: ProofAttempts?
+    var review: JobReview?
+    var payment: JobPayment?
 
     init(
         id: String = UUID().uuidString,
@@ -52,7 +65,10 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
         reviewDeadline: Date? = nil,
         createdAt: Date = .now,
         matchReason: String? = nil,
-        distanceMiles: Double? = nil
+        distanceMiles: Double? = nil,
+        poster: WorkerSummary? = nil,
+        challengeCode: String? = nil,
+        allowedActions: [String]? = nil
     ) {
         self.id = id
         self.title = title
@@ -72,9 +88,15 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
         self.createdAt = createdAt
         self.matchReason = matchReason
         self.distanceMiles = distanceMiles
+        self.poster = poster
+        self.challengeCode = challengeCode
+        self.allowedActions = allowedActions
     }
 
     var isRemote: Bool { location == nil }
+
+    /// Whether the server offers this action to the signed-in user (`allowedActions`).
+    func allows(_ action: String) -> Bool { allowedActions?.contains(action) ?? false }
 
     /// The verdict for one checklist item, if the AI has graded it.
     func verdict(for item: ChecklistItem) -> Verdict? {
@@ -98,6 +120,22 @@ extension PostedJob {
         if isRemote { return "Remote" }
         guard let distanceMiles else { return location?.address ?? "" }
         return "\(distanceMiles.formatted(.number.precision(.fractionLength(1)))) mi"
+    }
+
+    var displayJob: Job {
+        let cents = NSDecimalNumber(decimal: payAmount * 100).intValue
+        return Job(
+            id: id,
+            title: title,
+            pay: cents / 100,
+            location: distanceText,
+            deadline: deadlineText,
+            sticker: PostDraft.sticker(for: category.displayName),
+            tileColor: PostDraft.tileColor(for: category.displayName),
+            status: JobStatus.api(status.rawValue),
+            currency: currency.rawValue,
+            payCents: cents
+        )
     }
 
     /// The poster's rating of the worker, once given.
@@ -273,13 +311,33 @@ struct ChecklistItem: Identifiable, Codable, Hashable, Sendable {
     var evidenceType: EvidenceType
     /// How many photos are required. Only used when `evidenceType == .photo`.
     var photoCount: Int?
+    /// `nil` reads as required, the server's default.
+    var required: Bool?
+    /// Photo items that need a "before" shot as well as the result.
+    var beforeAfter: Bool?
+    /// How to frame the photo, e.g. "Straight on, whole design in frame".
+    var angleHint: String?
 
-    init(id: String = UUID().uuidString, text: String, evidenceType: EvidenceType, photoCount: Int? = nil) {
+    init(
+        id: String = UUID().uuidString,
+        text: String,
+        evidenceType: EvidenceType,
+        photoCount: Int? = nil,
+        required: Bool? = true,
+        beforeAfter: Bool? = false,
+        angleHint: String? = nil
+    ) {
         self.id = id
         self.text = text
         self.evidenceType = evidenceType
         self.photoCount = evidenceType == .photo ? (photoCount ?? 1) : nil
+        self.required = required
+        self.beforeAfter = evidenceType == .photo ? beforeAfter : false
+        self.angleHint = angleHint
     }
+
+    var isRequired: Bool { required ?? true }
+    var needsBeforePhoto: Bool { evidenceType == .photo && beforeAfter == true }
 }
 
 enum EvidenceType: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -315,7 +373,10 @@ struct Proof: Codable, Hashable, Sendable {
 struct ProofItem: Codable, Hashable, Sendable {
     let checklistItemId: String
     var photoURLs: [URL] = []
+    var beforePhotoURLs: [URL]?
+    var afterPhotoURLs: [URL]?
     var link: URL?
+    var fileURLs: [URL]?
     var checkedInAt: Date?
 }
 
@@ -326,6 +387,54 @@ struct Verdict: Codable, Hashable, Sendable {
     /// 0.0 to 1.0
     var confidence: Double
     var explanation: String
+    /// `pass`, `fail` or `unclear`.
+    var verdict: String?
+}
+
+/// `attempts`: failed AI reviews so far, and how many retries the worker gets (US-43).
+struct ProofAttempts: Codable, Hashable, Sendable {
+    var failed: Int
+    var maxRetries: Int
+
+    var retriesLeft: Int { max(0, maxRetries - failed) }
+}
+
+/// `review`: the AI's overall result once grading finishes.
+struct JobReview: Codable, Hashable, Sendable {
+    var decision: String?
+    var summary: String?
+    var requiresPosterAction: Bool?
+    var windowEndsAt: Date?
+}
+
+/// `payment.status`: `unpaid`, `held`, `releasing`, `paid`, `refunding` or `refunded`.
+struct JobPayment: Codable, Hashable, Sendable {
+    var status: String
+
+    var displayName: String {
+        switch status {
+        case "unpaid": "Not funded"
+        case "held": "Held in escrow"
+        case "releasing": "Paying out"
+        case "paid": "Paid"
+        case "refunding": "Refunding"
+        case "refunded": "Refunded"
+        default: status.capitalized
+        }
+    }
+}
+
+/// One row of `GET /jobs/{id}/timeline` (US-17/49).
+struct TimelineEntry: Codable, Hashable, Identifiable, Sendable {
+    let seq: Int
+    let type: String
+    let status: String?
+    let label: String
+    /// `you`, `poster`, `worker`, `platform` or `admin`.
+    let actor: String?
+    let at: Date
+
+    var id: Int { seq }
 }
 
 // MARK: - Requests

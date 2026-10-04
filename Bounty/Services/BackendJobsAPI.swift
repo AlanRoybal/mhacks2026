@@ -1,16 +1,19 @@
 import Foundation
+import TwinKit
 
 /// The poster's job routes on the main backend (`docs/API.md`, "Jobs › Poster").
 ///
-/// In local dev it signs in as the demo handle `guest-poster`, the same account Caleb's checkout
-/// files jobs under when it sends no session, so jobs funded through the checkout show up here.
-/// Deployed stages need a real session: swap `signIn()` for TwinKit's `SessionStore` token.
+/// Requests carry the signed-in user's session (TwinKit's `SessionStore`), so posting and working
+/// happen under one account. Debug builds with no session fall back to the demo handle
+/// `guest-poster`, which only a local backend accepts without a demo key.
 actor BackendJobsAPI: JobsAPI {
     let baseURL: URL
-    private var token: String?
+    private let tokenProvider: (any AccessTokenProvider)?
+    private var demoToken: String?
 
-    init(baseURL: URL) {
+    init(baseURL: URL, tokenProvider: (any AccessTokenProvider)? = nil) {
         self.baseURL = baseURL
+        self.tokenProvider = tokenProvider
     }
 
     /// True for errors that mean the backend isn't running or can't be reached.
@@ -30,12 +33,32 @@ actor BackendJobsAPI: JobsAPI {
         try await send("POST", "jobs", body: draft)
     }
 
+    func updateDraft(jobId: String, _ draft: NewJobDraft) async throws -> PostedJob {
+        try await send("PATCH", "jobs/\(jobId)", body: draft)
+    }
+
+    func deleteDraft(jobId: String) async throws {
+        _ = try await data("DELETE", "jobs/\(jobId)", body: nil as Empty?)
+    }
+
     func updateChecklist(jobId: String, checklist: [ChecklistItem]) async throws -> PostedJob {
         try await send("PUT", "jobs/\(jobId)/checklist", body: ["checklist": checklist])
     }
 
-    func startFunding(jobId: String) async throws -> FundingSession {
+    func regenerateChecklist(jobId: String) async throws -> PostedJob {
+        try await send("POST", "jobs/\(jobId)/checklist/regenerate")
+    }
+
+    func fund(jobId: String) async throws -> FundingResult {
         try await send("POST", "jobs/\(jobId)/fund")
+    }
+
+    func cancel(jobId: String) async throws -> PostedJob {
+        try await send("POST", "jobs/\(jobId)/cancel")
+    }
+
+    func timeline(jobId: String) async throws -> [TimelineEntry] {
+        try await send("GET", "jobs/\(jobId)/timeline")
     }
 
     func job(id: String) async throws -> PostedJob {
@@ -80,38 +103,46 @@ actor BackendJobsAPI: JobsAPI {
         try await send(method, path, body: nil as Empty?)
     }
 
-    private func send<Response: Decodable, Body: Encodable>(
-        _ method: String,
-        _ path: String,
-        body: Body?,
-        isRetry: Bool = false
-    ) async throws -> Response {
+    private func send<Response: Decodable, Body: Encodable>(_ method: String, _ path: String, body: Body?) async throws -> Response {
+        try Self.decoder.decode(Response.self, from: try await data(method, path, body: body))
+    }
+
+    /// Sends the request and returns the body of a 2xx response.
+    private func data<Body: Encodable>(_ method: String, _ path: String, body: Body?, isRetry: Bool = false) async throws -> Data {
         let token = try await currentToken()
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = method
-        request.timeoutInterval = 20
+        request.timeoutInterval = 35 // creating a draft waits on the AI checklist
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try Self.encoder.encode(body)
         }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (payload, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
 
-        // A restarted local backend forgets sessions: sign in again once.
-        if status == 401, !isRetry {
-            self.token = nil
-            return try await send(method, path, body: body, isRetry: true)
+        // A restarted local backend forgets demo sessions: sign in again once.
+        if status == 401, !isRetry, demoToken != nil {
+            demoToken = nil
+            return try await data(method, path, body: body, isRetry: true)
+        }
+        if status == 401 {
+            throw JobsAPIError.server("Your session expired. Sign in again.")
         }
         guard (200..<300).contains(status) else {
-            throw JobsAPIError.server(Self.errorMessage(from: data) ?? "The server returned an error (\(status)).")
+            throw JobsAPIError.server(Self.errorMessage(from: payload) ?? "The server returned an error (\(status)).")
         }
-        return try Self.decoder.decode(Response.self, from: data)
+        return payload
     }
 
     private func currentToken() async throws -> String {
-        if let token { return token }
+        if let token = await tokenProvider?.accessToken() { return token }
+        #if DEBUG
+        if let demoToken { return demoToken }
+        #else
+        throw JobsAPIError.server("Sign in to post and manage jobs.")
+        #endif
         var request = URLRequest(url: baseURL.appendingPathComponent("auth/demo"))
         request.httpMethod = "POST"
         request.timeoutInterval = 20
@@ -122,7 +153,7 @@ actor BackendJobsAPI: JobsAPI {
               let session = try? JSONDecoder().decode(DemoSession.self, from: data) else {
             throw JobsAPIError.server(Self.errorMessage(from: data) ?? "Couldn't sign in to the Bounty backend.")
         }
-        token = session.token
+        demoToken = session.token
         return session.token
     }
 

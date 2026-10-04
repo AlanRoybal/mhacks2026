@@ -1,4 +1,5 @@
-import StripePaymentSheet
+// The standalone payments server (payments-server/): USDC escrow jobs and their status. Card checkout
+// for marketplace jobs goes through the main backend instead (JobFundingSheet).
 import SwiftUI
 
 struct FundingDraft: Codable, Identifiable {
@@ -49,38 +50,11 @@ struct FundedJob: Codable, Identifiable {
     }
 }
 
-private struct PaymentSheetResponse: Decodable {
-    let job: FundedJob
-    let paymentIntentClientSecret: String
-    let publishableKey: String
-}
-
 private struct PaymentServerError: Decodable { let error: String }
 
 @MainActor
 struct PaymentAPI {
     var baseURLKey = "BountyPaymentsBaseURL"
-    func prepare(_ draft: FundingDraft) async throws -> (FundedJob, PaymentSheet) {
-        let response: PaymentSheetResponse = try await request(
-            path: "payment-sheet", method: "POST", body: JSONEncoder().encode(draft)
-        )
-        guard response.publishableKey.hasPrefix("pk_test_") else {
-            throw PaymentAPIError(message: "This build requires Stripe test mode.")
-        }
-        STPAPIClient.shared.publishableKey = response.publishableKey
-        var configuration = PaymentSheet.Configuration()
-        configuration.merchantDisplayName = "Bounty"
-        configuration.returnURL = "bounty://stripe-redirect"
-        configuration.allowsDelayedPaymentMethods = false
-        if let merchantID = Bundle.main.object(forInfoDictionaryKey: "BountyApplePayMerchantIdentifier") as? String,
-           merchantID.hasPrefix("merchant.") {
-            configuration.applePay = .init(merchantId: merchantID, merchantCountryCode: "US")
-        }
-        return (response.job, PaymentSheet(
-            paymentIntentClientSecret: response.paymentIntentClientSecret, configuration: configuration
-        ))
-    }
-
     func status(for id: UUID) async throws -> FundedJob {
         try await request(path: "jobs/\(id.uuidString.lowercased())", method: "GET")
     }
@@ -173,145 +147,6 @@ final class PostedJobsStore: ObservableObject {
                 defaults.set(pendingIDs.map(\.uuidString), forKey: "pendingPaymentJobIDs")
             }
             catch { refreshError = error.localizedDescription }
-        }
-    }
-}
-
-@MainActor
-private final class PaymentCheckoutModel: ObservableObject {
-    @Published var paymentSheet: PaymentSheet?
-    @Published var job: FundedJob?
-    @Published var isBusy = false
-    @Published var didCompletePayment = false
-    @Published var message: String?
-    let draft: FundingDraft
-    private let api = PaymentAPI()
-    var isFunded: Bool { job.map { $0.status != "draft" } ?? false }
-
-    init(draft: FundingDraft) { self.draft = draft }
-
-    func prepare(store: PostedJobsStore) async {
-        guard !isBusy else { return }
-        isBusy = true
-        message = nil
-        defer { isBusy = false }
-        store.track(draft.id)
-        do {
-            (job, paymentSheet) = try await api.prepare(draft)
-            if let job, job.status != "draft" {
-                store.record(job)
-                paymentSheet = nil
-            }
-        } catch { message = error.localizedDescription }
-    }
-
-    func handle(_ result: PaymentSheetResult, store: PostedJobsStore) {
-        switch result {
-        case .completed:
-            didCompletePayment = true
-            paymentSheet = nil
-            Task { await verify(store: store) }
-        case .canceled:
-            message = "Payment canceled. You can try again when you’re ready."
-        case .failed(let error):
-            message = error.localizedDescription
-        }
-    }
-
-    func verify(store: PostedJobsStore) async {
-        guard !isBusy else { return }
-        isBusy = true
-        message = nil
-        defer { isBusy = false }
-        do {
-            for attempt in 0..<3 {
-                let confirmed = try await api.status(for: draft.id)
-                if confirmed.status != "draft" {
-                    job = confirmed
-                    store.record(confirmed)
-                    return
-                }
-                if attempt < 2 { try await Task.sleep(for: .seconds(1)) }
-            }
-            message = "Your payment is still being confirmed. Check its status again in a moment."
-        } catch { message = "Couldn’t confirm payment yet. Check its status again before starting another checkout. \(error.localizedDescription)" }
-    }
-}
-
-struct PaymentCheckoutView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var postedJobs: PostedJobsStore
-    @StateObject private var model: PaymentCheckoutModel
-    let onFunded: () -> Void
-
-    init(draft: FundingDraft, onFunded: @escaping () -> Void) {
-        _model = StateObject(wrappedValue: PaymentCheckoutModel(draft: draft))
-        self.onFunded = onFunded
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                if model.isFunded {
-                    Section {
-                        Label(JobStatus.api(model.job?.status ?? "funded").rawValue, systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(BountyColor.greenInk)
-                            .font(.title2.bold())
-                        Text("Your job is now in Jobs → Posted.")
-                        Button("Done") { onFunded(); dismiss() }
-                            .font(.headline)
-                    }
-                } else {
-                    Section("Job") {
-                        Text(model.draft.title).font(.headline)
-                        Text(model.draft.details).foregroundStyle(.secondary)
-                    }
-                    Section("Payment summary") {
-                        priceRow("Job pay", cents: model.job?.amountCents ?? model.draft.amountCents)
-                        priceRow("Platform fee (10%)", cents: model.job?.feeCents ?? Int((Double(model.draft.amountCents) * 0.10).rounded()))
-                        if let job = model.job { priceRow("Total", cents: job.totalCents).font(.headline) }
-                    }
-                    Section {
-                        if model.isBusy {
-                            HStack { ProgressView(); Text(model.didCompletePayment ? "Confirming payment…" : "Preparing checkout…") }
-                        } else if model.didCompletePayment {
-                            Button("Check payment status") { Task { await model.verify(store: postedJobs) } }
-                        } else if let sheet = model.paymentSheet, let job = model.job {
-                            PaymentSheet.PaymentButton(paymentSheet: sheet, onCompletion: { model.handle($0, store: postedJobs) }) {
-                                Text("Pay \((Decimal(job.totalCents) / 100).formatted(.currency(code: "USD"))) & fund job")
-                                    .font(.headline)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                            }
-                        } else {
-                            Button("Retry checkout") { Task { await model.prepare(store: postedJobs) } }
-                        }
-                    } footer: {
-                        Text("Stripe test mode. No real money is charged.")
-                    }
-                    if let message = model.message {
-                        Section { Text(message).foregroundStyle(.secondary) }
-                    }
-                }
-            }
-            .navigationTitle("Fund job")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                        .disabled(model.isBusy || (model.didCompletePayment && !model.isFunded))
-                }
-            }
-            .interactiveDismissDisabled(model.isBusy || (model.didCompletePayment && !model.isFunded))
-            .task { await model.prepare(store: postedJobs) }
-        }
-    }
-
-    private func priceRow(_ label: String, cents: Int) -> some View {
-        HStack {
-            Text(label)
-            Spacer()
-            Text(Decimal(cents) / 100, format: .currency(code: "USD"))
         }
     }
 }

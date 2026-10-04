@@ -24,7 +24,7 @@ enum AppRoute: Hashable {
 
     var usesDarkStatusBar: Bool {
         switch self {
-        case .lockScreenOffer, .proofCapture: true
+        case .lockScreenOffer: true
         default: false
         }
     }
@@ -48,6 +48,7 @@ final class AppRouter {
     var jobsSegment = JobsSegment.working
     /// The posted job the poster screens (checklist, fund, posted job, review) are showing.
     var posterJobId: String?
+    var workerJobId: String?
 
     var tab: AppTab { location.tab }
     var route: AppRoute? { location.route }
@@ -60,6 +61,11 @@ final class AppRouter {
     /// Opens a poster screen for one of the user's posted jobs.
     func open(_ route: AppRoute, posterJob jobId: String) {
         posterJobId = jobId
+        open(route)
+    }
+
+    func open(_ route: AppRoute, workerJob jobId: String) {
+        workerJobId = jobId
         open(route)
     }
 

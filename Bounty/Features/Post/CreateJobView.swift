@@ -1,3 +1,5 @@
+import PhotosUI
+import StripePaymentSheet
 import SwiftUI
 
 // MARK: - 12 Post a job
@@ -5,8 +7,10 @@ import SwiftUI
 struct CreateJobView: View {
     @Environment(AppRouter.self) private var router
     @Environment(PostDraft.self) private var draft
+    @Environment(PosterStore.self) private var posterStore
     @State private var pickingDeadline = false
     @State private var pickingLocation = false
+    @State private var pickedPhotos: [PhotosPickerItem] = []
 
     var body: some View {
         @Bindable var draft = draft
@@ -26,25 +30,49 @@ struct CreateJobView: View {
             }
             .entrance(.top)
 
-            HStack(spacing: 10) {
-                StickerTile(sticker: draft.sticker, background: draft.tileColor, size: 84, stickerSize: 66, radius: 18)
-                Button {} label: {
-                    VStack(spacing: 4) {
-                        IconGlyph(icon: .images, size: 22)
-                        Text("Add photo")
-                            .bountyType(.caption)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    StickerTile(sticker: draft.sticker, background: draft.tileColor, size: 84, stickerSize: 66, radius: 18)
+                    // Photos help workers see the job and give the AI a "before" reference (US-11).
+                    ForEach(draft.photos) { photo in
+                        Image(uiImage: photo.image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 84, height: 84)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay {
+                                if photo.failed {
+                                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.white, BountyColor.red)
+                                } else if photo.fileURL == nil {
+                                    ProgressView().tint(.white)
+                                }
+                            }
+                            .contextMenu {
+                                Button("Remove", role: .destructive) { draft.removePhoto(photo.id) }
+                            }
+                            .accessibilityLabel("Job photo")
+                            .accessibilityAction(named: "Remove") { draft.removePhoto(photo.id) }
                     }
-                    .foregroundStyle(BountyColor.inkSecondary)
-                    .frame(width: 84, height: 84)
-                    .background(BountyColor.field, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(BountyColor.inkTertiary, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                    if draft.photos.count < 6 {
+                        PhotosPicker(selection: $pickedPhotos, maxSelectionCount: 6 - draft.photos.count, matching: .images) {
+                            AddPhotoTile()
+                        }
+                        .buttonStyle(PressableStyle())
                     }
                 }
-                .buttonStyle(PressableStyle())
             }
             .entrance(.top)
+            .onChange(of: pickedPhotos) { _, items in
+                guard !items.isEmpty else { return }
+                pickedPhotos = []
+                Task {
+                    for item in items {
+                        if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
+                            await draft.addPhoto(image, api: posterStore.api)
+                        }
+                    }
+                }
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 FieldLabel(text: "Title")
@@ -160,10 +188,17 @@ struct CreateJobView: View {
                 .tintedPanel(BountyColor.cream, radius: BountyRadius.row)
                 .transition(.opacity)
             }
+            if let error = draft.syncError {
+                Text(error)
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.red)
+            }
         } bottom: {
-            PillButton(title: "Draft the proof checklist", icon: .sparkles) { router.open(.proofChecklist) }
-                .disabled(draft.problem != nil)
-                .opacity(draft.problem == nil ? 1 : 0.4)
+            PillButton(title: draft.isSyncing ? "Drafting the checklist\u{2026}" : "Draft the proof checklist", icon: .sparkles) {
+                Task { if await draft.syncDraft(api: posterStore.api) { router.open(.proofChecklist) } }
+            }
+            .disabled(draft.problem != nil || draft.isSyncing)
+            .opacity(draft.problem == nil && !draft.isSyncing ? 1 : 0.4)
         }
         .sheet(isPresented: $pickingLocation) {
             LocationPicker(location: Binding(
@@ -175,7 +210,7 @@ struct CreateJobView: View {
             ))
         }
         .sheet(isPresented: $pickingDeadline) {
-            DatePicker("Deadline", selection: $draft.deadline, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+            DatePicker("Deadline", selection: $draft.deadline, in: Date.now.addingTimeInterval(30 * 60)..., displayedComponents: [.date, .hourAndMinute])
                 .datePickerStyle(.graphical)
                 .padding()
                 .presentationDetents([.medium, .large])
@@ -183,37 +218,34 @@ struct CreateJobView: View {
     }
 }
 
+/// The dashed "Add photo" tile. Its own view because PhotosPicker builds its label off the main actor.
+private struct AddPhotoTile: View {
+    var body: some View {
+        VStack(spacing: 4) {
+            IconGlyph(icon: .images, size: 22)
+            Text("Add photo")
+                .bountyType(.caption)
+        }
+        .foregroundStyle(BountyColor.inkSecondary)
+        .frame(width: 84, height: 84)
+        .background(BountyColor.field, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(BountyColor.inkTertiary, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+        }
+    }
+}
+
 // MARK: - 13 Proof checklist
 
+/// The AI checklist for the backend draft, editable until funding locks it (US-13/14).
 struct ProofChecklistView: View {
     @Environment(AppRouter.self) private var router
     @Environment(PostDraft.self) private var draft
-
-    typealias Requirement = (title: String, evidenceIcon: BountyIcon, evidence: String)
-
-    /// Sample checklists until the backend drafts one before funding (the checkout creates the
-    /// job only at payment). The demo's logo job gets its own, so it doesn't show lawn items.
-    static func requirements(for draft: PostDraft) -> [Requirement] {
-        switch draft.category {
-        case "Design":
-            [
-                ("Hand-drawn logo with a coffee cup", .camera, "1 photo of the sketch"),
-                ("Shop name is readable", .camera, "Same photo, checked by AI"),
-                ("One-time code written on the page", .camera, "Shows it was drawn for this job")
-            ]
-        default:
-            [
-                ("Front lawn mowed, under 3 in", .camera, "4 after photos from marked angles"),
-                ("Clippings bagged or mulched", .camera, "1 photo of the bags"),
-                ("Sidewalk edges trimmed", .camera, "2 close-up photos"),
-                ("On-site check-in and out", .locate, "GPS and time, automatic")
-            ]
-        }
-    }
-
-    private var requirements: [Requirement] { Self.requirements(for: draft) }
+    @Environment(PosterStore.self) private var posterStore
 
     var body: some View {
+        @Bindable var draft = draft
         BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 300), spacing: 14) {
             NavRow(leadingAction: router.back) {
                 ProgressDots(total: 3, current: 1)
@@ -229,7 +261,7 @@ struct ProofChecklistView: View {
                 .foregroundStyle(BountyColor.inkPrimary)
                 .entrance(.top)
 
-            Text("It locks once the job is funded.")
+            Text("Workers see this before accepting, and the AI checks their proof against it. It locks once the job is funded.")
                 .bountyType(.body)
                 .foregroundStyle(BountyColor.inkSecondary)
                 .entrance(.top)
@@ -239,6 +271,12 @@ struct ProofChecklistView: View {
                 Text("Drafted by AI from your description. Edit anything.")
                     .bountyType(.subhead)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    Task { await draft.regenerateChecklist(api: posterStore.api) }
+                } label: {
+                    Text(draft.isSyncing ? "Working\u{2026}" : "Redo").bountyType(.subheadStrong)
+                }
+                .disabled(draft.isSyncing)
             }
             .foregroundStyle(BountyColor.lavenderInk)
             .padding(12)
@@ -246,57 +284,104 @@ struct ProofChecklistView: View {
             .entrance(.rest(0))
 
             VStack(spacing: 10) {
-                ForEach(Array(requirements.enumerated()), id: \.offset) { index, requirement in
-                    HStack(alignment: .top, spacing: 10) {
-                        GripDots()
-                            .frame(width: 20, height: 20)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(requirement.title)
-                                .bountyType(.bodyStrong)
-                                .foregroundStyle(BountyColor.inkPrimary)
-                            HStack(spacing: 6) {
-                                IconGlyph(icon: requirement.evidenceIcon, size: 14)
-                                Text(requirement.evidence)
-                                    .bountyType(.footnote)
-                            }
-                            .foregroundStyle(BountyColor.inkSecondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        IconGlyph(icon: .pencil, size: 18)
-                            .foregroundStyle(BountyColor.inkSecondary)
-                    }
-                    .padding(14)
-                    .borderedCard(radius: BountyRadius.row)
-                    .entrance(.rest(1 + index))
+                ForEach(Array(draft.checklist.indices), id: \.self) { index in
+                    ChecklistItemEditor(
+                        item: $draft.checklist[index],
+                        canMoveUp: index > 0,
+                        canMoveDown: index < draft.checklist.count - 1,
+                        onMove: { offset in
+                            let target = index + offset
+                            guard draft.checklist.indices.contains(target) else { return }
+                            withAnimation(Motion.press) { draft.checklist.swapAt(index, target) }
+                        },
+                        onDelete: { withAnimation(Motion.press) { _ = draft.checklist.remove(at: index) } }
+                    )
                 }
             }
+            .entrance(.rest(1))
 
-            HStack(spacing: 6) {
-                IconGlyph(icon: .plus, size: 18, weight: .semibold)
-                Text("Add a requirement")
-                    .bountyType(.bodyStrong)
+            Button {
+                withAnimation(Motion.press) { draft.checklist.append(ChecklistItem(text: "", evidenceType: .photo)) }
+            } label: {
+                HStack(spacing: 6) {
+                    IconGlyph(icon: .plus, size: 18, weight: .semibold)
+                    Text("Add a requirement")
+                        .bountyType(.bodyStrong)
+                }
+                .foregroundStyle(BountyColor.lavenderInk)
             }
-            .foregroundStyle(BountyColor.lavenderInk)
-            .entrance(.rest(1 + requirements.count))
+            .buttonStyle(PressableStyle())
+            .entrance(.rest(2))
+
+            if let error = draft.syncError {
+                Text(error)
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.red)
+            }
         } bottom: {
-            PillButton(title: "Looks right") { router.open(.fundJob) }
+            PillButton(title: draft.isSyncing ? "Saving\u{2026}" : "Looks right") {
+                Task { if await draft.saveChecklist(api: posterStore.api) { router.open(.fundJob) } }
+            }
+            .disabled(draft.isSyncing || draft.checklist.isEmpty)
         }
     }
 }
 
-/// Lucide grip-vertical: two columns of three dots.
-private struct GripDots: View {
+/// One checklist item: its text, what evidence proves it, and order and delete controls.
+private struct ChecklistItemEditor: View {
+    @Binding var item: ChecklistItem
+    let canMoveUp: Bool
+    let canMoveDown: Bool
+    let onMove: (Int) -> Void
+    let onDelete: () -> Void
+
     var body: some View {
-        Grid(horizontalSpacing: 4, verticalSpacing: 4) {
-            ForEach(0..<3, id: \.self) { _ in
-                GridRow {
-                    Circle().frame(width: 3.5, height: 3.5)
-                    Circle().frame(width: 3.5, height: 3.5)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                TextField("Requirement, e.g. \u{201C}Clippings are bagged\u{201D}", text: $item.text, axis: .vertical)
+                    .bountyType(.bodyStrong)
+                    .foregroundStyle(BountyColor.inkPrimary)
+                    .lineLimit(1...3)
+                Menu {
+                    Button("Move up", systemImage: "arrow.up") { onMove(-1) }.disabled(!canMoveUp)
+                    Button("Move down", systemImage: "arrow.down") { onMove(1) }.disabled(!canMoveDown)
+                    Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
+                } label: {
+                    IconGlyph(icon: .ellipsis, size: 18)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                        .frame(width: 28, height: 28)
                 }
+                .accessibilityLabel("Requirement options")
+            }
+            FlowLayout(spacing: 8) {
+                Menu {
+                    Picker("Evidence", selection: Binding(get: { item.evidenceType }, set: { setEvidence($0) })) {
+                        ForEach(EvidenceType.allCases) { Text($0.displayName).tag($0) }
+                    }
+                } label: {
+                    Chip(label: item.evidenceType.displayName, tone: .lavender)
+                }
+                if item.evidenceType == .photo {
+                    Menu {
+                        Picker("Photos", selection: Binding(get: { item.photoCount ?? 1 }, set: { item.photoCount = $0 })) {
+                            ForEach(1...4, id: \.self) { Text("\($0) photo\($0 == 1 ? "" : "s")").tag($0) }
+                        }
+                    } label: {
+                        Chip(label: "\(item.photoCount ?? 1) photo\((item.photoCount ?? 1) == 1 ? "" : "s")", tone: .grey)
+                    }
+                    ChoiceChip(label: "Before & after", isSelected: item.beforeAfter == true) { item.beforeAfter = !(item.beforeAfter ?? false) }
+                }
+                ChoiceChip(label: item.isRequired ? "Required" : "Optional", isSelected: item.isRequired) { item.required = !item.isRequired }
             }
         }
-        .foregroundStyle(BountyColor.inkTertiary)
-        .accessibilityHidden(true)
+        .padding(14)
+        .borderedCard(radius: BountyRadius.row)
+    }
+
+    private func setEvidence(_ type: EvidenceType) {
+        item.evidenceType = type
+        item.photoCount = type == .photo ? (item.photoCount ?? 1) : nil
+        if type != .photo { item.beforeAfter = false }
     }
 }
 
@@ -305,8 +390,11 @@ private struct GripDots: View {
 struct FundJobView: View {
     @Environment(AppRouter.self) private var router
     @Environment(PostDraft.self) private var draft
+    @Environment(PosterStore.self) private var posterStore
     @State private var method = PaymentMethod.card
-    /// Set to open Stripe's PaymentSheet through the payments server (PaymentCheckoutView).
+    /// Card: the backend draft, funded through `JobFundingSheet`.
+    @State private var fundingJob: PostedJob?
+    /// USDC: the job as the payments server takes it (`CryptoCheckoutView`).
     @State private var checkout: FundingDraft?
 
     enum PaymentMethod: Hashable {
@@ -331,7 +419,7 @@ struct FundJobView: View {
 
             HStack(spacing: 12) {
                 StickerTile(sticker: draft.sticker, background: draft.tileColor, size: 56, stickerSize: 46, radius: 17)
-                TitleSubtitle(title: draft.title, subtitle: "Due \(draft.deadlineText) · \(ProofChecklistView.requirements(for: draft).count) proof items")
+                TitleSubtitle(title: draft.title, subtitle: "Due \(draft.deadlineText) · \(draft.checklist.count) proof items")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -380,19 +468,29 @@ struct FundJobView: View {
                     icon: method == .card ? .apple : nil,
                     style: .dark
                 ) {
-                    checkout = draft.fundingDraft()
+                    if method == .card {
+                        fundingJob = draft.job
+                    } else {
+                        Task {
+                            // USDC escrow runs on the payments server, which keeps its own copy of the job.
+                            await draft.discardBackendDraft(api: posterStore.api)
+                            checkout = draft.fundingDraft()
+                        }
+                    }
                 }
-                .disabled(!draft.canFund)
+                .disabled(!draft.canFund || (method == .card && draft.job == nil))
                 Text(method == .card ? "Test mode · card 4242 4242 4242 4242" : "Test USDC · Base Sepolia")
                     .bountyType(.footnote)
                     .foregroundStyle(BountyColor.inkTertiary)
             }
         }
         .sheet(item: $checkout) { funding in
-            if method == .usdc {
-                CryptoCheckoutView(draft: funding, onFunded: finishFunding)
-            } else {
-                PaymentCheckoutView(draft: funding, onFunded: finishFunding)
+            CryptoCheckoutView(draft: funding, onFunded: finishFunding)
+        }
+        .sheet(item: $fundingJob) { job in
+            JobFundingSheet(job: job) { funded in
+                posterStore.upsert(funded)
+                finishFunding()
             }
         }
     }

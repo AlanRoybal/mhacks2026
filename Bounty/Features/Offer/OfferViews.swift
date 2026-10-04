@@ -1,4 +1,5 @@
 import LocalAuthentication
+import MapKit
 import SwiftUI
 
 /// "Accept asks for Face ID." Falls back to accepting when the device has no biometrics set up.
@@ -155,46 +156,100 @@ private struct NotificationActions: View {
 
 struct OfferView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(AppServices.self) private var services
+    @Environment(MarketplaceStore.self) private var marketplace
+    /// Set when the offer ends before the worker gets it (US-26).
+    @State private var outcome: OfferOutcome?
+    /// Kept so the screen still shows the real offer after the store drops it (expired, taken).
+    @State private var lastJob: PostedJob?
+    @State private var lastOffer: MarketplaceOffer?
+
+    private var job: PostedJob? { marketplace.offeredJob ?? lastJob }
+    private var offer: MarketplaceOffer? { marketplace.currentOffer ?? lastOffer }
+    /// Sample text only for previews and sample mode, never in front of a real offer.
+    private var isSample: Bool { services.api == nil }
+
+    enum OfferOutcome {
+        case expired, taken, tooLate, failed(String)
+
+        var title: String {
+            switch self {
+            case .expired: "This offer expired"
+            case .taken: "Someone else got this one"
+            case .tooLate: "Not enough time left"
+            case .failed: "Couldn\u{2019}t accept"
+            }
+        }
+
+        var detail: String {
+            switch self {
+            case .expired: "Offers last under a minute. Your twin keeps looking and will send the next good match."
+            case .taken: "Another worker accepted first, or the job moved on. Your twin keeps looking."
+            case .tooLate: "The deadline is too close to finish it now."
+            case .failed(let message): message
+            }
+        }
+    }
 
     var body: some View {
         BountyScreen(glow: ScreenGlow(BountyColor.glowCream, height: 520)) {
             NavRow(leadingIcon: .x, leadingLabel: "Close", leadingAction: router.back) {
-                OfferCountdown(expiry: router.offerExpiry) { remaining in
-                    Chip(label: "Expires in \(remaining)", tone: .coral)
+                if outcome == nil {
+                    OfferCountdown(expiry: offer?.expiresAt ?? router.offerExpiry) { remaining in
+                        Chip(label: "Expires in \(remaining)", tone: .coral)
+                    }
+                } else {
+                    Chip(label: "Closed", tone: .grey)
                 }
             } trailing: {
-                IconButton(icon: .ellipsis, label: "More") {}
+                EmptyView()
             }
             .entrance(.top)
 
+            if let outcome {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(outcome.title).bountyType(.headline)
+                    Text(outcome.detail).bountyType(.subhead)
+                }
+                .foregroundStyle(BountyColor.creamInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .tintedPanel(BountyColor.cream, radius: BountyRadius.row)
+                .transition(.opacity)
+            }
             VStack(spacing: 2) {
                 Text("Your twin found you")
                     .bountyType(.subheadStrong)
                     .foregroundStyle(BountyColor.creamInk)
-                Text("$15")
+                Text(job?.payText ?? (isSample ? "$15" : ""))
                     .bountyType(.money(size: 88, lineHeight: 92))
                     .foregroundStyle(BountyColor.inkPrimary)
-                Text("≈ $90/hr · about 10 min")
-                    .bountyType(.bodyStrong)
-                    .foregroundStyle(BountyColor.inkSecondary)
+                if let offer {
+                    Text("≈ \(offer.hourlyRate.formatted(.currency(code: job?.currency.rawValue ?? "USD")))/hr · about \(offer.estMinutes) min")
+                        .bountyType(.bodyStrong)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                } else if isSample {
+                    Text("≈ $90.00/hr · about 10 min")
+                        .bountyType(.bodyStrong)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                }
             }
             .frame(maxWidth: .infinity)
             .entrance(.top)
 
-            Text("Sketch a coffee shop logo")
+            Text(job?.title ?? (isSample ? "Sketch a coffee shop logo" : "Offer"))
                 .bountyType(.title)
                 .foregroundStyle(BountyColor.inkPrimary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
                 .entrance(.top)
 
-            Image("map-art")
-                .resizable()
+            OfferMap(location: job?.location)
                 .frame(height: 130)
                 .overlay(alignment: .bottomLeading) {
                     HStack(spacing: 6) {
                         IconGlyph(icon: .navigation, size: 14)
-                        Text("0.4 mi · 8 min walk · Blue Fern Coffee")
+                        Text(travelText)
                             .bountyType(.footnote)
                     }
                     .foregroundStyle(BountyColor.inkPrimary)
@@ -213,7 +268,7 @@ struct OfferView: View {
                     Text("Why your twin picked this")
                         .bountyType(.bodyStrong)
                 }
-                Text("You sent 3 logo invoices this year (Gmail) and list brand design on LinkedIn. You’re free until 7 PM.")
+                Text(offer?.matchReason ?? job?.matchReason ?? (isSample ? "You sent 3 logo invoices this year (Gmail) and list brand design on LinkedIn. You’re free until 7 PM." : "It matches your skills and preferences."))
                     .bountyType(.subhead)
             }
             .foregroundStyle(BountyColor.lavenderInk)
@@ -225,24 +280,96 @@ struct OfferView: View {
             VStack(alignment: .leading, spacing: 8) {
                 FieldLabel(text: "Proof you’ll submit")
                 FlowLayout(spacing: 8) {
-                    Chip(label: "Photo of the sketch", tone: .cream)
-                    Chip(label: "Code on the page", tone: .cream)
-                    Chip(label: "Shop name readable", tone: .cream)
+                    if let checklist = job?.checklist, !checklist.isEmpty {
+                        ForEach(checklist.prefix(4)) { item in
+                            Chip(label: item.text, tone: .cream)
+                        }
+                    } else {
+                        Chip(label: "Photo of the sketch", tone: .cream)
+                        Chip(label: "Code on the page", tone: .cream)
+                        Chip(label: "Shop name readable", tone: .cream)
+                    }
                 }
             }
             .entrance(.rest(2))
         } bottom: {
-            HStack(spacing: 12) {
-                PillButton(title: "Decline", style: .secondary) {
-                    router.offerDeclined = true
-                    router.finish(on: .home)
-                }
-                PillButton(title: "Accept", icon: .scanFace) {
-                    Task {
-                        if await AcceptGate.confirm() { router.open(.jobDetail) }
+            if outcome != nil {
+                PillButton(title: "Back to home") { router.finish(on: .home) }
+            } else {
+                HStack(spacing: 12) {
+                    PillButton(title: "Decline", style: .secondary) {
+                        Task {
+                            if services.api != nil { _ = await marketplace.respond(api: services.api, accept: false) }
+                            router.offerDeclined = true
+                            router.finish(on: .home)
+                        }
                     }
+                    PillButton(title: marketplace.isLoading ? "Accepting…" : "Accept", icon: .scanFace) {
+                        Task { await accept() }
+                    }
+                    .disabled(marketplace.isLoading)
                 }
             }
+        }
+        .onAppear {
+            lastJob = marketplace.offeredJob
+            lastOffer = marketplace.currentOffer
+        }
+    }
+
+    /// "Remote", or "0.4 mi · 8 min travel · 1200 S University Ave".
+    private var travelText: String {
+        guard let job else { return isSample ? "0.4 mi · 8 min travel" : "" }
+        if job.isRemote { return "Remote" }
+        return [job.distanceText, offer?.travelMinutes.map { "\($0) min travel" }, job.location?.address.isEmpty == false ? job.location?.address : nil]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+    }
+
+    private func accept() async {
+        guard await AcceptGate.confirm() else { return }
+        guard services.api != nil else {
+            router.open(.jobDetail)
+            return
+        }
+        if let fresh = marketplace.offeredJob { lastJob = fresh }
+        if let fresh = marketplace.currentOffer { lastOffer = fresh }
+        // The store dropped the offer on its last refresh: the server already ended it.
+        guard marketplace.currentOffer != nil else {
+            withAnimation(Motion.press) { outcome = .expired }
+            return
+        }
+        // The server's clock decides (US-26); a phone that's a few seconds off still asks.
+        if let job = await marketplace.respond(api: services.api, accept: true) {
+            router.open(.jobDetail, workerJob: job.id)
+            return
+        }
+        withAnimation(Motion.press) {
+            switch marketplace.lastErrorCode {
+            case "offer_expired": outcome = .expired
+            // After the countdown ends the server may already have moved the job on; that's still "expired".
+            case "offer_not_current": outcome = (lastOffer?.expiresAt).map { $0 <= .now } == true ? .expired : .taken
+            case "not_enough_time": outcome = .tooLate
+            default: outcome = .failed(marketplace.errorMessage ?? "Please try again.")
+            }
+        }
+    }
+}
+
+/// The job's spot on a map for in-person jobs; the illustrated map for remote ones (US-31).
+private struct OfferMap: View {
+    let location: JobLocation?
+
+    var body: some View {
+        if let location {
+            let center = CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)
+            Map(initialPosition: .region(MKCoordinateRegion(center: center, latitudinalMeters: 1600, longitudinalMeters: 1600))) {
+                Marker(location.address.isEmpty ? "Job" : location.address, coordinate: center)
+                UserAnnotation()
+            }
+            .allowsHitTesting(false)
+        } else {
+            Image("map-art").resizable()
         }
     }
 }
@@ -262,7 +389,7 @@ struct FlowLayout: Layout {
         for row in arrange(width: bounds.width, subviews: subviews) {
             var x = bounds.minX
             for index in row.indices {
-                let size = subviews[index].sizeThatFits(.unspecified)
+                let size = Self.size(of: subviews[index], maxWidth: bounds.width)
                 subviews[index].place(at: CGPoint(x: x, y: bounds.minY + row.y), proposal: ProposedViewSize(size))
                 x += size.width + spacing
             }
@@ -280,7 +407,7 @@ struct FlowLayout: Layout {
         var rows: [Row] = []
         var current = Row()
         for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.unspecified)
+            let size = Self.size(of: subviews[index], maxWidth: width)
             let proposedWidth = current.indices.isEmpty ? size.width : current.width + spacing + size.width
             if proposedWidth > width, !current.indices.isEmpty {
                 rows.append(current)
@@ -293,11 +420,20 @@ struct FlowLayout: Layout {
         if !current.indices.isEmpty { rows.append(current) }
         return rows
     }
+
+    /// The child's natural size, capped at the row width.
+    private static func size(of subview: LayoutSubview, maxWidth: CGFloat) -> CGSize {
+        let natural = subview.sizeThatFits(.unspecified)
+        guard natural.width > maxWidth, maxWidth.isFinite else { return natural }
+        return subview.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
+    }
 }
 
 #Preview("Offer") {
     OfferView()
         .environment(AppRouter())
+        .environment(AppServices())
+        .environment(MarketplaceStore())
 }
 
 #Preview("Lock screen") {

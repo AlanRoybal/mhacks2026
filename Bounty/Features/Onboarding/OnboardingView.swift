@@ -1,6 +1,7 @@
 import AuthenticationServices
 import SwiftUI
 import TwinKit
+import UniformTypeIdentifiers
 
 /// 01 Welcome → 02 Profile import → 03 Building your twin → 05 Availability.
 /// Finishing lands on 04 Twin review in the Twin tab.
@@ -27,7 +28,7 @@ struct OnboardingView: View {
             case .building:
                 BuildingTwinView(onCancel: { go(to: .profileImport) }, onContinue: { go(to: .availability) })
             case .availability:
-                AvailabilityView(onBack: { go(to: .profileImport) }, onContinue: { transition.perform(onComplete) })
+                WorkPreferencesView(onBack: { go(to: .profileImport) }, onContinue: { transition.perform(onComplete) })
             }
         }
         .id(step)
@@ -104,7 +105,15 @@ private struct WelcomeView: View {
                     signInWithLinkedIn()
                 }
                 .disabled(isSigningIn)
-                PillButton(title: "Continue with Apple", icon: .apple, style: .secondary, action: onContinue)
+                SignInWithAppleButton(.continue) { request in
+                    request.requestedScopes = [.fullName, .email]
+                } onCompletion: { result in
+                    signInWithApple(result)
+                }
+                .signInWithAppleButtonStyle(.black)
+                .frame(height: 56)
+                .clipShape(Capsule())
+                .disabled(isSigningIn)
                 Text(signInError ?? "By continuing you agree to the Terms and Privacy Policy.")
                     .bountyType(.footnote)
                     .foregroundStyle(signInError == nil ? BountyColor.inkTertiary : BountyColor.red)
@@ -135,6 +144,29 @@ private struct WelcomeView: View {
             }
         }
     }
+
+    private func signInWithApple(_ result: Result<ASAuthorization, Error>) {
+        guard services.api != nil else {
+            onContinue()
+            return
+        }
+        guard case .success(let authorization) = result,
+              let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+            if case .failure(let error) = result { signInError = error.localizedDescription }
+            return
+        }
+        isSigningIn = true
+        signInError = nil
+        Task {
+            defer { isSigningIn = false }
+            do {
+                try await services.signInWithApple(credential)
+                onContinue()
+            } catch {
+                signInError = error.localizedDescription
+            }
+        }
+    }
 }
 
 @MainActor
@@ -150,11 +182,18 @@ private final class PresentationAnchor: NSObject, ASWebAuthenticationPresentatio
 // MARK: - 02 Profile import
 
 private struct ProfileImportView: View {
+    @Environment(AppServices.self) private var services
     let onBack: () -> Void
     let onContinue: () -> Void
 
+    @State private var addedGmail = false
     @State private var addedLinkedIn = false
     @State private var addedCalendar = false
+    @State private var isPickingLinkedIn = false
+    @State private var addedResume = false
+    @State private var isPickingResume = false
+    @State private var isImporting = false
+    @State private var importError: String?
 
     var body: some View {
         BountyScreen {
@@ -176,24 +215,38 @@ private struct ProfileImportView: View {
                 .entrance(.top)
 
             VStack(spacing: 12) {
-                SourceRow(title: "Gmail", detail: "Read-only · sent mail", isAdded: true) {
+                SourceRow(title: "Gmail", detail: "Read-only · sent mail", isAdded: addedGmail) {
                     StickerTile(sticker: .mail, background: BountyColor.sky)
-                } onAdd: {}
-                SourceRow(title: "LinkedIn profile PDF", detail: "Profile → Save to PDF", isAdded: addedLinkedIn) {
+                } onAdd: {
+                    importError = "Gmail needs a Google OAuth client before it can connect."
+                }
+                SourceRow(title: "LinkedIn profile PDF", detail: isImporting ? "Importing…" : "Profile → Save to PDF", isAdded: addedLinkedIn) {
                     IconGlyph(icon: .linkedin, size: 24)
                         .foregroundStyle(BountyColor.lavenderInk)
                         .frame(width: 52, height: 52)
                         .background(BountyColor.lavenderSoft, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 } onAdd: {
-                    withAnimation(Motion.press) { addedLinkedIn = true }
+                    isPickingLinkedIn = true
+                }
+                SourceRow(title: "Résumé", detail: isImporting ? "Importing…" : "PDF", isAdded: addedResume) {
+                    StickerTile(sticker: .book, background: BountyColor.mint)
+                } onAdd: {
+                    isPickingResume = true
                 }
                 SourceRow(title: "Calendar", detail: "Free/busy, stays on device", isAdded: addedCalendar) {
                     StickerTile(sticker: .calendar, background: BountyColor.cream)
                 } onAdd: {
-                    withAnimation(Motion.press) { addedCalendar = true }
+                    connectCalendar()
                 }
             }
             .entrance(.rest(0))
+
+            if let importError {
+                Text(importError)
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             HStack(alignment: .top, spacing: 10) {
                 IconGlyph(icon: .lock, size: 18)
@@ -208,6 +261,60 @@ private struct ProfileImportView: View {
             .entrance(.rest(1))
         } bottom: {
             PillButton(title: "Build my twin", icon: .sparkles, action: onContinue)
+                .disabled(isImporting)
+        }
+        .fileImporter(isPresented: $isPickingLinkedIn, allowedContentTypes: [.pdf, .zip]) { result in
+            importDocument(result, isResume: false)
+        }
+        .background {
+            // A second file importer on the same view replaces the first, so this one hangs off a background view.
+            Color.clear.fileImporter(isPresented: $isPickingResume, allowedContentTypes: [.pdf]) { result in
+                importDocument(result, isResume: true)
+            }
+        }
+    }
+
+    private func importDocument(_ result: Result<URL, Error>, isResume: Bool) {
+        guard case .success(let url) = result else {
+            if case .failure(let error) = result { importError = error.localizedDescription }
+            return
+        }
+        let markAdded = { withAnimation(Motion.press) { if isResume { addedResume = true } else { addedLinkedIn = true } } }
+        guard let ingestion = services.profileIngestion else {
+            markAdded()
+            return
+        }
+        isImporting = true
+        importError = nil
+        Task {
+            defer { isImporting = false }
+            do {
+                let source: ProfileDocumentSource = isResume ? .resume : url.pathExtension.lowercased() == "zip" ? .linkedInExport : .linkedInPDF
+                _ = try await ingestion.ingest(fileURL: url, source: source)
+                markAdded()
+            } catch {
+                importError = error.localizedDescription
+            }
+        }
+    }
+
+    private func connectCalendar() {
+        guard let availability = services.availability else {
+            withAnimation(Motion.press) { addedCalendar = true }
+            return
+        }
+        importError = nil
+        Task {
+            guard await availability.requestAccess() else {
+                importError = "Calendar access was not granted. You can enable it in Settings."
+                return
+            }
+            do {
+                try await availability.sync()
+                withAnimation(Motion.press) { addedCalendar = true }
+            } catch {
+                importError = error.localizedDescription
+            }
         }
     }
 }
@@ -248,9 +355,15 @@ private struct StepLabel: View {
 
 // MARK: - 03 Building your twin
 
+/// Follows the server's import (`GET /twin` → `ingest`) until the skills are extracted (US-03).
 private struct BuildingTwinView: View {
+    @Environment(AppServices.self) private var services
     let onCancel: () -> Void
     let onContinue: () -> Void
+    @State private var twin: TwinSettings?
+    @State private var waitedTooLong = false
+
+    private var status: String { twin?.ingest.status ?? "processing" }
 
     var body: some View {
         BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 460), spacing: 14) {
@@ -266,35 +379,83 @@ private struct BuildingTwinView: View {
                     StickerView(sticker: .twin, size: 130)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 18)
-                    Chip(label: "Reading 3 sources", tone: .dark)
+                    Chip(label: chipText, tone: .dark)
                         .padding(.leading, 20)
                         .padding(.top, 158)
                 }
             }
             .entrance(.top)
 
-            Text("Building your twin…")
+            Text(headline)
                 .bountyType(.display)
                 .foregroundStyle(BountyColor.inkPrimary)
                 .entrance(.rest(0))
 
             VStack(spacing: 4) {
-                BuildRow(status: .done, title: "Read LinkedIn PDF", detail: "Freelance designer · 2 yrs", trailing: "0:06")
-                BuildRow(status: .active, title: "Scanning sent Gmail", detail: "Logo invoices, tutoring threads", trailing: "64%", progress: 0.64)
-                BuildRow(status: .todo, title: "Checking your calendar", detail: "Free/busy blocks only")
+                switch status {
+                case "done":
+                    BuildRow(status: .done, title: "Read your files", detail: "Skills, roles and education")
+                    BuildRow(status: .done, title: "Found \(twin?.skills.count ?? 0) skills",
+                             detail: twin?.skills.prefix(3).map(\.name).joined(separator: ", ") ?? "")
+                case "failed":
+                    BuildRow(status: .todo, title: "Couldn\u{2019}t read that file", detail: twin?.ingest.error ?? "Try a different file.")
+                case "idle":
+                    BuildRow(status: .todo, title: "No files added", detail: "You can add skills by hand on your Twin page.")
+                default:
+                    BuildRow(status: .active, title: "Reading your files", detail: waitedTooLong ? "Still working. You can keep going; it finishes in the background." : "Usually under a minute")
+                    BuildRow(status: .todo, title: "Extracting skills", detail: "Each one keeps its source and confidence")
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .borderedCard()
             .entrance(.rest(1))
         } bottom: {
-            PillButton(title: "Keep going in the background", style: .secondary, action: onContinue)
+            if status == "failed" {
+                VStack(spacing: 10) {
+                    PillButton(title: "Try another file", icon: .refresh, action: onCancel)
+                    PillButton(title: "Continue without it", style: .secondary, action: onContinue)
+                }
+            } else {
+                PillButton(title: status == "processing" ? "Keep going in the background" : "Continue", style: status == "processing" ? .secondary : .primary, action: onContinue)
+            }
         }
-        .task {
-            // Auto-advance: moves on by itself after 2.5 s.
+        .task { await follow() }
+    }
+
+    private var chipText: String {
+        switch status {
+        case "done": "\(twin?.skills.count ?? 0) skills found"
+        case "failed": "Import failed"
+        case "idle": "Nothing to read"
+        default: "Reading"
+        }
+    }
+
+    private var headline: String {
+        switch status {
+        case "done": "Your twin is ready to review"
+        case "failed": "That file didn\u{2019}t work"
+        case "idle": "Start from scratch"
+        default: "Building your twin\u{2026}"
+        }
+    }
+
+    /// Polls every 2 s. Without a backend (previews, sample mode) it moves on after a moment.
+    private func follow() async {
+        guard let api = services.api else {
             try? await Task.sleep(for: Motion.autoAdvance)
-            guard !Task.isCancelled else { return }
-            onContinue()
+            if !Task.isCancelled { onContinue() }
+            return
+        }
+        let started = Date.now
+        while !Task.isCancelled {
+            if let fresh: TwinSettings = try? await api.request(.get, "twin") {
+                withAnimation(Motion.press) { twin = fresh }
+                if fresh.ingest.status != "processing" { return }
+            }
+            waitedTooLong = Date.now.timeIntervalSince(started) > 45
+            try? await Task.sleep(for: .seconds(2))
         }
     }
 }
@@ -327,7 +488,11 @@ private struct BuildRow: View {
 
 // MARK: - 05 Availability & preferences
 
-private struct AvailabilityView: View {
+/// Availability and work preferences (US-06/07). The last onboarding step, and Settings › Work preferences.
+struct WorkPreferencesView: View {
+    @Environment(AppServices.self) private var services
+    /// Settings shows a title and a Save button instead of the onboarding steps.
+    var inSettings = false
     let onBack: () -> Void
     let onContinue: () -> Void
 
@@ -335,8 +500,11 @@ private struct AvailabilityView: View {
     @State private var minimumPay = 15.0
     @State private var radius = 3.0
     @State private var workMode = WorkMode.both
-    @State private var hidden = ["Pet sitting", "Moving"]
+    /// Categories the twin never offers.
+    @State private var hidden: Set<JobCategory> = [.moving]
     @State private var quietHours = true
+    @State private var isSaving = false
+    @State private var saveError: String?
 
     enum WorkMode: Hashable {
         case remote, inPerson, both
@@ -347,9 +515,13 @@ private struct AvailabilityView: View {
     var body: some View {
         BountyScreen {
             NavRow(leadingAction: onBack) {
-                ProgressDots(total: 4, current: 3)
+                if inSettings {
+                    Text("Work preferences").bountyType(.bodyStrong)
+                } else {
+                    ProgressDots(total: 4, current: 3)
+                }
             } trailing: {
-                StepLabel(text: "4 of 4")
+                if !inSettings { StepLabel(text: "4 of 4") }
             }
             .entrance(.top)
 
@@ -413,15 +585,19 @@ private struct AvailabilityView: View {
                     selection: $workMode
                 )
 
-                HStack(spacing: 8) {
-                    Text("Hide")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Never offer me")
                         .bountyType(.bodyStrong)
                         .foregroundStyle(BountyColor.inkPrimary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    ForEach(hidden, id: \.self) { category in
-                        Chip(label: category, tone: .grey)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(JobCategory.allCases.filter { $0 != .other }) { category in
+                                ChoiceChip(label: category.displayName, isSelected: hidden.contains(category)) {
+                                    if hidden.contains(category) { hidden.remove(category) } else { hidden.insert(category) }
+                                }
+                            }
+                        }
                     }
-                    Chip(label: "+ Add", tone: .yellow)
                 }
 
                 Toggle(isOn: $quietHours) {
@@ -439,9 +615,77 @@ private struct AvailabilityView: View {
             .padding(16)
             .borderedCard()
             .entrance(.rest(0))
+
+            if let saveError {
+                Text(saveError)
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.red)
+            }
         } bottom: {
-            PillButton(title: "Start matching", icon: .sparkles, action: onContinue)
+            PillButton(title: isSaving ? "Saving…" : inSettings ? "Save" : "Start matching", icon: inSettings ? .check : .sparkles) {
+                saveAndContinue()
+            }
+            .disabled(isSaving)
         }
+        .task { await loadSaved() }
+    }
+
+    /// Starts from what the server has, so returning to this screen doesn't reset anything.
+    private func loadSaved() async {
+        guard let api = services.api, let twin: TwinSettings = try? await api.request(.get, "twin") else { return }
+        let prefs = twin.prefs
+        minimumPay = min(40, max(5, prefs.minPay))
+        if let miles = prefs.maxRadiusMiles { radius = min(7, max(1, miles.rounded())) }
+        workMode = prefs.remoteOk && prefs.inPersonOk ? .both : prefs.remoteOk ? .remote : .inPerson
+        hidden = Set(prefs.blockedCategories.compactMap(JobCategory.init(rawValue:)))
+        quietHours = prefs.quietHours != nil
+        if let weekly = twin.availability?.weekly, weekly.count == 168 {
+            let hours = Array(weekly)
+            let ranges = [8..<12, 12..<17, 17..<22]
+            freeSlots = Set((0..<21).filter { slot in ranges[slot % 3].contains { hours[slot / 3 * 24 + $0] == "1" } })
+        }
+    }
+
+    private func saveAndContinue() {
+        guard let api = services.api else {
+            onContinue()
+            return
+        }
+        isSaving = true
+        saveError = nil
+        Task {
+            defer { isSaving = false }
+            do {
+                try await api.send(.put, "twin/prefs", body: TwinPreferencesUpdate(
+                    minPay: minimumPay,
+                    maxRadiusMiles: radius,
+                    blockedCategories: hidden.map(\.rawValue).sorted(),
+                    remoteOk: workMode != .inPerson,
+                    inPersonOk: workMode != .remote,
+                    tz: TimeZone.current.identifier,
+                    quietHours: quietHours ? QuietHours(start: "22:00", end: "08:00") : nil
+                ))
+                try await api.send(.put, "twin/availability", body: TwinAvailabilityUpdate(
+                    tz: TimeZone.current.identifier,
+                    weekly: weeklyAvailability,
+                    busy: []
+                ))
+                onContinue()
+            } catch {
+                saveError = error.localizedDescription
+            }
+        }
+    }
+
+    private var weeklyAvailability: String {
+        let ranges = [8..<12, 12..<17, 17..<22]
+        var hours = Array(repeating: "0", count: 168)
+        for slot in freeSlots {
+            let day = slot / 3
+            let block = slot % 3
+            for hour in ranges[block] { hours[day * 24 + hour] = "1" }
+        }
+        return hours.joined()
     }
 
     private func toggle(_ slot: Int) {
@@ -451,6 +695,76 @@ private struct AvailabilityView: View {
             freeSlots.insert(slot)
         }
     }
+}
+
+/// The parts of `GET /twin` this screen and Settings read.
+struct TwinSettings: Decodable, Sendable {
+    struct Prefs: Decodable, Sendable {
+        let minPay: Double
+        let maxRadiusMiles: Double?
+        let blockedCategories: [String]
+        let remoteOk: Bool
+        let inPersonOk: Bool
+        let quietHours: QuietHoursWindow?
+    }
+
+    struct QuietHoursWindow: Decodable, Sendable {
+        let start: String
+        let end: String
+    }
+
+    struct Availability: Decodable, Sendable {
+        let weekly: String?
+    }
+
+    /// `ready` once nothing in `missing` is left; `recommended` items help matching but aren't required (US-08).
+    struct Readiness: Decodable, Sendable {
+        let ready: Bool
+        let missing: [String]
+        let recommended: [String]
+    }
+
+    struct Ingest: Decodable, Sendable {
+        /// `idle`, `processing`, `done` or `failed`.
+        let status: String
+        let error: String?
+    }
+
+    let prefs: Prefs
+    let availability: Availability?
+    let readiness: Readiness
+    let ingest: Ingest
+    let skills: [Skill]
+
+    struct Skill: Decodable, Sendable {
+        let name: String
+    }
+}
+
+private struct QuietHours: Encodable, Sendable {
+    let start: String
+    let end: String
+}
+
+private struct TwinPreferencesUpdate: Encodable, Sendable {
+    let minPay: Double
+    let maxRadiusMiles: Double
+    let blockedCategories: [String]
+    let remoteOk: Bool
+    let inPersonOk: Bool
+    let tz: String
+    let quietHours: QuietHours?
+}
+
+private struct TwinAvailabilityUpdate: Encodable, Sendable {
+    let tz: String
+    let weekly: String
+    let busy: [BusyWindow]
+}
+
+private struct BusyWindow: Encodable, Sendable {
+    let start: Date
+    let end: Date
 }
 
 private struct ValueRow: View {
