@@ -268,6 +268,7 @@ Here is a real poster draft. Every field before `myRole` is in iOS-B's `Job.swif
 
 | Extension field | Use |
 |---|---|
+| `verification` | The job's verification plan: `{ summary, signals, privacy }`. See [Verification plan](#verification-plan). |
 | `allowedActions` | Which buttons to show: `edit_checklist`, `fund`, `delete`, `cancel`, `update_terms`, `accept`, `decline`, `start`, `withdraw`, `submit_proof`, `approve`, `reject`, `dispute`, `resolve`, `rate`. |
 | `myRole` | `poster`, `worker`, `offered` or `admin`. |
 | `offer` | For the offered worker: `{ id, expiresAt, estMinutes, hourlyRate, travelMinutes, fit }`. For the poster: `{ id, expiresAt }`. |
@@ -277,6 +278,37 @@ Here is a real poster draft. Every field before `myRole` is in iOS-B's `Job.swif
 | `payment.status` | `unpaid`, `held`, `releasing`, `paid`, `refunding` or `refunded`. |
 | `proof.items[]` | `{ checklistItemId, photoURLs, beforePhotoURLs, afterPhotoURLs, link, fileURLs, checkedInAt, note }`. |
 | `verdicts[]` | `{ checklistItemId, pass, verdict: pass\|fail\|unclear, confidence, explanation }`. |
+
+## Verification plan
+
+Every job carries `verification`: what Bounty checks before paying, and what it records about the worker to do so. The server works it out from the job (in person or remote) and its checklist, so it always matches what is enforced. It's on the draft (the poster sees it before funding) and on the offer (the worker sees it before accepting).
+
+```json
+{ "summary": "Verified on site: location at start, located photos, and AI review of 3 items.",
+  "signals": [
+    { "id": "on_site_start", "stage": "start", "enforcement": "blocks", "title": "On site to start",
+      "detail": "Start only works within 200 m of 1200 S University Ave.", "collects": "One GPS reading when the worker taps Start" }
+  ],
+  "privacy": "Bounty never tracks location in the background. It reads GPS only when the worker taps Start, checks in, or takes a proof photo." }
+```
+
+- **`stage`:** `start`, `proof` or `review`.
+- **`enforcement`:**
+  - `blocks`: the step can't happen
+  - `fails_item`: that checklist item fails grading
+  - `poster_reviews`: no automatic payment; the poster decides
+- **`collects`:** what is recorded about the worker, or `null`.
+
+| `id` | Included when | Enforced by |
+|---|---|---|
+| `on_site_start` | In person | `POST /jobs/{id}/start` returns `too_far` beyond the check-in radius (200 m, or 500 m in demo mode). |
+| `on_site_check_in` | The checklist has a `CHECK_IN` item | The server judges the check-in from GPS; the AI isn't involved. |
+| `photo_location` | In person, with photo items | Photos taken beyond twice the check-in radius, or without GPS, make the grade `unclear`. |
+| `fresh_photos` | Photo items | Captures must come after Start, and a photo reused from another job is rejected. |
+| `before_after` | A photo item with `beforeAfter` | The AI checks both photos show the same place. |
+| `deliverable` | `FILE` or `LINK` items | The AI judges the file or link against the description. |
+| `deadline` | Always | No proof after the deadline; the poster is refunded if nobody finishes. |
+| `ai_review` | Always | Each required item needs confidence ≥ 0.7; otherwise the poster decides. |
 
 ## Payments
 
