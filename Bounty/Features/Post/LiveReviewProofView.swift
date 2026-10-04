@@ -87,9 +87,17 @@ struct LiveReviewProofView: View {
                     .foregroundStyle(BountyColor.inkPrimary)
                     .entrance(.top)
 
+                // The worker's own evidence: their before shot (if the job asked for one) and the result,
+                // or their video when they recorded one instead of photos.
                 HStack(spacing: 11) {
-                    ProofPhoto(url: job.posterPhotos.first, fallbackAsset: "before-photo", label: "Before")
-                    ProofPhoto(url: firstProofPhoto(job), fallbackAsset: "after-photo", label: "After")
+                    if let before = firstProofPhoto(job, \.beforePhotoURLs) {
+                        ProofPhoto(url: before, label: "Before")
+                    }
+                    if let after = firstProofPhoto(job, \.afterPhotoURLs) ?? job.proof?.items.lazy.compactMap(\.photoURLs.first).first {
+                        ProofPhoto(url: after, label: "After")
+                    } else if let video = job.proof?.items.lazy.compactMap({ $0.videoURLs?.first }).first {
+                        ProofVideoTile(url: video)
+                    }
                 }
                 .entrance(.top)
 
@@ -191,8 +199,8 @@ struct LiveReviewProofView: View {
         job.worker?.name.split(separator: " ").first.map(String.init) ?? "the worker"
     }
 
-    private func firstProofPhoto(_ job: PostedJob) -> URL? {
-        job.proof?.items.lazy.compactMap(\.photoURLs.first).first
+    private func firstProofPhoto(_ job: PostedJob, _ list: KeyPath<ProofItem, [URL]?>) -> URL? {
+        job.proof?.items.lazy.compactMap { $0[keyPath: list]?.first }.first
     }
 
     private func outcome(for job: PostedJob) -> String? {
@@ -222,12 +230,11 @@ struct LiveReviewProofView: View {
 /// A before or after photo. Uses the real upload when there is one, else the design's art.
 private struct ProofPhoto: View {
     let url: URL?
-    let fallbackAsset: String
     let label: String
 
     var body: some View {
         // A fixed-size frame with the photo as an overlay, so a wide photo can't widen the row.
-        Color.clear
+        BountyColor.field
             .frame(height: 150)
             .frame(maxWidth: .infinity)
             .overlay {
@@ -235,12 +242,12 @@ private struct ProofPhoto: View {
                     AsyncImage(url: url) { phase in
                         if let image = phase.image {
                             image.resizable().scaledToFill()
+                        } else if phase.error != nil {
+                            IconGlyph(icon: .alert, size: 22).foregroundStyle(BountyColor.inkTertiary)
                         } else {
-                            Image(fallbackAsset).resizable()
+                            ProgressView()
                         }
                     }
-                } else {
-                    Image(fallbackAsset).resizable()
                 }
             }
             .overlay(alignment: .topLeading) {
@@ -249,6 +256,27 @@ private struct ProofPhoto: View {
             .clipShape(RoundedRectangle(cornerRadius: BountyRadius.row, style: .continuous))
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(label) photo")
+    }
+}
+
+/// The worker's proof video: opens the clip to watch.
+private struct ProofVideoTile: View {
+    let url: URL
+
+    var body: some View {
+        Link(destination: url) {
+            BountyColor.night
+                .frame(height: 150)
+                .frame(maxWidth: .infinity)
+                .overlay {
+                    Image(systemName: "play.circle.fill").font(.system(size: 40)).foregroundStyle(.white)
+                }
+                .overlay(alignment: .topLeading) {
+                    Chip(label: "Video", tone: .dark).padding(10)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: BountyRadius.row, style: .continuous))
+        }
+        .accessibilityLabel("Watch the proof video")
     }
 }
 
