@@ -9,6 +9,7 @@ import { newUser, reliability, updateUser } from "../../services/users.js";
 import { isAdmin } from "../auth.js";
 import { parseBody, type AppEnv } from "../http.js";
 import { wireDate } from "../wire.js";
+import { workerTrust } from "../../services/risk.js";
 
 const MAX_DEVICES = 5;
 const CODE_TTL_MS = 10 * 60_000;
@@ -49,6 +50,18 @@ export function meRoutes(deps: Deps): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
   app.get("/", (c) => c.json(meView(deps, c.get("user"))));
+
+  // The worker's trust score and the escrow it lets them hold at once (domain/risk.ts).
+  app.get("/trust", async (c) => {
+    const { trust, limitCents, openCents } = await workerTrust(deps, c.get("user"));
+    return c.json({
+      score: Math.round(trust.mean * 1000) / 1000,
+      conservative: Math.round(trust.lower * 1000) / 1000,
+      effectiveJobs: Math.round(trust.effectiveJobs * 10) / 10,
+      exposureLimit: limitCents / 100,
+      openExposure: openCents / 100,
+    });
+  });
 
   app.patch("/", async (c) => {
     const body = await parseBody(c, z.object({ displayName: z.string().trim().min(1).max(60) }));

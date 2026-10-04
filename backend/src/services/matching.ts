@@ -14,6 +14,7 @@ import type { Actor, Job, Offer, User } from "../domain/types.js";
 import { applyEvent } from "./jobs.js";
 import { briefOf } from "./postings.js";
 import { activeSkills, readiness, twinDocument } from "./twin.js";
+import { withinExposureLimit } from "./risk.js";
 import { averageStars } from "./trackRecord.js";
 import { reliability } from "./users.js";
 
@@ -77,6 +78,8 @@ async function rankCandidates(deps: Deps, job: Job): Promise<Offer[]> {
   const candidates: Candidate[] = [];
   for (const user of users) {
     if (ineligibleReason(job, user, now)) continue;
+    // Exposure limit: a worker can't hold more escrow at once than their track record supports.
+    if (!(await withinExposureLimit(deps, user, job))) continue;
     const distanceKm = job.remote || !user.prefs.base || !job.location ? undefined : haversineKm(user.prefs.base, job.location);
     const twinVector = user.twin.embedding && user.twin.embeddingModel === deps.embedder.model ? user.twin.embedding : await deps.embedder.embed(twinDocument(user));
     const similarity = Math.max(0, cosine(jobVector, twinVector));
@@ -146,6 +149,8 @@ export async function sendNextOffer(deps: Deps, jobId: string, known?: Offer[]):
     const worker = await deps.store.getUser(offer.workerId);
     // Skip people who became ineligible or are in quiet hours; they stay queued for a later pass.
     if (!worker || ineligibleReason(job, worker, now) || isQuietTime(worker.prefs, now)) continue;
+    // They may have taken other jobs since being queued.
+    if (!(await withinExposureLimit(deps, worker, job))) continue;
     const expiresAt = new Date(now.getTime() + deps.config.rules.offerTtlSec * 1000).toISOString();
     await deps.store.updateOffer(offer.offerId, { expiresAt });
     await applyEvent(deps, jobId, { type: "OFFER_SENT", offerId: offer.offerId, workerId: offer.workerId, expiresAt }, SYSTEM);

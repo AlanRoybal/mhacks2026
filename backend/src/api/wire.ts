@@ -15,6 +15,7 @@ import type { ChecklistItem, Job, Offer, Proof, User } from "../domain/types.js"
 import { notFound } from "../lib/errors.js";
 import { CONFIDENT } from "../services/grading.js";
 import { photoGeofenceM } from "../services/proof.js";
+import { jobRisk, type JobRisk } from "../services/risk.js";
 import { reliability } from "../services/users.js";
 import { isAdmin } from "./auth.js";
 
@@ -179,6 +180,9 @@ export async function jobWire(ctx: WireContext, job: Job, viewer: User) {
       { remote: job.remote, address: job.location?.address, checklist: job.checklist },
       { checkInRadiusM: deps.config.rules.checkInRadiusM, photoRadiusM: photoGeofenceM(deps), confidence: CONFIDENT },
     ),
+    // The escrow's risk (domain/risk.ts), for the poster and admins once the job holds money:
+    // tier A-E, EL = PD x LGD x EAD, and the assigned worker's trust score.
+    risk: isPoster && job.state !== "DRAFT" ? riskWire(await jobRisk(deps, job)) : null,
     // In-person jobs: how far from the address the worker was when they started, and how accurate
     // that fix was. Distance only; the worker's coordinates aren't shared.
     startCheck:
@@ -265,4 +269,18 @@ export function timelineWire(job: Job, viewer: User, ledger: LedgerEvent[]) {
               : "worker";
     return { seq: e.seq, type: e.type, status: e.to, from: e.from, label: LABELS[e.type](e), actor, at: wireDate(e.at) };
   });
+}
+
+export function riskWire(risk: JobRisk) {
+  const pct = (x: number) => Math.round(x * 1000) / 1000;
+  return {
+    tier: risk.tier,
+    rail: risk.rail,
+    exposure: dollars(risk.exposureCents),
+    probabilityOfLoss: pct(risk.pd),
+    lossGivenDefault: pct(risk.lgd),
+    expectedLoss: dollars(risk.expectedLossCents),
+    worker: risk.worker ? { trust: pct(risk.worker.trust), conservative: pct(risk.worker.lower), ratedJobs: risk.worker.ratedJobs } : null,
+    posterDisputeProbability: pct(risk.posterDispute),
+  };
 }
