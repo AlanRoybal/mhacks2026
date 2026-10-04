@@ -8,6 +8,55 @@ import SwiftUI
 @Observable
 final class PostDraft {
     nonisolated static let categories = ["Yard work", "Design", "Photos", "Tutoring", "Errands"]
+    var customCategories: [String] = UserDefaults.standard.stringArray(forKey: "post.customCategories") ?? [] {
+        didSet { UserDefaults.standard.set(customCategories, forKey: "post.customCategories") }
+    }
+    var availableCategories: [String] { Self.categories + customCategories }
+
+    enum Field: Hashable { case title, details, category, address, deadline, pay }
+
+    func validationError(for field: Field) -> String? {
+        switch field {
+        case .title:
+            let value = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            if value.isEmpty { return "Enter a job title." }
+            if value.utf16.count > 120 { return "Keep the title to 120 characters or fewer." }
+        case .details:
+            let value = details.trimmingCharacters(in: .whitespacesAndNewlines)
+            if value.isEmpty { return "Describe what you need done." }
+            if value.utf16.count > 4000 { return "Keep the description to 4,000 characters or fewer." }
+        case .category:
+            let value = category.trimmingCharacters(in: .whitespacesAndNewlines)
+            if value.isEmpty || value.utf16.count > 40 { return "Choose a category of 1–40 characters." }
+        case .address:
+            if inPerson && address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return "Enter an address for this in-person job."
+            }
+        case .deadline:
+            guard let deadline else { return "Choose a deadline." }
+            if deadline <= .now { return "Choose a deadline in the future." }
+        case .pay:
+            guard let pay, (1...10_000).contains(pay) else {
+                return "Enter whole-dollar pay between $1 and $10,000."
+            }
+        }
+        return nil
+    }
+
+    /// Returns an error without changing the selection when a name is invalid.
+    func addCustomCategory(_ name: String) -> String? {
+        let value = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, value.utf16.count <= 40 else {
+            return "Enter a category of 1–40 characters."
+        }
+        if let existing = availableCategories.first(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) {
+            category = existing
+        } else {
+            customCategories.append(value)
+            category = value
+        }
+        return nil
+    }
 
     var title = ""
     var details = ""
@@ -21,19 +70,14 @@ final class PostDraft {
     /// Whole dollars, as shown on the Post screen.
     var pay: Int?
 
-    var payCents: Int { (pay ?? 0) * 100 }
+    var payCents: Int { pay.flatMap { (1...10_000).contains($0) ? $0 * 100 : nil } ?? 0 }
     var feeCents: Int { Int((Double(payCents) * 0.10).rounded()) }
     var totalCents: Int { payCents + feeCents }
 
-    /// Same limits the payments server enforces, so checkout never fails on validation.
+    /// Shared validation for advancing the form and preparing checkout.
     var canFund: Bool {
-        guard let pay, let deadline else { return false }
-        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let details = details.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !title.isEmpty && title.count <= 120
-            && !details.isEmpty && details.count <= 4000
-            && pay >= 1 && pay <= 10_000
-            && deadline > .now
+        [Field.title, .details, .category, .address, .deadline, .pay]
+            .allSatisfy { validationError(for: $0) == nil }
     }
 
     var deadlineText: String {
@@ -69,13 +113,14 @@ final class PostDraft {
         pay = fresh.pay
     }
 
-    /// The payments server accepts Design, Home, Tutoring, Photography and Technology.
+    /// Normalize built-in labels while preserving custom category names at checkout.
     nonisolated static func serverCategory(for category: String) -> String {
         switch category {
         case "Design": "Design"
         case "Photos": "Photography"
         case "Tutoring": "Tutoring"
-        default: "Home"
+        case "Yard work", "Errands": "Home"
+        default: category.trimmingCharacters(in: .whitespacesAndNewlines)
         }
     }
 

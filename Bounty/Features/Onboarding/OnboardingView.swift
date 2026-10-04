@@ -69,7 +69,15 @@ private struct WelcomeView: View {
             .accessibilityElement(children: .combine)
             .entrance(.top)
 
-            StackCard(tone: .lavender, height: 260, bandTop: 162) {
+            StackCard(
+                tone: StackTone(
+                    front: BountyColor.lavenderBand,
+                    back: BountyColor.lavenderInk,
+                    band: BountyColor.lavenderBack
+                ),
+                height: 260,
+                bandTop: 162
+            ) {
                 ZStack(alignment: .topLeading) {
                     StickerView(sticker: .twin, size: 140)
                         .frame(maxWidth: .infinity)
@@ -83,6 +91,12 @@ private struct WelcomeView: View {
                     .padding(.leading, 20)
                     .padding(.top, 174)
                 }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: BountyRadius.stackCard, style: .continuous)
+                    .strokeBorder(BountyColor.lavenderInk, lineWidth: 1.5)
+                    .padding(.bottom, 12)
+                    .allowsHitTesting(false)
             }
             .entrance(.top)
 

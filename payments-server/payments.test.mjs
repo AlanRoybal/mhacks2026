@@ -58,11 +58,21 @@ test('invalid prices, job IDs, deadlines, and payloads never reach Stripe', asyn
     await assert.rejects(payments.prepare(draft({ amountCents })), { status: 400 });
   }
   for (const changes of [{ id: '../../secret' }, { title: '' }, { details: ' ' }, { deadline: 'yesterday' },
-    { deadline: new Date(0).toISOString() }, { isRemote: 'yes' }, { category: 'Unknown' }]) {
+    { deadline: new Date(0).toISOString() }, { isRemote: 'yes' }, { category: ' ' },
+    { category: 'x'.repeat(41) }, { category: 42 }]) {
     await assert.rejects(payments.prepare(draft(changes)), { status: 400 });
   }
   await assert.rejects(payments.prepare(null), { status: 400 });
   assert.equal(calls.length, 0);
+});
+
+test('custom category names survive checkout and storage', async t => {
+  const { payments, store } = fixture(t);
+  const input = draft({ category: '  Pet care  ' });
+  const result = await payments.prepare(input);
+  assert.equal(result.job.category, 'Pet care');
+  assert.equal(store.get(input.id).category, 'Pet care');
+  assert.equal(store.get(input.id).draft.category, 'Pet care');
 });
 
 test('only a matching, fully received succeeded charge funds a job', async t => {

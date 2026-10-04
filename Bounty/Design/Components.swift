@@ -655,6 +655,26 @@ extension View {
 
 // MARK: - Avatar
 
+struct ProfileAvatar: View {
+    let profile: UserProfile
+    var size: CGFloat = 44
+
+    var body: some View {
+        Group {
+            if let data = profile.avatarData, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                InitialsAvatar(initials: profile.initials, size: size)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 struct InitialsAvatar: View {
     let initials: String
     var background: Color = BountyColor.lavender

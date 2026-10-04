@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import ImageIO
+import UIKit
 
 struct UserProfile: Codable, Equatable {
     var name = "Alan Roybal"
@@ -7,6 +9,7 @@ struct UserProfile: Codable, Equatable {
     var phone = ""
     var location = ""
     var bio = ""
+    var avatarData: Data?
 
     var firstName: String {
         name.split(whereSeparator: \.isWhitespace).first.map(String.init) ?? "You"
@@ -38,6 +41,20 @@ struct UserProfile: Codable, Equatable {
             return "Enter a valid email address, or leave it blank."
         }
         return nil
+    }
+}
+
+enum AvatarPhoto {
+    /// Downsample before decoding so full-resolution library images aren't kept in memory.
+    nonisolated static func prepare(_ data: Data) -> Data? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: 512,
+                kCGImageSourceShouldCacheImmediately: true
+              ] as CFDictionary) else { return nil }
+        return UIImage(cgImage: thumbnail).jpegData(compressionQuality: 0.85)
     }
 }
 

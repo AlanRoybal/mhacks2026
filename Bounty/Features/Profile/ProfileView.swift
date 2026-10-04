@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct ProfileView: View {
     @Environment(AppRouter.self) private var router
@@ -8,6 +9,9 @@ struct ProfileView: View {
     @State private var showingDiscardConfirmation = false
     @State private var message: String?
     @State private var saveError: String?
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var isLoadingPhoto = false
+    @State private var photoError: String?
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
@@ -29,7 +33,10 @@ struct ProfileView: View {
             .entrance(.top)
 
             VStack(spacing: 10) {
-                InitialsAvatar(initials: profileStore.profile.initials, size: 80)
+                ProfileAvatar(profile: isEditing ? draft : profileStore.profile, size: 80)
+                if isEditing {
+                    photoControls
+                }
                 Text(profileStore.profile.name)
                     .bountyType(.title)
                     .foregroundStyle(BountyColor.inkPrimary)
@@ -73,8 +80,8 @@ struct ProfileView: View {
                     HStack(spacing: 10) {
                         PillButton(title: "Cancel", style: .secondary, action: cancelEditing)
                         PillButton(title: "Save", icon: .check, action: save)
-                            .disabled(draft.validationMessage != nil)
-                            .opacity(draft.validationMessage == nil ? 1 : 0.5)
+                            .disabled(draft.validationMessage != nil || isLoadingPhoto)
+                            .opacity(draft.validationMessage == nil && !isLoadingPhoto ? 1 : 0.5)
                             .accessibilityIdentifier("saveProfileButton")
                     }
                 }
@@ -83,10 +90,69 @@ struct ProfileView: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
+        .task(id: selectedPhoto) {
+            guard let selection = selectedPhoto, isEditing else { return }
+            isLoadingPhoto = true
+            photoError = nil
+            defer {
+                if selectedPhoto == selection { isLoadingPhoto = false }
+            }
+            do {
+                guard let data = try await selection.loadTransferable(type: Data.self) else {
+                    throw PhotoError.unreadable
+                }
+                let prepared = await Task.detached(priority: .userInitiated) {
+                    AvatarPhoto.prepare(data)
+                }.value
+                try Task.checkCancellation()
+                guard isEditing, selectedPhoto == selection else { return }
+                guard let prepared else { throw PhotoError.unreadable }
+                draft.avatarData = prepared
+            } catch {
+                guard !Task.isCancelled, isEditing, selectedPhoto == selection else { return }
+                photoError = "This photo couldn't be loaded. Please choose another photo."
+            }
+        }
         .confirmationDialog("Discard your unsaved changes?", isPresented: $showingDiscardConfirmation, titleVisibility: .visible) {
             Button("Discard changes", role: .destructive) { router.back() }
             Button("Keep editing", role: .cancel) {}
         }
+    }
+
+    private enum PhotoError: Error { case unreadable }
+
+    private var photoControls: some View {
+        VStack(spacing: 8) {
+            PhotosPicker(draft.avatarData == nil ? "Add photo" : "Change photo",
+                         selection: $selectedPhoto, matching: .images)
+            .bountyType(.subheadStrong)
+            .foregroundStyle(BountyColor.lavenderInk)
+            .accessibilityIdentifier("profilePhotoPicker")
+            if isLoadingPhoto {
+                ProgressView("Loading photo…")
+                    .bountyType(.footnote)
+            }
+            if draft.avatarData != nil {
+                Button("Remove photo", role: .destructive) {
+                    resetPhotoSelection()
+                    draft.avatarData = nil
+                }
+                .bountyType(.footnote)
+                .accessibilityIdentifier("removeProfilePhotoButton")
+            }
+            if let photoError {
+                Text(photoError)
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.red)
+                    .multilineTextAlignment(.center)
+            }
+        }
+    }
+
+    private func resetPhotoSelection() {
+        selectedPhoto = nil
+        isLoadingPhoto = false
+        photoError = nil
     }
 
     private var information: some View {
@@ -159,6 +225,7 @@ struct ProfileView: View {
     }
 
     private func beginEditing() {
+        resetPhotoSelection()
         draft = profileStore.profile
         message = nil
         saveError = nil
@@ -166,15 +233,17 @@ struct ProfileView: View {
     }
 
     private func cancelEditing() {
+        resetPhotoSelection()
         focusedField = nil
         saveError = nil
         isEditing = false
     }
 
     private func save() {
-        guard draft.validationMessage == nil else { return }
+        guard draft.validationMessage == nil, !isLoadingPhoto else { return }
         do {
             try profileStore.save(draft)
+            resetPhotoSelection()
             focusedField = nil
             isEditing = false
             message = "Changes saved"

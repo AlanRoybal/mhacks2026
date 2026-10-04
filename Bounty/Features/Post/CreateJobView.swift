@@ -8,6 +8,11 @@ struct CreateJobView: View {
     @State private var pickingDeadline = false
     @State private var selectedDeadline = Date().addingTimeInterval(86_400)
     @State private var pickingLocation = false
+    @State private var showValidation = false
+    @State private var addingCategory = false
+    @State private var customCategory = ""
+    @State private var categoryError: String?
+    @State private var payText = ""
 
     var body: some View {
         @Bindable var draft = draft
@@ -18,7 +23,7 @@ struct CreateJobView: View {
             .entrance(.top)
 
             HStack(spacing: 10) {
-                StickerTile(sticker: draft.sticker, background: draft.tileColor, size: 56, stickerSize: 42, radius: 18)
+                StickerTile(sticker: draft.sticker, background: draft.tileColor, size: 72, stickerSize: 44, radius: 18)
                 Button {} label: {
                     VStack(spacing: 4) {
                         IconGlyph(icon: .images, size: 22)
@@ -26,7 +31,7 @@ struct CreateJobView: View {
                             .bountyType(.caption)
                     }
                     .foregroundStyle(BountyColor.inkSecondary)
-                    .frame(width: 56, height: 56)
+                    .frame(width: 72, height: 72)
                     .background(BountyColor.field, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -35,6 +40,7 @@ struct CreateJobView: View {
                 }
                 .buttonStyle(PressableStyle())
             }
+            .padding(.vertical, 8)
             .entrance(.top)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -47,6 +53,7 @@ struct CreateJobView: View {
                     .bountyType(.body)
                     .foregroundStyle(BountyColor.inkPrimary)
                     .fieldBackground()
+                validationMessage(for: .title)
             }
             .entrance(.top)
 
@@ -64,16 +71,44 @@ struct CreateJobView: View {
                     .lineLimit(2...3)
                     .padding(.vertical, 8)
                     .fieldBackground(height: 56)
+                validationMessage(for: .details)
             }
             .entrance(.rest(0))
 
             VStack(alignment: .leading, spacing: 4) {
                 FieldLabel(text: "Category")
                 FlowLayout(spacing: 6) {
-                    ForEach(PostDraft.categories, id: \.self) { option in
+                    ForEach(draft.availableCategories, id: \.self) { option in
                         ChoiceChip(label: option, isSelected: option == draft.category) { draft.category = option }
+                            .frame(maxWidth: 260)
+                            .accessibilityLabel(option)
+                    }
+                    ChoiceChip(label: "+ Custom", isSelected: addingCategory) {
+                        addingCategory.toggle()
+                        categoryError = nil
                     }
                 }
+                if addingCategory {
+                    TextField("Custom category", text: $customCategory,
+                              prompt: Text("e.g. Pet care").foregroundStyle(BountyColor.inkTertiary))
+                        .bountyType(.body)
+                        .fieldBackground()
+                        .onChange(of: customCategory) { _, _ in categoryError = nil }
+                        .onSubmit { saveCustomCategory() }
+                    HStack {
+                        Button("Cancel") {
+                            addingCategory = false
+                            customCategory = ""
+                            categoryError = nil
+                        }
+                        Spacer()
+                        Button("Add category") { saveCustomCategory() }
+                    }
+                    .bountyType(.subhead)
+                    .padding(.vertical, 4)
+                    if let categoryError { errorMessage(categoryError) }
+                }
+                validationMessage(for: .category)
             }
             .entrance(.rest(1))
 
@@ -113,10 +148,11 @@ struct CreateJobView: View {
                 .opacity(draft.inPerson ? 1 : 0.4)
                 .disabled(!draft.inPerson)
                 .animation(Motion.pressTint, value: draft.inPerson)
+                validationMessage(for: .address)
             }
             .entrance(.rest(2))
 
-            HStack(spacing: 11) {
+            HStack(alignment: .top, spacing: 11) {
                 VStack(alignment: .leading, spacing: 4) {
                     FieldLabel(text: "Deadline")
                     Button {
@@ -136,6 +172,7 @@ struct CreateJobView: View {
                     }
                     .buttonStyle(PressableStyle())
                     .accessibilityLabel("Deadline, \(draft.deadlineText)")
+                    validationMessage(for: .deadline)
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     FieldLabel(text: "Pay")
@@ -144,11 +181,15 @@ struct CreateJobView: View {
                             Text("$")
                             TextField(
                                 "Pay",
-                                value: $draft.pay,
-                                format: .number,
+                                text: $payText,
                                 prompt: Text("40").foregroundStyle(BountyColor.inkTertiary)
                             )
                                 .keyboardType(.numberPad)
+                                .onChange(of: payText) { _, value in
+                                    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    draft.pay = !trimmed.isEmpty && trimmed.allSatisfy({ $0.isASCII && $0.isNumber })
+                                        ? Int(trimmed) : nil
+                                }
                         }
                         .bountyType(.moneyM)
                         .foregroundStyle(BountyColor.inkPrimary)
@@ -156,12 +197,17 @@ struct CreateJobView: View {
                         Chip(label: "USD", tone: .grey)
                     }
                     .fieldBackground()
+                    validationMessage(for: .pay)
                 }
             }
             .entrance(.rest(3))
         } bottom: {
-            PillButton(title: "Draft the proof checklist", icon: .sparkles) { router.open(.proofChecklist) }
+            PillButton(title: "Draft the proof checklist", icon: .sparkles) {
+                showValidation = true
+                if draft.canFund { router.open(.proofChecklist) }
+            }
         }
+        .onAppear { payText = draft.pay.map(String.init) ?? "" }
         .sheet(isPresented: $pickingLocation) {
             LocationPicker(location: Binding(
                 get: { draft.location },
@@ -189,6 +235,29 @@ struct CreateJobView: View {
             }
             .presentationDetents([.medium, .large])
         }
+    }
+
+    private func saveCustomCategory() {
+        categoryError = draft.addCustomCategory(customCategory)
+        if categoryError == nil {
+            customCategory = ""
+            addingCategory = false
+        }
+    }
+
+    @ViewBuilder
+    private func validationMessage(for field: PostDraft.Field) -> some View {
+        if showValidation, let message = draft.validationError(for: field) {
+            errorMessage(message)
+        }
+    }
+
+    private func errorMessage(_ message: String) -> some View {
+        Text(message)
+            .bountyType(.footnote)
+            .foregroundStyle(BountyColor.red)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel("Error: \(message)")
     }
 }
 

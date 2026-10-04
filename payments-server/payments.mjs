@@ -25,9 +25,6 @@ export function validateDraft(input) {
   }
   if (typeof input.isRemote !== 'boolean') throw new PaymentError(400, 'Choose a job location.');
   const category = text('category', 40);
-  if (!['Design', 'Home', 'Tutoring', 'Photography', 'Technology'].includes(category)) {
-    throw new PaymentError(400, 'Choose a supported category.');
-  }
   return {
     id: input.id.toLowerCase(), title: text('title', 120), details: text('details', 4000),
     category, isRemote: input.isRemote, deadline: deadline.toISOString(), amountCents: input.amountCents,

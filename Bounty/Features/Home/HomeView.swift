@@ -33,7 +33,7 @@ struct HomeView: View {
                         }
                         .accessibilityValue("\(HomeNotification.unreadCount(router: router)) unread")
                     Button { router.open(.profile) } label: {
-                        InitialsAvatar(initials: profileStore.profile.initials)
+                        ProfileAvatar(profile: profileStore.profile)
                     }
                     .buttonStyle(PressableStyle())
                     .accessibilityLabel("Your profile")
