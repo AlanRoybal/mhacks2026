@@ -6,7 +6,8 @@ import TwinKit
 /// review screen. Posting and funding go through `PostDraft` and Caleb's checkout; this store
 /// picks those jobs up from the backend (`GET /jobs/mine`) and handles approve and dispute.
 ///
-/// If the backend isn't running, it switches to `MockJobsAPI` so the screens still demo.
+/// Errors are shown, never papered over with sample data: `MockJobsAPI` is only for previews and
+/// builds with no backend configured.
 @MainActor
 @Observable
 final class PosterStore {
@@ -44,11 +45,7 @@ final class PosterStore {
             setJobs(try await api.myJobs())
             errorMessage = nil
         } catch {
-            if fallBackIfUnreachable(error) {
-                setJobs((try? await api.myJobs()) ?? [])
-            } else {
-                errorMessage = error.localizedDescription
-            }
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -59,7 +56,7 @@ final class PosterStore {
             try await api.registerDevice(token: token)
         } catch {
             // Not fatal: the Posted list still refreshes while open, and reminders are local.
-            _ = fallBackIfUnreachable(error)
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -95,9 +92,7 @@ final class PosterStore {
             errorMessage = nil
             return job
         } catch {
-            if !fallBackIfUnreachable(error) {
-                errorMessage = error.localizedDescription
-            }
+            errorMessage = error.localizedDescription
             return nil
         }
     }
@@ -151,13 +146,5 @@ final class PosterStore {
             }
             return lhs.createdAt > rhs.createdAt
         }
-    }
-
-    /// Switches to sample data the first time the backend can't be reached. Returns whether it did.
-    private func fallBackIfUnreachable(_ error: Error) -> Bool {
-        guard !isUsingSampleData, BackendJobsAPI.isUnreachable(error) else { return false }
-        api = MockJobsAPI()
-        isUsingSampleData = true
-        return true
     }
 }
