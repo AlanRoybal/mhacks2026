@@ -35,15 +35,16 @@ function phaseFor(job: Job): { phase: LivePhase; detail: string } | null {
   return states[job.state] ?? null;
 }
 
-// Content for the app's BountyLiveAttributes.ContentState. timerStart is "now minus time on site" while
-// on site, so the widget's ticking timer shows the total including earlier stretches.
+// Content for the app's BountyLiveAttributes.ContentState (ActivityKit decodes it, so no ISO dates):
+// timerStartEpoch is "now minus time on site" in Unix seconds while on site, so the widget's ticking
+// timer shows the total including earlier stretches.
 export function liveContent(session: LiveSession, job: Job, rules: Rules, now: Date) {
   const seconds = onSiteSeconds(session, now);
   const onSite = Boolean(session.onSiteSince) && ACTIVE_PHASES.has(session.phase);
   return {
     phase: session.phase,
     onSiteSeconds: seconds,
-    timerStart: onSite ? new Date(now.getTime() - seconds * 1000).toISOString().replace(/\.\d{3}Z$/, "Z") : null,
+    timerStartEpoch: onSite ? Math.floor(now.getTime() / 1000) - seconds : null,
     itemsDone: session.itemsDone,
     itemsTotal: session.itemsTotal,
     minOnSiteSeconds: job.remote ? 0 : minOnSiteSec(rules, job.estMinutes),

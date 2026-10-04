@@ -43,7 +43,7 @@ test("starting opens a live session on site; leaving pauses the clock and coming
   let live = (await api.call("GET", `/jobs/${job.id}/live`, poster.token)).body;
   assert.equal(live.phase, "on_site");
   assert.equal(live.provider, "memory");
-  assert.ok(live.timerStart, "the Live Activity can tick a timer from here");
+  assert.ok(live.timerStartEpoch, "the Live Activity can tick a timer from here");
 
   deps.clock.advance(60);
   await ping(api, worker.token, job.id, SITE);
@@ -52,7 +52,7 @@ test("starting opens a live session on site; leaving pauses the clock and coming
   assert.equal(live.phase, "away");
   assert.equal(live.onSiteSeconds, 120);
   assert.equal(live.leftSiteCount, 1);
-  assert.equal(live.timerStart, null, "the timer stops while away");
+  assert.equal(live.timerStartEpoch, null, "the timer stops while away");
 
   deps.clock.advance(60);
   live = (await ping(api, worker.token, job.id, SITE)).body;
