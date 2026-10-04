@@ -10,16 +10,16 @@ struct TwinView: View {
     ]
 
     var body: some View {
-        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 320)) {
-            ScreenTitle(title: "Your twin") {
+        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 320), spacing: 8) {
+            ScreenTitle(title: "Your twin", type: .title) {
                 Chip(label: "Ready to match", tone: .mint)
             }
             .entrance(.top)
 
-            StackCard(tone: .lavender, height: 150, bandTop: 108) {
+            StackCard(tone: .lavender, height: 124, bandTop: 90) {
                 HStack(alignment: .top, spacing: 16) {
-                    StickerView(sticker: .twin, size: 110)
-                        .padding(.top, 18)
+                    StickerView(sticker: .twin, size: 80)
+                        .padding(.top, 12)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Alan’s twin")
                             .bountyType(.headline)
@@ -35,7 +35,7 @@ struct TwinView: View {
                         .padding(.top, 6)
                     }
                     .foregroundStyle(BountyColor.inkPrimary)
-                    .padding(.top, 22)
+                    .padding(.top, 12)
                 }
                 .padding(.leading, 14)
             }
@@ -88,10 +88,10 @@ private struct SkillRow: View {
     let skill: TwinSkill
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Text(skill.name)
-                    .bountyType(.bodyStrong)
+                    .bountyType(.subheadStrong)
                     .foregroundStyle(BountyColor.inkPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Chip(label: skill.source, tone: skill.source == "LinkedIn" ? .lavender : .sky)
@@ -106,7 +106,7 @@ private struct SkillRow: View {
                     .foregroundStyle(BountyColor.inkSecondary)
             }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 6)
     }
 }
 

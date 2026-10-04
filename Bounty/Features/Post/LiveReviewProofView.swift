@@ -30,10 +30,10 @@ struct PostedJobCard: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                StickerTile(sticker: job.sticker, background: job.tileColor, size: 56, stickerSize: 46, radius: 17)
+                StickerTile(sticker: job.sticker, background: job.tileColor, size: 44, stickerSize: 34, radius: 14)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(job.title)
-                        .bountyType(.bodyStrong)
+                        .bountyType(.subheadStrong)
                         .foregroundStyle(BountyColor.inkPrimary)
                     Text(detail)
                         .bountyType(.footnote)
@@ -46,7 +46,8 @@ struct PostedJobCard: View {
                     .bountyType(.moneyM)
                     .foregroundStyle(BountyColor.inkPrimary)
             }
-            .padding(14)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .borderedCard(radius: 22)
         }
         .buttonStyle(PressableStyle())
@@ -68,7 +69,7 @@ struct LiveReviewProofView: View {
     private var job: PostedJob? { store.job(router.posterJobId) }
 
     var body: some View {
-        BountyScreen(spacing: 14) {
+        BountyScreen(spacing: 10) {
             NavRow(leadingAction: router.back) {
                 if let job {
                     Chip(

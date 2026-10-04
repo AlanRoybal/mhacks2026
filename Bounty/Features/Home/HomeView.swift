@@ -3,22 +3,42 @@ import SwiftUI
 /// 06 Home.
 struct HomeView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(ProfileStore.self) private var profileStore
 
     var body: some View {
-        BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 380), spacing: 18) {
+        BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 380), spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Good evening")
                         .bountyType(.subhead)
                         .foregroundStyle(BountyColor.inkSecondary)
-                    Text("Alan")
+                    Text(profileStore.profile.firstName)
                         .bountyType(.title)
                         .foregroundStyle(BountyColor.inkPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 Spacer()
                 HStack(spacing: 8) {
-                    IconButton(icon: .bell, label: "Notifications") { router.open(.lockScreenOffer) }
-                    InitialsAvatar(initials: "AR")
+                    IconButton(icon: .bell, label: "Notifications") { router.open(.notifications) }
+                        .overlay(alignment: .topTrailing) {
+                            if HomeNotification.unreadCount(router: router) > 0 {
+                                Circle()
+                                    .fill(BountyColor.coral)
+                                    .frame(width: 10, height: 10)
+                                    .overlay(Circle().stroke(BountyColor.canvas, lineWidth: 2))
+                                    .offset(x: -2, y: 2)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                        .accessibilityValue("\(HomeNotification.unreadCount(router: router)) unread")
+                    Button { router.open(.profile) } label: {
+                        InitialsAvatar(initials: profileStore.profile.initials)
+                    }
+                    .buttonStyle(PressableStyle())
+                    .accessibilityLabel("Your profile")
+                    .accessibilityHint("View and edit your personal information")
+                    .accessibilityIdentifier("profileButton")
                 }
             }
             .entrance(.top)
@@ -51,6 +71,126 @@ struct HomeView: View {
     }
 }
 
+/// Activity for the same sample jobs shown on Home and Jobs.
+private struct HomeNotification: Identifiable {
+    let id: String
+    let title: String
+    let message: String
+    let actionLabel: String
+    let icon: BountyIcon
+    let route: AppRoute?
+
+    @MainActor
+    static func items(router: AppRouter) -> [HomeNotification] {
+        var items: [HomeNotification] = []
+        if !router.offerDeclined {
+            items.append(HomeNotification(
+                id: "coffee-offer", title: "Your twin found a match",
+                message: "Sketch a coffee shop logo · $15 · 0.4 mi away",
+                actionLabel: "View offer", icon: .sparkles, route: .offer
+            ))
+        }
+        items.append(HomeNotification(
+            id: "desk-accepted", title: "You’re booked",
+            message: "Photograph a vintage desk · Tomorrow, 2 PM",
+            actionLabel: "View job", icon: .briefcase, route: .jobDetail
+        ))
+        items.append(HomeNotification(
+            id: "calculus-review", title: "Your work is in review",
+            message: "Review a calculus worksheet · $35",
+            actionLabel: "View jobs", icon: .shieldCheck, route: nil
+        ))
+        return items
+    }
+
+    @MainActor
+    static func unreadCount(router: AppRouter) -> Int {
+        items(router: router).filter { !router.readNotificationIDs.contains($0.id) }.count
+    }
+}
+
+struct NotificationsView: View {
+    @Environment(AppRouter.self) private var router
+
+    var body: some View {
+        BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 300), spacing: 16) {
+            NavRow(leadingAction: router.back) {
+                Text("Notifications")
+                    .bountyType(.bodyStrong)
+                    .foregroundStyle(BountyColor.inkPrimary)
+            } trailing: {
+                EmptyView()
+            }
+            .entrance(.top)
+
+            HStack {
+                Text(HomeNotification.unreadCount(router: router) == 0
+                     ? "You’re all caught up"
+                     : "\(HomeNotification.unreadCount(router: router)) unread")
+                    .bountyType(.subhead)
+                    .foregroundStyle(BountyColor.inkSecondary)
+                Spacer()
+                Button("Mark all read") {
+                    router.readNotificationIDs.formUnion(HomeNotification.items(router: router).map(\.id))
+                }
+                .bountyType(.footnote)
+                .foregroundStyle(BountyColor.inkPrimary)
+                .disabled(HomeNotification.unreadCount(router: router) == 0)
+                .opacity(HomeNotification.unreadCount(router: router) == 0 ? 0.4 : 1)
+            }
+            .entrance(.top)
+
+            ForEach(Array(HomeNotification.items(router: router).enumerated()), id: \.element.id) { index, notification in
+                notificationRow(notification)
+                    .entrance(.rest(index))
+            }
+        }
+    }
+
+    private func notificationRow(_ notification: HomeNotification) -> some View {
+        let isUnread = !router.readNotificationIDs.contains(notification.id)
+        return Button {
+            router.readNotificationIDs.insert(notification.id)
+            if let route = notification.route {
+                router.open(route)
+            } else {
+                router.jobsSegment = .working
+                router.select(.jobs)
+            }
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                IconGlyph(icon: notification.icon, size: 24)
+                    .foregroundStyle(BountyColor.inkPrimary)
+                    .frame(width: 44, height: 44)
+                    .background(BountyColor.cream, in: RoundedRectangle(cornerRadius: 14))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(notification.title)
+                        .bountyType(.subheadStrong)
+                        .foregroundStyle(BountyColor.inkPrimary)
+                    Text(notification.message)
+                        .bountyType(.footnote)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                    Text(notification.actionLabel)
+                        .bountyType(.footnote)
+                        .foregroundStyle(BountyColor.inkPrimary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if isUnread {
+                    Circle()
+                        .fill(BountyColor.coral)
+                        .frame(width: 8, height: 8)
+                        .padding(.top, 6)
+                }
+            }
+            .multilineTextAlignment(.leading)
+            .padding(16)
+            .borderedCard(radius: BountyRadius.row)
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityValue(isUnread ? "Unread" : "Read")
+    }
+}
+
 private struct TwinStatusPill: View {
     @State private var pulsing = false
 
@@ -76,7 +216,7 @@ private struct TwinStatusPill: View {
         }
         .foregroundStyle(BountyColor.lavenderInk)
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
         .tintedPanel(BountyColor.lavenderSoft, radius: 22)
         .accessibilityElement(children: .combine)
     }
@@ -88,32 +228,32 @@ private struct NewMatchCard: View {
     let onView: () -> Void
 
     var body: some View {
-        StackCard(tone: .cream, height: 292, bandTop: 204.4) {
+        StackCard(tone: .cream, height: 244, bandTop: 174) {
             VStack(alignment: .leading, spacing: 6) {
                 OfferCountdown(expiry: expiry) { remaining in
                     Chip(label: "New match · \(remaining) left", tone: .coral)
                 }
-                Text("$15")
-                    .bountyType(.moneyXL)
+                HStack {
+                    Text("$15")
+                        .bountyType(.moneyL)
+                    Spacer()
+                    StickerView(sticker: .coffee, size: 52)
+                }
                 Text("Sketch a coffee shop logo")
-                    .bountyType(.headline)
+                    .bountyType(.bodyStrong)
                 Text("0.4 mi · about 10 min · Due 6:00 PM")
-                    .bountyType(.subhead)
+                    .bountyType(.footnote)
                 HStack(spacing: 10) {
                     PillButton(title: "Decline", style: .outline, action: onDecline)
                     PillButton(title: "View offer", action: onView)
                 }
-                .padding(.top, 8)
+                .padding(.top, 4)
             }
             .foregroundStyle(BountyColor.creamInk)
             .padding(.horizontal, 20)
-            .padding(.top, 20)
+            .padding(.top, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(alignment: .topTrailing) {
-                StickerView(sticker: .coffee, size: 100)
-                    .padding(.top, 14)
-                    .padding(.trailing, 17)
-            }
+
         }
     }
 }
@@ -124,15 +264,15 @@ struct HomeJobRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            StickerTile(sticker: job.sticker, background: job.tileColor)
-            TitleSubtitle(title: job.title, subtitle: detail)
+            StickerTile(sticker: job.sticker, background: job.tileColor, size: 44, stickerSize: 34, radius: 14)
+            TitleSubtitle(title: job.title, subtitle: detail, titleType: .subheadStrong, subtitleType: .footnote)
                 .multilineTextAlignment(.leading)
             Text("$\(job.pay)")
                 .bountyType(.moneyM)
                 .foregroundStyle(BountyColor.inkPrimary)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 8)
         .borderedCard(radius: BountyRadius.row)
     }
 }

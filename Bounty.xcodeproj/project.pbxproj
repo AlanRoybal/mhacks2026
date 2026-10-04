@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        C0DE01000000000000000001 /* ProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE01000000000000000002 /* ProfileStore.swift */; };
+        C0DE02000000000000000001 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE02000000000000000002 /* ProfileView.swift */; };
 		C0FABD7DF1D1B04C24B6E898 /* PosterPush.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0765A919486404C75CE5767 /* PosterPush.swift */; };
 		C0A08B1ECFB9BD4E15784AE8 /* MockJobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = C005463F342E009FCA8AF367 /* MockJobsAPI.swift */; };
 		C077C166F58068323FBB0EB3 /* JobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0B58AD39BE0102A02761320 /* JobsAPI.swift */; };
@@ -46,6 +48,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        C0DE01000000000000000002 /* ProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStore.swift; sourceTree = "<group>"; };
+        C0DE02000000000000000002 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		C0765A919486404C75CE5767 /* PosterPush.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterPush.swift; sourceTree = "<group>"; };
 		C005463F342E009FCA8AF367 /* MockJobsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockJobsAPI.swift; sourceTree = "<group>"; };
 		C0B58AD39BE0102A02761320 /* JobsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsAPI.swift; sourceTree = "<group>"; };
@@ -102,6 +106,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+        C0DE03000000000000000001 /* Profile */ = {
+            isa = PBXGroup;
+            children = (
+                C0DE01000000000000000002 /* ProfileStore.swift */,
+                C0DE02000000000000000002 /* ProfileView.swift */,
+            );
+            path = Profile;
+            sourceTree = "<group>";
+        };
 		C0DC0035A4737DB72003AC3C /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -167,6 +180,7 @@
 		4FB8CB37CE0CB59DA1DD6786 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+                C0DE03000000000000000001 /* Profile */,
 				87353BBFCE883984368AAEF3 /* Earnings */,
 				8DCB9BF0F2F5DC47728B63E3 /* Home */,
 				6A1FEA9FB35AF085D854E2F8 /* Jobs */,
@@ -371,6 +385,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+                C0DE01000000000000000001 /* ProfileStore.swift in Sources */,
+                C0DE02000000000000000001 /* ProfileView.swift in Sources */,
 				85B63159010D69B7AE220FF5 /* AppRouter.swift in Sources */,
 				A10000000000000000000001 /* PaymentCheckoutView.swift in Sources */,
 				BD0000000000000000000001 /* PostDraft.swift in Sources */,

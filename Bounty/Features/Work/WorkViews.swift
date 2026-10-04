@@ -133,7 +133,7 @@ struct ProofCaptureView: View {
     @State private var codeFound = false
 
     var body: some View {
-        BountyScreen(background: BountyColor.night, spacing: 14, scrolls: false) {
+        BountyScreen(background: BountyColor.night, spacing: 10, scrolls: false) {
             NavRow(
                 leadingIcon: .x,
                 leadingLabel: "Close",
@@ -190,7 +190,7 @@ struct ProofCaptureView: View {
                 ) {}
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 24)
+            .padding(.bottom, 8)
         }
         .task {
             try? await Task.sleep(for: .milliseconds(900))
@@ -243,7 +243,7 @@ private struct Viewfinder: View {
                 .resizable()
                 .frame(width: 301, height: 390)
         }
-        .frame(height: 470)
+        .frame(height: 390)
         .overlay(alignment: .top) {
             HStack {
                 ViewfinderPill(icon: .locate, iconColor: BountyColor.green, text: "Blue Fern Coffee · ±5 m")

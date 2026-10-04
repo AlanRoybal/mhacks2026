@@ -55,7 +55,7 @@ private struct WelcomeView: View {
     @State private var signInError: String?
 
     var body: some View {
-        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 460), spacing: 20) {
+        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 460), spacing: 10) {
             HStack(spacing: 6) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 18, weight: .semibold))
@@ -69,9 +69,9 @@ private struct WelcomeView: View {
             .accessibilityElement(children: .combine)
             .entrance(.top)
 
-            StackCard(tone: .lavender, height: 300, bandTop: 186) {
+            StackCard(tone: .lavender, height: 260, bandTop: 162) {
                 ZStack(alignment: .topLeading) {
-                    StickerView(sticker: .twin, size: 170)
+                    StickerView(sticker: .twin, size: 140)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 26)
                     VStack(alignment: .leading, spacing: 10) {
@@ -81,12 +81,12 @@ private struct WelcomeView: View {
                             .foregroundStyle(BountyColor.inkPrimary)
                     }
                     .padding(.leading, 20)
-                    .padding(.top, 212)
+                    .padding(.top, 174)
                 }
             }
             .entrance(.top)
 
-            VStack(spacing: 20) {
+            VStack(spacing: 12) {
                 Text("Meet your work twin")
                     .bountyType(.display)
                     .foregroundStyle(BountyColor.inkPrimary)
@@ -253,7 +253,7 @@ private struct BuildingTwinView: View {
     let onContinue: () -> Void
 
     var body: some View {
-        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 460), spacing: 14) {
+        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 460), spacing: 10) {
             NavRow(leadingIcon: .x, leadingLabel: "Cancel", leadingAction: onCancel) {
                 ProgressDots(total: 4, current: 2)
             } trailing: {

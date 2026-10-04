@@ -11,6 +11,8 @@ enum AppTab: Hashable, CaseIterable {
 
 /// Full-screen destinations that sit above the tab bar.
 enum AppRoute: Hashable {
+    case notifications
+    case profile
     case lockScreenOffer
     case offer
     case jobDetail
@@ -45,6 +47,7 @@ final class AppRouter {
     /// When the current offer stops being available.
     let offerExpiry = Date.now.addingTimeInterval(42)
     var offerDeclined = false
+    var readNotificationIDs: Set<String> = []
     var jobsSegment = JobsSegment.working
     /// The posted job the poster screens (checklist, fund, posted job, review) are showing.
     var posterJobId: String?

@@ -6,18 +6,19 @@ struct CreateJobView: View {
     @Environment(AppRouter.self) private var router
     @Environment(PostDraft.self) private var draft
     @State private var pickingDeadline = false
+    @State private var selectedDeadline = Date().addingTimeInterval(86_400)
     @State private var pickingLocation = false
 
     var body: some View {
         @Bindable var draft = draft
-        BountyScreen(spacing: 14) {
-            ScreenTitle(title: "Post a job") {
+        BountyScreen(spacing: 8) {
+            ScreenTitle(title: "Post a job", type: .title) {
                 Chip(label: "Draft", tone: .grey)
             }
             .entrance(.top)
 
             HStack(spacing: 10) {
-                StickerTile(sticker: draft.sticker, background: draft.tileColor, size: 84, stickerSize: 66, radius: 18)
+                StickerTile(sticker: draft.sticker, background: draft.tileColor, size: 56, stickerSize: 42, radius: 18)
                 Button {} label: {
                     VStack(spacing: 4) {
                         IconGlyph(icon: .images, size: 22)
@@ -25,7 +26,7 @@ struct CreateJobView: View {
                             .bountyType(.caption)
                     }
                     .foregroundStyle(BountyColor.inkSecondary)
-                    .frame(width: 84, height: 84)
+                    .frame(width: 56, height: 56)
                     .background(BountyColor.field, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -36,29 +37,39 @@ struct CreateJobView: View {
             }
             .entrance(.top)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 FieldLabel(text: "Title")
-                TextField("What do you need done?", text: $draft.title)
+                TextField(
+                    "Title",
+                    text: $draft.title,
+                    prompt: Text("e.g. Mow my front lawn").foregroundStyle(BountyColor.inkTertiary)
+                )
                     .bountyType(.body)
                     .foregroundStyle(BountyColor.inkPrimary)
                     .fieldBackground()
             }
             .entrance(.top)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 FieldLabel(text: "Description")
-                TextField("Add details", text: $draft.details, axis: .vertical)
+                TextField(
+                    "Description",
+                    text: $draft.details,
+                    prompt: Text("e.g. Front yard only. Bag the clippings. The mower is in the open garage.")
+                        .foregroundStyle(BountyColor.inkTertiary),
+                    axis: .vertical
+                )
                     .bountyType(.body)
                     .foregroundStyle(BountyColor.inkPrimary)
-                    .lineLimit(2...4)
-                    .padding(.vertical, 14)
-                    .fieldBackground(height: 68)
+                    .lineLimit(2...3)
+                    .padding(.vertical, 8)
+                    .fieldBackground(height: 56)
             }
             .entrance(.rest(0))
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 FieldLabel(text: "Category")
-                FlowLayout(spacing: 8) {
+                FlowLayout(spacing: 6) {
                     ForEach(PostDraft.categories, id: \.self) { option in
                         ChoiceChip(label: option, isSelected: option == draft.category) { draft.category = option }
                     }
@@ -66,7 +77,7 @@ struct CreateJobView: View {
             }
             .entrance(.rest(1))
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     FieldLabel(text: "Where")
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -76,7 +87,11 @@ struct CreateJobView: View {
                 HStack(spacing: 10) {
                     IconGlyph(icon: .mapPin, size: 20)
                         .foregroundStyle(BountyColor.inkSecondary)
-                    TextField("Address", text: $draft.address)
+                    TextField(
+                        "Address",
+                        text: $draft.address,
+                        prompt: Text("e.g. 1200 S University Ave").foregroundStyle(BountyColor.inkTertiary)
+                    )
                         .bountyType(.body)
                         .foregroundStyle(BountyColor.inkPrimary)
                     // Search or use the current location, so the job gets real coordinates.
@@ -102,15 +117,18 @@ struct CreateJobView: View {
             .entrance(.rest(2))
 
             HStack(spacing: 11) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     FieldLabel(text: "Deadline")
-                    Button { pickingDeadline = true } label: {
+                    Button {
+                        selectedDeadline = draft.deadline ?? .now.addingTimeInterval(86_400)
+                        pickingDeadline = true
+                    } label: {
                         HStack(spacing: 10) {
                             IconGlyph(icon: .clock, size: 20)
                                 .foregroundStyle(BountyColor.inkSecondary)
                             Text(draft.deadlineText)
                                 .bountyType(.body)
-                                .foregroundStyle(BountyColor.inkPrimary)
+                                .foregroundStyle(draft.deadline == nil ? BountyColor.inkTertiary : BountyColor.inkPrimary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                         }
@@ -119,12 +137,17 @@ struct CreateJobView: View {
                     .buttonStyle(PressableStyle())
                     .accessibilityLabel("Deadline, \(draft.deadlineText)")
                 }
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     FieldLabel(text: "Pay")
                     HStack(spacing: 10) {
                         HStack(spacing: 0) {
                             Text("$")
-                            TextField("40", value: $draft.pay, format: .number)
+                            TextField(
+                                "Pay",
+                                value: $draft.pay,
+                                format: .number,
+                                prompt: Text("40").foregroundStyle(BountyColor.inkTertiary)
+                            )
                                 .keyboardType(.numberPad)
                         }
                         .bountyType(.moneyM)
@@ -149,10 +172,22 @@ struct CreateJobView: View {
             ))
         }
         .sheet(isPresented: $pickingDeadline) {
-            DatePicker("Deadline", selection: $draft.deadline, in: Date()..., displayedComponents: [.date, .hourAndMinute])
-                .datePickerStyle(.graphical)
-                .padding()
-                .presentationDetents([.medium, .large])
+            NavigationStack {
+                DatePicker("Deadline", selection: $selectedDeadline, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                    .datePickerStyle(.graphical)
+                    .padding()
+                    .navigationTitle("Deadline")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") {
+                                draft.deadline = selectedDeadline
+                                pickingDeadline = false
+                            }
+                        }
+                    }
+            }
+            .presentationDetents([.medium, .large])
         }
     }
 }
@@ -170,7 +205,7 @@ struct ProofChecklistView: View {
     ]
 
     var body: some View {
-        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 300), spacing: 14) {
+        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 300), spacing: 10) {
             NavRow(leadingAction: router.back) {
                 ProgressDots(total: 3, current: 1)
             } trailing: {

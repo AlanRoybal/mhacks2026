@@ -24,8 +24,8 @@ struct JobsView: View {
 
     var body: some View {
         @Bindable var router = router
-        BountyScreen {
-            ScreenTitle(title: "Jobs") {
+        BountyScreen(spacing: 8) {
+            ScreenTitle(title: "Jobs", type: .title) {
                 IconButton(icon: .sliders, label: "Filters") {}
             }
             .entrance(.top)
@@ -36,7 +36,7 @@ struct JobsView: View {
             )
             .entrance(.top)
 
-            VStack(spacing: 16) {
+            VStack(spacing: 8) {
                 if router.jobsSegment == .posted {
                     ForEach(Array(posterStore.sortedJobs.enumerated()), id: \.element.id) { index, job in
                         PostedJobCard(job: job) {
@@ -100,10 +100,10 @@ private struct JobCard: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                StickerTile(sticker: job.sticker, background: job.tileColor, size: 56, stickerSize: 46, radius: 17)
+                StickerTile(sticker: job.sticker, background: job.tileColor, size: 44, stickerSize: 34, radius: 14)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(job.title)
-                        .bountyType(.bodyStrong)
+                        .bountyType(.subheadStrong)
                         .foregroundStyle(BountyColor.inkPrimary)
                     Text(detail)
                         .bountyType(.footnote)
@@ -116,7 +116,8 @@ private struct JobCard: View {
                     .bountyType(.moneyM)
                     .foregroundStyle(BountyColor.inkPrimary)
             }
-            .padding(14)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .borderedCard(radius: 22)
         }
         .buttonStyle(PressableStyle())
@@ -151,7 +152,7 @@ private struct SampleReviewProofView: View {
     ]
 
     var body: some View {
-        BountyScreen(spacing: 14) {
+        BountyScreen(spacing: 10) {
             NavRow(leadingAction: router.back) {
                 Chip(label: "Needs your review", tone: .yellow)
             } trailing: {

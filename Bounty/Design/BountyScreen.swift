@@ -16,13 +16,12 @@ struct ScreenGlow {
     }
 }
 
-/// Lays out a screen the way every Figma frame does (20 pt gutters, content under the
-/// status bar, bottom actions 12 pt above the home indicator) and plays the page
-/// enter and exit choreography.
+/// Keeps screen content inside the safe viewport with compact section spacing,
+/// scroll bounce, and pinned bottom actions. Plays the page entrance choreography.
 struct BountyScreen<Content: View, Bottom: View>: View {
     var background: Color = BountyColor.canvas
     var glow: ScreenGlow?
-    var spacing: CGFloat = 16
+    var spacing: CGFloat = 10
     var scrolls = true
     @ViewBuilder let content: Content
     @ViewBuilder let bottom: Bottom
@@ -35,7 +34,7 @@ struct BountyScreen<Content: View, Bottom: View>: View {
                 ScrollView {
                     stack
                 }
-                .scrollBounceBehavior(.basedOnSize)
+                .scrollBounceBehavior(.always, axes: .vertical)
                 .scrollIndicators(.hidden)
             } else {
                 stack
@@ -43,13 +42,15 @@ struct BountyScreen<Content: View, Bottom: View>: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            bottom
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 12)
-                .offset(y: phase.bottomOffset)
-                .opacity(phase == .settled ? 1 : 0)
-                .animation(bottomAnimation, value: phase)
+            // Empty bottom slots must not reserve space above the tab bar.
+            if Bottom.self != EmptyView.self {
+                bottom
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .offset(y: phase.bottomOffset)
+                    .opacity(phase == .settled ? 1 : 0)
+                    .animation(bottomAnimation, value: phase)
+            }
         }
         // The glow sits behind the content so a tall glow never changes the layout.
         .background(alignment: .top) {
@@ -72,7 +73,7 @@ struct BountyScreen<Content: View, Bottom: View>: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 4)
-        .padding(.bottom, 16)
+        .padding(.bottom, 8)
         .offset(y: phase.contentOffset)
     }
 
@@ -89,7 +90,7 @@ extension BountyScreen where Bottom == EmptyView {
     init(
         background: Color = BountyColor.canvas,
         glow: ScreenGlow? = nil,
-        spacing: CGFloat = 16,
+        spacing: CGFloat = 10,
         scrolls: Bool = true,
         @ViewBuilder content: () -> Content
     ) {

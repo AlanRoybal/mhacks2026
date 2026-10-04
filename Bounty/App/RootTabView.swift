@@ -8,6 +8,7 @@ struct RootTabView: View {
     @StateObject private var postedJobs = PostedJobsStore()
     // The job being posted, shared by Post a job → Proof checklist → Fund.
     @State private var postDraft = PostDraft()
+    @State private var profileStore = ProfileStore()
     /// The tab bar steps aside while typing, instead of riding up on the keyboard.
     @State private var isKeyboardShown = false
 
@@ -17,24 +18,22 @@ struct RootTabView: View {
                 routeView(route)
                     .id(route)
             } else {
-                VStack(spacing: 0) {
-                    ZStack {
-                        tabView(router.tab)
-                            .id(router.tab)
-                            .transition(.opacity)
+                tabView(router.tab)
+                    .id(router.tab)
+                    .transition(.opacity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if !isKeyboardShown {
+                            BountyTabBar(selection: router.tab) { router.select($0) }
+                        }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    if !isKeyboardShown {
-                        BountyTabBar(selection: router.tab) { router.select($0) }
-                    }
-                }
             }
         }
         .environment(\.screenExiting, router.transition.isExiting)
         .preferredColorScheme(router.route?.usesDarkStatusBar == true ? .dark : .light)
         .environmentObject(postedJobs)
         .environment(postDraft)
+        .environment(profileStore)
         // Re-check pending checkouts whenever the app comes back to the foreground.
         .task(id: scenePhase) {
             if scenePhase == .active { await postedJobs.refresh() }
@@ -76,6 +75,8 @@ struct RootTabView: View {
     @ViewBuilder
     private func routeView(_ route: AppRoute) -> some View {
         switch route {
+        case .notifications: NotificationsView()
+        case .profile: ProfileView()
         case .lockScreenOffer: LockScreenOfferView()
         case .offer: OfferView()
         case .jobDetail: JobDetailView()
@@ -130,7 +131,7 @@ struct BountyTabBar: View {
             item(.earnings, title: "Earnings", icon: .wallet)
         }
         .padding(.top, 5)
-        .frame(height: 49, alignment: .top)
+        .frame(height: 58, alignment: .top)
         .background {
             BountyColor.canvas
                 .overlay(alignment: .top) {

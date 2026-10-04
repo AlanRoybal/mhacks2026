@@ -44,7 +44,7 @@ struct LockScreenOfferView: View {
             .entrance(.top)
 
             Color.clear
-                .frame(height: 150)
+                .frame(height: 64)
 
             VStack(spacing: 6) {
                 OfferNotification()
@@ -76,7 +76,7 @@ struct LockScreenOfferView: View {
                 lockButton(.camera, label: "Camera")
             }
             .padding(.horizontal, 26)
-            .padding(.bottom, 26)
+            .padding(.bottom, 8)
         }
     }
 

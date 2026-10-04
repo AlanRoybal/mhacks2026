@@ -41,7 +41,7 @@ struct PillButtonStyle: ButtonStyle {
             .foregroundStyle(style.foreground)
             .lineLimit(1)
             .padding(.horizontal, 24)
-            .frame(maxWidth: .infinity, minHeight: 56, maxHeight: 56)
+            .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 48)
             .background(style.background(pressed: pressed), in: Capsule())
             .overlay {
                 if style == .outline {
@@ -646,7 +646,7 @@ struct FieldLabel: View {
 }
 
 extension View {
-    func fieldBackground(height: CGFloat? = 52) -> some View {
+    func fieldBackground(height: CGFloat? = 48) -> some View {
         padding(.horizontal, 16)
             .frame(maxWidth: .infinity, minHeight: height, alignment: .leading)
             .background(BountyColor.field, in: RoundedRectangle(cornerRadius: BountyRadius.field, style: .continuous))

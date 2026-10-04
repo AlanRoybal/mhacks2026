@@ -9,24 +9,25 @@ import SwiftUI
 final class PostDraft {
     nonisolated static let categories = ["Yard work", "Design", "Photos", "Tutoring", "Errands"]
 
-    var title = "Mow my front lawn"
-    var details = "Front yard only. Bag the clippings. The mower is in the open garage."
+    var title = ""
+    var details = ""
     var category = "Yard work"
     var inPerson = true
-    var address = "1200 S University Ave"
+    var address = ""
     /// Coordinates for `address`, set when the poster picks it from search or their location.
     /// Without them the backend places in-person jobs at a campus default.
     var location: JobLocation?
-    var deadline = PostDraft.nextSundayNoon()
+    var deadline: Date?
     /// Whole dollars, as shown on the Post screen.
-    var pay = 40
+    var pay: Int?
 
-    var payCents: Int { pay * 100 }
+    var payCents: Int { (pay ?? 0) * 100 }
     var feeCents: Int { Int((Double(payCents) * 0.10).rounded()) }
     var totalCents: Int { payCents + feeCents }
 
     /// Same limits the payments server enforces, so checkout never fails on validation.
     var canFund: Bool {
+        guard let pay, let deadline else { return false }
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let details = details.trimmingCharacters(in: .whitespacesAndNewlines)
         return !title.isEmpty && title.count <= 120
@@ -36,14 +37,15 @@ final class PostDraft {
     }
 
     var deadlineText: String {
-        deadline.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+        deadline?.formatted(.dateTime.weekday(.abbreviated).hour().minute()) ?? "Choose deadline"
     }
 
     var sticker: Sticker { Self.sticker(for: category) }
     var tileColor: Color { Self.tileColor(for: category) }
 
-    func fundingDraft() -> FundingDraft {
-        FundingDraft(
+    func fundingDraft() -> FundingDraft? {
+        guard canFund, let deadline else { return nil }
+        return FundingDraft(
             id: UUID(),
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             details: details.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -96,11 +98,5 @@ final class PostDraft {
         case "Technology": BountyColor.cream
         default: BountyColor.mint
         }
-    }
-
-    private static func nextSundayNoon() -> Date {
-        let calendar = Calendar.current
-        let sunday = calendar.nextDate(after: .now, matching: DateComponents(hour: 12, minute: 0, weekday: 1), matchingPolicy: .nextTime)
-        return sunday ?? .now.addingTimeInterval(2 * 86_400)
     }
 }

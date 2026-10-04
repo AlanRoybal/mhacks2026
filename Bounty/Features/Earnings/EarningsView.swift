@@ -3,13 +3,13 @@ import SwiftUI
 /// 17 Earnings.
 struct EarningsView: View {
     var body: some View {
-        BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 360)) {
-            ScreenTitle(title: "Earnings") {
+        BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 360), spacing: 8) {
+            ScreenTitle(title: "Earnings", type: .title) {
                 IconButton(icon: .userRound, label: "Account") {}
             }
             .entrance(.top)
 
-            StackCard(tone: .yellow, height: 180, bandTop: 135) {
+            StackCard(tone: .yellow, height: 156, bandTop: 116) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("This week")
                         .bountyType(.subheadStrong)
@@ -23,11 +23,11 @@ struct EarningsView: View {
                 }
                 .foregroundStyle(BountyColor.inkPrimary)
                 .padding(.leading, 20)
-                .padding(.top, 22)
+                .padding(.top, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .overlay(alignment: .topTrailing) {
-                    StickerView(sticker: .coins, size: 120)
-                        .padding(.top, 18)
+                    StickerView(sticker: .coins, size: 96)
+                        .padding(.top, 12)
                         .padding(.trailing, 15)
                 }
             }
@@ -68,7 +68,7 @@ private struct BalanceTile: View {
             Text(amount).bountyType(.moneyM)
         }
         .foregroundStyle(foreground)
-        .padding(14)
+        .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .tintedPanel(background, radius: BountyRadius.row)
         .accessibilityElement(children: .combine)
@@ -86,12 +86,12 @@ private struct ActivityRow: View {
     var body: some View {
         HStack(spacing: 12) {
             StickerTile(sticker: sticker, background: tile, size: 44, stickerSize: 34, radius: 13)
-            TitleSubtitle(title: title, subtitle: detail)
+            TitleSubtitle(title: title, subtitle: detail, titleType: .subheadStrong, subtitleType: .footnote)
             Text(amount)
                 .bountyType(.subheadStrong)
                 .foregroundStyle(settled ? BountyColor.greenInk : BountyColor.inkSecondary)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
     }
 }
