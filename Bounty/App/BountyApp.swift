@@ -49,12 +49,13 @@ struct BountyApp: App {
             .environment(posterStore)
             // At the root, so a link that cold-launches the app isn't lost during the launch animation.
             .onOpenURL { url in
+                // Coinbase Wallet replies first: it only claims its own messages (bounty://cbwallet…).
+                if (try? CoinbaseWalletSDK.shared.handleResponse(url)) == true { return }
                 if url.scheme == "bounty", url.host() == "wallet" {
                     NotificationCenter.default.post(name: .payoutSetupReturned, object: nil)
                     return
                 }
-                if StripeAPI.handleURLCallback(with: url) { return }
-                _ = try? CoinbaseWalletSDK.shared.handleResponse(url)
+                _ = StripeAPI.handleURLCallback(with: url)
             }
         }
     }

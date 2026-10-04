@@ -8,7 +8,8 @@ final class BountyWallet: ObservableObject {
 
     static func configure() {
         if !CoinbaseWalletSDK.isConfigured {
-            CoinbaseWalletSDK.configure(callback: URL(string: "bounty://wallet/callback")!)
+            // Not bounty://wallet: that's Stripe Connect's return link (EarningsView).
+            CoinbaseWalletSDK.configure(callback: URL(string: "bounty://cbwallet")!)
         }
     }
     func connect() async throws {
