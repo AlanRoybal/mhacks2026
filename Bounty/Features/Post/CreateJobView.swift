@@ -14,7 +14,7 @@ struct CreateJobView: View {
 
     var body: some View {
         @Bindable var draft = draft
-        BountyScreen(spacing: 14) {
+        BountyScreen(spacing: 14, alwaysBounces: true) {
             ScreenTitle(title: "Post a job") {
                 HStack(spacing: 8) {
                     // Plan step 10: fills in the demo's coffee shop logo job.

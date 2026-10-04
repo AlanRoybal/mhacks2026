@@ -29,7 +29,7 @@ struct JobsView: View {
 
     var body: some View {
         @Bindable var router = router
-        BountyScreen {
+        BountyScreen(alwaysBounces: true) {
             ScreenTitle(title: "Jobs") {
                 IconButton(icon: .sliders, label: "Filters") {}
             }
@@ -70,11 +70,8 @@ struct JobsView: View {
             }
         }
         .sheet(item: $selectedJob) { job in NavigationStack { FundedJobDetailView(job: job) } }
-        .task {
-            await postedJobs.refresh()
-            await workerPayments.refresh()
-            await marketplace.refresh(api: services.api)
-        }
+        .task { await reload() }
+        .refreshable { await reload() }
         .task(id: router.jobsSegment) {
             // Keep the Posted list live while it's on screen; push alerts take over once wired up.
             guard router.jobsSegment == .posted else { return }
@@ -83,6 +80,13 @@ struct JobsView: View {
                 try? await Task.sleep(for: .seconds(3))
             }
         }
+    }
+
+    private func reload() async {
+        await postedJobs.refresh()
+        await workerPayments.refresh()
+        await marketplace.refresh(api: services.api)
+        if router.jobsSegment == .posted { await posterStore.loadJobs() }
     }
 
     private func open(_ job: Job) {

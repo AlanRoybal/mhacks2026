@@ -18,7 +18,7 @@ struct EarningsView: View {
     private var usdcPendingCents: Int { payments.earnings?.totals.usdc.pendingCents ?? 0 }
 
     var body: some View {
-        BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 360)) {
+        BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 360), alwaysBounces: true) {
             ScreenTitle(title: "Earnings") {
                 IconButton(icon: .userRound, label: "Account") { showsSettings = true }
             }

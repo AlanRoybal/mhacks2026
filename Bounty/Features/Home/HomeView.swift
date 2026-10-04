@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var name: String?
     @State private var showsSettings = false
     @State private var unreadCount = 0
+    @State private var readiness: TwinSettings.Readiness?
 
     private var greeting: String {
         switch Calendar.current.component(.hour, from: .now) {
@@ -19,7 +20,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 380), spacing: 18) {
+        BountyScreen(glow: ScreenGlow(BountyColor.glowYellow, height: 380), spacing: 18, alwaysBounces: true) {
             HStack {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(greeting)
@@ -53,7 +54,7 @@ struct HomeView: View {
             }
             .entrance(.top)
 
-            TwinStatusPill()
+            TwinStatusPill(readiness: readiness)
                 .entrance(.top)
 
             if let offer = marketplace.currentOffer, let job = marketplace.offeredJob {
@@ -90,24 +91,36 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $showsSettings) { SettingsView() }
-        .task {
-            guard let api = services.api, let me: MeProfile = try? await api.request(.get, "me") else { return }
-            name = me.displayName
-        }
-        // Refreshes the bell's dot on launch and whenever a screen above Home (e.g. Notifications) closes.
+        // Loads on launch and whenever a screen above Home (e.g. Notifications) closes; pulling down reloads.
         .task(id: router.route == nil) {
-            guard router.route == nil, let api = services.api,
-                  let page: InboxPage = try? await api.request(.get, "me/notifications") else { return }
-            withAnimation(Motion.press) { unreadCount = page.unreadCount }
+            guard router.route == nil else { return }
+            await reload(includingJobs: false)
         }
+        .refreshable { await reload(includingJobs: true) }
+    }
+
+    /// Name, twin status and the bell's dot. The offer and job stores also refresh when the app becomes
+    /// active (RootTabView), so only a pull reloads them here.
+    private func reload(includingJobs: Bool) async {
+        guard let api = services.api else { return }
+        async let me: MeProfile? = try? api.request(.get, "me")
+        async let twin: TwinSettings? = try? api.request(.get, "twin")
+        async let inbox: InboxPage? = try? api.request(.get, "me/notifications")
+        if includingJobs {
+            await marketplace.refresh(api: api)
+            await workerPayments.refresh()
+        }
+        let (profile, settings, page) = await (me, twin, inbox)
+        if let profile { name = profile.displayName }
+        if let settings { readiness = settings.readiness }
+        if let page { withAnimation(Motion.press) { unreadCount = page.unreadCount } }
     }
 }
 
 private struct TwinStatusPill: View {
-    @Environment(AppServices.self) private var services
     @Environment(AppRouter.self) private var router
+    let readiness: TwinSettings.Readiness?
     @State private var pulsing = false
-    @State private var readiness: TwinSettings.Readiness?
 
     private var isReady: Bool { readiness?.ready ?? true }
 
@@ -138,10 +151,6 @@ private struct TwinStatusPill: View {
         .padding(.vertical, 10)
         .tintedPanel(BountyColor.lavenderSoft, radius: 22)
         .accessibilityElement(children: .combine)
-        .task {
-            guard let api = services.api, let twin: TwinSettings = try? await api.request(.get, "twin") else { return }
-            readiness = twin.readiness
-        }
     }
 }
 

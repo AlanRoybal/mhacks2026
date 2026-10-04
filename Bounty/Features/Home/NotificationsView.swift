@@ -11,7 +11,7 @@ struct NotificationsView: View {
     @State private var loadError: String?
 
     var body: some View {
-        BountyScreen(spacing: 16) {
+        BountyScreen(spacing: 16, alwaysBounces: true) {
             NavRow(leadingAction: router.back) {
                 Text("Notifications").bountyType(.bodyStrong)
             } trailing: {

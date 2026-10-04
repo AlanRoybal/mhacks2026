@@ -26,7 +26,7 @@ struct TwinView: View {
     private var skills: [TwinKit.TwinSkill] { services.profile == nil ? sampleSkills : profile?.skills ?? [] }
 
     var body: some View {
-        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 320)) {
+        BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 320), alwaysBounces: true) {
             ScreenTitle(title: "Your twin") {
                 HStack(spacing: 8) {
                     if let readiness = settings?.readiness {

@@ -24,6 +24,8 @@ struct BountyScreen<Content: View, Bottom: View>: View {
     var glow: ScreenGlow?
     var spacing: CGFloat = 16
     var scrolls = true
+    /// Rubber-band even when the content fits. On for the main pages (tabs, Notifications); flows and forms only scroll when they overflow.
+    var alwaysBounces = false
     @ViewBuilder let content: Content
     @ViewBuilder let bottom: Bottom
 
@@ -35,7 +37,7 @@ struct BountyScreen<Content: View, Bottom: View>: View {
                 ScrollView {
                     stack
                 }
-                .scrollBounceBehavior(.basedOnSize)
+                .scrollBounceBehavior(alwaysBounces ? .always : .basedOnSize)
                 .scrollIndicators(.hidden)
             } else {
                 stack
@@ -94,12 +96,14 @@ extension BountyScreen where Bottom == EmptyView {
         glow: ScreenGlow? = nil,
         spacing: CGFloat = 16,
         scrolls: Bool = true,
+        alwaysBounces: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
         self.background = background
         self.glow = glow
         self.spacing = spacing
         self.scrolls = scrolls
+        self.alwaysBounces = alwaysBounces
         self.content = content()
         self.bottom = EmptyView()
     }
