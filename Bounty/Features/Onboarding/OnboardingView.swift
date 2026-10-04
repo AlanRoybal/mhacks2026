@@ -57,18 +57,10 @@ private struct WelcomeView: View {
 
     var body: some View {
         BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 460), spacing: 20) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(BountyColor.yellow)
-                    .frame(width: 22, height: 22)
-                Text("bounty")
-                    .bountyType(.headline)
-                    .foregroundStyle(BountyColor.inkPrimary)
-            }
-            .padding(.top, 8)
-            .accessibilityElement(children: .combine)
-            .entrance(.top)
+            // Logo/Lockup at 30 pt (Figma 01 Welcome).
+            BountyLockup(height: 30)
+                .padding(.top, 8)
+                .entrance(.top)
 
             StackCard(tone: .lavender, height: 300, bandTop: 186) {
                 ZStack(alignment: .topLeading) {

@@ -43,13 +43,16 @@ struct BountyScreen<Content: View, Bottom: View>: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            bottom
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 12)
-                .offset(y: phase.bottomOffset)
-                .opacity(phase == .settled ? 1 : 0)
-                .animation(bottomAnimation, value: phase)
+            // Screens without a bottom button (most tabs) shouldn't reserve its padding under the content.
+            if Bottom.self != EmptyView.self {
+                bottom
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 12)
+                    .offset(y: phase.bottomOffset)
+                    .opacity(phase == .settled ? 1 : 0)
+                    .animation(bottomAnimation, value: phase)
+            }
         }
         // The glow sits behind the content so a tall glow never changes the layout.
         .background(alignment: .top) {

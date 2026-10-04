@@ -64,7 +64,9 @@ targets:
         LSRequiresIPhoneOS: true
         ITSAppUsesNonExemptEncryption: false
         UIApplicationSupportsIndirectInputEvents: true
-        UILaunchScreen: {}
+        # Static launch screen: surface/canvas white, no image. The launch animation starts on the same white.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         CFBundleURLTypes:
           - CFBundleURLName: com.alanroybal.BountyTwin.oauth

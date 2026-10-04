@@ -8,6 +8,10 @@
 	<string>$(BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER)</string>
 	<key>BountyLinkedInClientID</key>
 	<string>86rcq1bjy06k5g</string>
+	<key>BountyPaymentsBaseURL</key>
+	<string>$(BOUNTY_PAYMENTS_BASE_URL)</string>
+	<key>BountySettlementsBaseURL</key>
+	<string>$(BOUNTY_SETTLEMENTS_BASE_URL)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -41,8 +45,11 @@
 	<false/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.business</string>
-	<key>BountyPaymentsBaseURL</key>
-	<string>$(BOUNTY_PAYMENTS_BASE_URL)</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>cbwallet</string>
+		<string>mwp+1.1</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
@@ -63,17 +70,13 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>cbwallet</string>
-		<string>mwp+1.1</string>
-	</array>
-	<key>BountySettlementsBaseURL</key>
-	<string>$(BOUNTY_SETTLEMENTS_BASE_URL)</string>
 </dict>
 </plist>
