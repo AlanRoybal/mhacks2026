@@ -44,6 +44,8 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
     var estMinutes: Int?
     /// What Bounty checks before paying, and what it records about the worker (`docs/API.md`, "Verification plan").
     var verification: VerificationPlan?
+    /// In-person jobs: how far from the address the worker was when they started.
+    var startCheck: StartCheck?
     var feeAmount: Decimal?
     var totalAmount: Decimal?
     var attempts: ProofAttempts?
@@ -290,6 +292,19 @@ enum PayCurrency: String, Codable, CaseIterable, Identifiable, Sendable {
     case usdc = "USDC"
 
     var id: String { rawValue }
+}
+
+/// The location check when the worker tapped Start (`POST /jobs/{id}/start`).
+struct StartCheck: Codable, Hashable, Sendable {
+    let distanceM: Int
+    let accuracyM: Int?
+    let at: Date
+
+    /// "Started 35 m from the address (±8 m) at 3:02 PM"
+    var summary: String {
+        let accuracy = accuracyM.map { " (\u{00B1}\($0) m)" } ?? ""
+        return "Started \(distanceM) m from the address\(accuracy) at \(at.formatted(date: .omitted, time: .shortened))"
+    }
 }
 
 struct JobLocation: Codable, Hashable, Sendable {

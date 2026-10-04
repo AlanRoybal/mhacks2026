@@ -255,7 +255,7 @@ final class MarketplaceStore {
         }
     }
 
-    func start(api: APIClient?, jobId: String, latitude: Double? = nil, longitude: Double? = nil) async -> PostedJob? {
+    func start(api: APIClient?, jobId: String, latitude: Double? = nil, longitude: Double? = nil, accuracyM: Double? = nil) async -> PostedJob? {
         guard let api else { return nil }
         isLoading = true
         defer { isLoading = false }
@@ -263,7 +263,7 @@ final class MarketplaceStore {
             let job: PostedJob = try await api.request(
                 .post,
                 "jobs/\(jobId)/start",
-                body: StartJobRequest(latitude: latitude, longitude: longitude)
+                body: StartJobRequest(latitude: latitude, longitude: longitude, accuracyM: accuracyM)
             )
             upsert(job)
             errorMessage = nil
@@ -292,4 +292,6 @@ final class MarketplaceStore {
 private struct StartJobRequest: Encodable, Sendable {
     let latitude: Double?
     let longitude: Double?
+    /// How accurate the fix is; the server refuses one too vague to show the worker is at the address.
+    let accuracyM: Double?
 }
