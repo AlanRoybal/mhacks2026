@@ -82,7 +82,7 @@ struct CryptoCheckoutView: View {
     @State private var stage = ""
     let draft: FundingDraft
     let onFunded: () -> Void
-    private let api = PaymentAPI()
+    private let api = PaymentAPI(baseURLKey: "BountySettlementsBaseURL")
 
     var body: some View {
         NavigationStack {
@@ -95,7 +95,7 @@ struct CryptoCheckoutView: View {
                 }
                 Section {
                     if funded {
-                        Label(JobStatus.api(confirmedJob?.status ?? "funded").rawValue, systemImage: "checkmark.circle.fill").foregroundStyle(BountyTheme.success)
+                        Label(JobStatus.api(confirmedJob?.status ?? "funded").rawValue, systemImage: "checkmark.circle.fill").foregroundStyle(BountyColor.greenInk)
                         Button("Done") { onFunded(); dismiss() }
                     } else if busy {
                         HStack { ProgressView(); Text(stage) }
@@ -125,7 +125,7 @@ struct CryptoCheckoutView: View {
             guard let address = wallet.address else { return }
             var body = try JSONSerialization.jsonObject(with: JSONEncoder().encode(draft)) as! [String: Any]
             body["posterWallet"] = address
-            postedJobs.track(draft.id)
+            postedJobs.track(draft.id, fundingRail: "usdc")
             let preparation: CryptoPreparation = try await api.request(path: "crypto/prepare", method: "POST", body: JSONSerialization.data(withJSONObject: body))
             prepared = preparation
             guard preparation.chainID == 84532 else { throw PaymentAPIError(message: "This checkout requires Base Sepolia.") }

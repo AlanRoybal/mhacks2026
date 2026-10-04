@@ -40,7 +40,7 @@ final class WorkerPayments: ObservableObject {
     @Published private(set) var busy = false
     @Published var message: String?
     private var session: WorkerSession?
-    private let api = PaymentAPI()
+    private let api = PaymentAPI(baseURLKey: "BountySettlementsBaseURL")
     private let service = "com.alanroybal.BountyTwin.worker-session"
 
     init() {

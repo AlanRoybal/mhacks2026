@@ -1,32 +1,45 @@
 {
-  "name": "bounty-payments",
-  "version": "1.0.0",
+  "name": "bounty-backend",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22"
   },
   "scripts": {
-    "dev": "node --env-file-if-exists=.env --env-file-if-exists=.env.chain --watch server.mjs",
-    "start": "node --env-file-if-exists=.env --env-file-if-exists=.env.chain server.mjs",
-    "test": "node --test payments.test.mjs settlements.test.mjs",
-    "test:contracts": "forge test --root ../contracts",
-    "test:chain": "forge build --root ../contracts && node chain-smoke-test.mjs",
-    "test:settlements": "node --env-file=.env settlement-smoke-test.mjs",
-    "setup:chain": "node setup-test-env.mjs",
-    "deploy:sepolia": "forge build --root ../contracts && node --env-file=.env.chain deploy-escrow.mjs",
-    "test:sandbox": "node --env-file=.env smoke-test.mjs",
-    "test:webhook": "node --env-file=.env smoke-test.mjs --webhook",
-    "webhooks": "node --env-file=.env webhook-listener.mjs"
+    "dev": "tsx watch --clear-screen=false src/local.ts",
+    "start": "tsx src/local.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "seed": "tsx scripts/seed.ts",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy --require-approval never"
   },
   "dependencies": {
-    "express": "^5.2.1",
+    "@anthropic-ai/bedrock-sdk": "^0.34.2",
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1146.0",
+    "@aws-sdk/client-dynamodb": "^3.1146.0",
+    "@aws-sdk/client-lambda": "^3.1146.0",
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/client-scheduler": "^3.1146.0",
+    "@aws-sdk/lib-dynamodb": "^3.1146.0",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
+    "@aws-sdk/util-dynamodb": "^3.996.9",
+    "@hono/node-server": "^2.1.3",
+    "fflate": "^0.8.3",
+    "hono": "^4.13.12",
+    "jose": "^6.2.12",
     "stripe": "^23.0.0",
-    "viem": "^2.57.2"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@foundry-rs/anvil": "^1.7.1",
-    "@foundry-rs/forge": "^1.7.1",
-    "@stripe/cli": "^1.53.0"
+    "@types/aws-lambda": "^8.10.164",
+    "@types/node": "^26.6.4",
+    "aws-cdk": "^2.1144.0",
+    "aws-cdk-lib": "^2.272.0",
+    "constructs": "^10.8.1",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
   }
 }

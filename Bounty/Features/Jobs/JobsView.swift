@@ -1,97 +1,255 @@
 import SwiftUI
 
+enum JobsSegment: Hashable {
+    case working, posted, done
+}
+
+// MARK: - 16 Jobs
+
 struct JobsView: View {
+    @Environment(AppRouter.self) private var router
+    // Jobs funded through Stripe checkout (real data) come before the sample cards.
     @EnvironmentObject private var postedJobs: PostedJobsStore
     @EnvironmentObject private var workerPayments: WorkerPayments
-    @State private var selection = JobCollection.working
+    @State private var selectedJob: Job?
+    // The poster's jobs from the backend (GET /jobs/mine), or sample jobs when it isn't running.
+    @Environment(PosterStore.self) private var posterStore
 
-    var filteredJobs: [Job] {
-        switch selection {
-        case .working:
-            workerPayments.jobs.filter { [.accepted, .inProgress, .inReview, .releasePending, .refundPending, .settlementIssue].contains($0.status) }
-        case .posted:
-            postedJobs.fundedJobs.map(\.job)
-        case .completed:
-            workerPayments.jobs.filter { [.paid, .refunded].contains($0.status) }
+    private func jobs(for segment: JobsSegment) -> [Job] {
+        switch segment {
+        case .working: workerPayments.jobs.filter { ![.paid, .refunded].contains($0.status) }
+        // Checkout jobs the backend hasn't listed yet; normally they all come through `posterStore`.
+        case .posted: postedJobs.fundedJobs.map(\.job).filter { posterStore.job($0.id) == nil }
+        case .done: workerPayments.jobs.filter { [.paid, .refunded].contains($0.status) }
         }
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Job collection", selection: $selection) {
-                ForEach(JobCollection.allCases) { collection in
-                    Text(collection.rawValue).tag(collection)
-                }
+        @Bindable var router = router
+        BountyScreen {
+            ScreenTitle(title: "Jobs") {
+                IconButton(icon: .sliders, label: "Filters") {}
             }
-            .pickerStyle(.segmented)
-            .padding()
+            .entrance(.top)
 
-            if selection == .posted, let error = postedJobs.refreshError {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(error).font(.footnote).foregroundStyle(.secondary)
-                    Button("Check payments again") { Task { await postedJobs.refresh() } }
-                }
-                .padding(.horizontal)
-                .padding(.bottom)
-            }
+            SegmentedPill(
+                options: [(JobsSegment.working, "Working"), (.posted, "Posted"), (.done, "Done")],
+                selection: $router.jobsSegment
+            )
+            .entrance(.top)
 
-            if filteredJobs.isEmpty {
-                ContentUnavailableView(
-                    "No jobs yet",
-                    systemImage: "tray",
-                    description: Text(selection == .posted ? "Jobs you post will appear here after funding." : "Your assigned jobs and completed payments will appear here.")
-                )
-            } else {
-                List(filteredJobs) { job in
-                    NavigationLink(value: job) {
-                        JobListRow(job: job)
+            VStack(spacing: 16) {
+                if router.jobsSegment == .posted {
+                    ForEach(Array(posterStore.sortedJobs.enumerated()), id: \.element.id) { index, job in
+                        PostedJobCard(job: job) {
+                            router.open(job.status == .inReview ? .reviewProof : .postedJob, posterJob: job.id)
+                        }
+                        .entrance(index == 0 ? .top : .rest(min(index - 1, 4)))
+                        .transition(.opacity.combined(with: .offset(y: 12)))
                     }
                 }
-                .listStyle(.plain)
+                ForEach(Array(jobs(for: router.jobsSegment).enumerated()), id: \.element.id) { index, job in
+                    JobCard(job: job, isPosted: router.jobsSegment == .posted) { open(job) }
+                        .entrance(index == 0 ? .top : .rest(index - 1))
+                        .transition(.opacity.combined(with: .offset(y: 12)))
+                }
+            }
+            .animation(Motion.enterRest, value: router.jobsSegment)
+
+            if router.jobsSegment == .posted && posterStore.isUsingSampleData {
+                Text("Sample jobs. Start the backend (cd backend && npm run dev) to see the jobs you post.")
+                    .bountyType(.footnote)
+                    .foregroundStyle(BountyColor.inkTertiary)
             }
         }
-        .navigationTitle("Jobs")
-        .refreshable { await postedJobs.refresh(); await workerPayments.refresh() }
-        .navigationDestination(for: Job.self) { job in
-            JobDetailView(job: job)
+        .sheet(item: $selectedJob) { job in NavigationStack { FundedJobDetailView(job: job) } }
+        .task { await postedJobs.refresh(); await workerPayments.refresh() }
+        .task(id: router.jobsSegment) {
+            // Keep the Posted list live while it's on screen; push alerts take over once wired up.
+            guard router.jobsSegment == .posted else { return }
+            while !Task.isCancelled {
+                await posterStore.loadJobs()
+                try? await Task.sleep(for: .seconds(3))
+            }
         }
     }
+
+    private func open(_ job: Job) { selectedJob = job }
+
 }
 
-private enum JobCollection: String, CaseIterable, Identifiable {
-    case working = "Working"
-    case posted = "Posted"
-    case completed = "Completed"
-
-    var id: String { rawValue }
-}
-
-private struct JobListRow: View {
+private struct JobCard: View {
     let job: Job
+    let isPosted: Bool
+    let action: () -> Void
+
+    private var detail: String {
+        "\(job.location) · \(job.deadline)"
+    }
+
+    private var statusLabel: String {
+        job.status.rawValue
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(job.title)
-                    .font(.headline)
-                Spacer()
+        Button(action: action) {
+            HStack(spacing: 12) {
+                StickerTile(sticker: job.sticker, background: job.tileColor, size: 56, stickerSize: 46, radius: 17)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(job.title)
+                        .bountyType(.bodyStrong)
+                        .foregroundStyle(BountyColor.inkPrimary)
+                    Text(detail)
+                        .bountyType(.footnote)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                    Chip(label: statusLabel, tone: job.status.chipTone)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.leading)
                 Text(job.displayPay)
-                    .font(.headline)
+                    .bountyType(.moneyM)
+                    .foregroundStyle(BountyColor.inkPrimary)
             }
-            HStack {
-                Text(job.status.rawValue)
-                    .foregroundStyle(BountyTheme.accent)
-                Spacer()
-                Text(job.deadline)
-                    .foregroundStyle(.secondary)
-            }
-            .font(.subheadline)
+            .padding(14)
+            .borderedCard(radius: 22)
         }
-        .padding(.vertical, 6)
+        .buttonStyle(PressableStyle())
     }
 }
 
-struct JobDetailView: View {
+// MARK: - 15 Review proof
+
+/// Opens the live review for one of the poster's jobs, or the design's sample when there isn't one.
+struct ReviewProofView: View {
+    @Environment(AppRouter.self) private var router
+    @Environment(PosterStore.self) private var posterStore
+
+    var body: some View {
+        if posterStore.job(router.posterJobId) != nil {
+            LiveReviewProofView()
+        } else {
+            SampleReviewProofView()
+        }
+    }
+}
+
+private struct SampleReviewProofView: View {
+    @Environment(AppRouter.self) private var router
+    @State private var autoApproveAt = Date.now.addingTimeInterval(23 * 3600 + 41 * 60 + 10)
+
+    private let checks = [
+        ("Whole front lawn mowed", "4 photos · 96%"),
+        ("Clippings bagged", "1 photo · 98%"),
+        ("Sidewalk edges trimmed", "2 photos · 88%"),
+        ("On site 2:02 – 2:51 PM", "GPS · verified")
+    ]
+
+    var body: some View {
+        BountyScreen(spacing: 14) {
+            NavRow(leadingAction: router.back) {
+                Chip(label: "Needs your review", tone: .yellow)
+            } trailing: {
+                IconButton(icon: .ellipsis, label: "More") {}
+            }
+            .entrance(.top)
+
+            Text("Review Jordan’s work")
+                .bountyType(.title)
+                .foregroundStyle(BountyColor.inkPrimary)
+                .entrance(.top)
+
+            HStack(spacing: 11) {
+                proofPhoto("before-photo", label: "Before")
+                proofPhoto("after-photo", label: "After")
+            }
+            .entrance(.top)
+
+            HStack(spacing: 10) {
+                IconGlyph(icon: .shieldCheck, size: 20)
+                Text("AI check: 4 of 4 passed")
+                    .bountyType(.bodyStrong)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("94% avg")
+                    .bountyType(.subheadStrong)
+            }
+            .foregroundStyle(BountyColor.mintInk)
+            .padding(14)
+            .tintedPanel(BountyColor.mint, radius: BountyRadius.row)
+            .entrance(.rest(0))
+
+            VStack(spacing: 2) {
+                ForEach(checks, id: \.0) { check in
+                    HStack(spacing: 12) {
+                        StatusBadge(status: .done)
+                        Text(check.0)
+                            .bountyType(.subheadStrong)
+                            .foregroundStyle(BountyColor.inkPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(check.1)
+                            .bountyType(.footnote)
+                            .foregroundStyle(BountyColor.inkSecondary)
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .borderedCard()
+            .entrance(.rest(1))
+
+            HStack(spacing: 8) {
+                IconGlyph(icon: .timer, size: 16)
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text("Approves on its own in \(remaining(at: context.date)) if you don’t respond")
+                        .bountyType(.footnote)
+                        .monospacedDigit()
+                }
+            }
+            .foregroundStyle(BountyColor.inkSecondary)
+            .entrance(.rest(2))
+        } bottom: {
+            VStack(spacing: 12) {
+                PillButton(title: "Approve and pay $40", icon: .check) { router.finish(on: .earnings) }
+                PillButton(title: "Dispute an item", icon: .flag, style: .secondary) {}
+            }
+        }
+    }
+
+    private func proofPhoto(_ asset: String, label: String) -> some View {
+        Image(asset)
+            .resizable()
+            .frame(height: 150)
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .topLeading) {
+                Chip(label: label, tone: .dark).padding(10)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: BountyRadius.row, style: .continuous))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(label) photo")
+    }
+
+    private func remaining(at date: Date) -> String {
+        let seconds = max(0, Int(autoApproveAt.timeIntervalSince(date)))
+        return String(format: "%d:%02d:%02d", seconds / 3600, seconds % 3600 / 60, seconds % 60)
+    }
+}
+
+#Preview("Jobs") {
+    JobsView()
+        .environment(AppRouter())
+        .environmentObject(WorkerPayments())
+        .environmentObject(PostedJobsStore())
+        .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))
+}
+
+#Preview("Review proof") {
+    ReviewProofView()
+        .environment(AppRouter())
+        .environmentObject(WorkerPayments())
+        .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))
+}
+
+struct FundedJobDetailView: View {
     @EnvironmentObject private var postedJobs: PostedJobsStore
     @EnvironmentObject private var workerPayments: WorkerPayments
     @State private var refundBusy = false
@@ -99,7 +257,7 @@ struct JobDetailView: View {
     let job: Job
     private var currentStatus: JobStatus {
         workerPayments.jobs.first(where: { $0.id == job.id })?.status
-            ?? postedJobs.fundedJobs.first(where: { $0.id == job.id }).map { JobStatus.api($0.status) } ?? job.status
+            ?? postedJobs.fundedJobs.first(where: { $0.id.uuidString.lowercased() == job.id }).map { JobStatus.api($0.status) } ?? job.status
     }
 
     var body: some View {
@@ -111,16 +269,17 @@ struct JobDetailView: View {
                     Text(job.title)
                         .font(.title2.bold())
                     Label(currentStatus.rawValue, systemImage: "clock.fill")
-                        .foregroundStyle(BountyTheme.accent)
+                        .foregroundStyle(BountyColor.greenInk)
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Why it matched")
+                    Text("Job details")
                         .font(.headline)
-                    Text(job.matchReason)
+                    Text(postedJobs.fundedJobs.first { $0.id.uuidString.lowercased() == job.id }?.details ?? job.location)
                         .foregroundStyle(.secondary)
                 }
-                .bountyPanel()
+                .padding(16)
+                .borderedCard()
 
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Proof checklist")
@@ -129,15 +288,10 @@ struct JobDetailView: View {
                     Label("Include the one-time code", systemImage: "checkmark.circle")
                     Label("Submit before \(job.deadline)", systemImage: "checkmark.circle")
                 }
-                .bountyPanel()
+                .padding(16)
+                .borderedCard()
 
-                if currentStatus == .accepted {
-                    Button("Start job", action: {})
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .frame(maxWidth: .infinity)
-                }
-                if let posted = postedJobs.fundedJobs.first(where: { $0.id == job.id }), posted.fundingRail == "usdc",
+                if let posted = postedJobs.fundedJobs.first(where: { $0.id.uuidString.lowercased() == job.id }), posted.fundingRail == "usdc",
                    !["released", "refunded"].contains(posted.status),
                    (posted.deadlineDate ?? .distantFuture) <= Date() {
                     Button(refundBusy ? "Confirming refund…" : "Refund expired job") { Task { await refund(posted) } }
@@ -157,7 +311,7 @@ struct JobDetailView: View {
         refundBusy = true; refundMessage = nil
         defer { refundBusy = false }
         do {
-            let api = PaymentAPI()
+            let api = PaymentAPI(baseURLKey: "BountySettlementsBaseURL")
             let transaction: CryptoTransaction = try await api.request(path: "crypto/jobs/\(posted.id.uuidString.lowercased())/refund-transaction", method: "GET")
             let wallet = BountyWallet.shared
             try await wallet.connect()
@@ -169,12 +323,4 @@ struct JobDetailView: View {
             refundMessage = confirmed.status == "refunded" ? "USDC refunded to your wallet." : "Refund is still being confirmed."
         } catch { refundMessage = error.localizedDescription }
     }
-}
-
-#Preview {
-    NavigationStack {
-        JobsView()
-    }
-    .environmentObject(PostedJobsStore())
-    .environmentObject(WorkerPayments())
 }

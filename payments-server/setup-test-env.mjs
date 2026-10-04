@@ -15,4 +15,4 @@ add('ESCROW_CONTRACT_ADDRESS', '');
 writeFileSync(path, content, { mode: 0o600 });
 const key = content.match(/^ESCROW_ARBITER_PRIVATE_KEY=(.+)$/m)[1];
 console.log(`Dedicated test signer: ${privateKeyToAccount(key).address}`);
-console.log('Private key and admin token saved in ignored backend/.env.chain. No credentials were printed.');
+console.log('Private key and admin token saved in ignored payments-server/.env.chain. No credentials were printed.');

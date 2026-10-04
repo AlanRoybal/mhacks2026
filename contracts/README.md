@@ -9,7 +9,7 @@ Public deployment is restricted to **Base Sepolia (84532)** and [Circle's six-de
 Node 22.13+ and the pinned npm Foundry binaries are sufficient:
 
 ```sh
-cd backend
+cd payments-server
 npm ci
 npm run test:contracts
 npm run test:chain
@@ -22,7 +22,7 @@ The 13 escrow tests cover permissions, immutable terms, exact deposits, duplicat
 ## Deploy Base Sepolia
 
 ```sh
-cd backend
+cd payments-server
 npm run setup:chain
 ```
 

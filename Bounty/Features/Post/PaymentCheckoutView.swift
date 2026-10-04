@@ -9,6 +9,7 @@ struct FundingDraft: Codable, Identifiable {
     let isRemote: Bool
     let deadline: String
     let amountCents: Int
+    var location: JobLocation? = nil
 }
 
 struct FundedJob: Codable, Identifiable {
@@ -33,10 +34,11 @@ struct FundedJob: Codable, Identifiable {
 
     var job: Job {
         Job(
-            id: id, title: title, pay: Decimal(amountCents) / 100,
-            distance: isRemote ? "Remote" : "Local",
+            id: id.uuidString.lowercased(), title: title, pay: amountCents / 100,
+            location: isRemote ? "Remote" : "In person",
             deadline: deadlineDate?.formatted(date: .abbreviated, time: .shortened) ?? deadline,
-            matchReason: details, status: JobStatus.api(status), currency: fundingRail == "usdc" ? "USDC" : "USD"
+            sticker: PostDraft.sticker(for: category), tileColor: PostDraft.tileColor(for: category),
+            status: JobStatus.api(status), currency: fundingRail == "usdc" ? "USDC" : "USD", payCents: amountCents
         )
     }
 
@@ -57,6 +59,7 @@ private struct PaymentServerError: Decodable { let error: String }
 
 @MainActor
 struct PaymentAPI {
+    var baseURLKey = "BountyPaymentsBaseURL"
     func prepare(_ draft: FundingDraft) async throws -> (FundedJob, PaymentSheet) {
         let response: PaymentSheetResponse = try await request(
             path: "payment-sheet", method: "POST", body: JSONEncoder().encode(draft)
@@ -83,7 +86,7 @@ struct PaymentAPI {
     }
 
     func request<Response: Decodable>(path: String, method: String, body: Data? = nil, token: String? = nil) async throws -> Response {
-        guard let value = Bundle.main.object(forInfoDictionaryKey: "BountyPaymentsBaseURL") as? String,
+        guard let value = Bundle.main.object(forInfoDictionaryKey: baseURLKey) as? String,
               let baseURL = URL(string: value), let host = baseURL.host,
               ["http", "https"].contains(baseURL.scheme) else {
             throw PaymentAPIError(message: "Configure the Bounty payments server URL in Config/Local.xcconfig.")
@@ -125,17 +128,23 @@ final class PostedJobsStore: ObservableObject {
     @Published private(set) var fundedJobs: [FundedJob]
     @Published var refreshError: String?
     private var pendingIDs: [UUID]
+    private var usdcIDs: Set<UUID>
     private let defaults: UserDefaults
     private let api = PaymentAPI()
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        usdcIDs = Set((defaults.stringArray(forKey: "usdcPaymentJobIDs") ?? []).compactMap(UUID.init(uuidString:)))
         fundedJobs = defaults.data(forKey: "fundedJobs")
             .flatMap { try? JSONDecoder().decode([FundedJob].self, from: $0) } ?? []
         pendingIDs = (defaults.stringArray(forKey: "pendingPaymentJobIDs") ?? []).compactMap(UUID.init(uuidString:))
     }
 
-    func track(_ id: UUID) {
+    func track(_ id: UUID, fundingRail: String = "stripe") {
+        if fundingRail == "usdc" {
+            usdcIDs.insert(id)
+            defaults.set(usdcIDs.map(\.uuidString), forKey: "usdcPaymentJobIDs")
+        }
         if !pendingIDs.contains(id) { pendingIDs.append(id) }
         defaults.set(pendingIDs.map(\.uuidString), forKey: "pendingPaymentJobIDs")
     }
@@ -153,7 +162,11 @@ final class PostedJobsStore: ObservableObject {
         refreshError = nil
         // Recover a successful charge even if the app closed before confirmation returned.
         for id in Set(pendingIDs + fundedJobs.map(\.id)) {
-            do { record(try await api.status(for: id)) }
+            do {
+                let isUSDC = usdcIDs.contains(id) || fundedJobs.contains { $0.id == id && $0.fundingRail == "usdc" }
+                let service = isUSDC ? PaymentAPI(baseURLKey: "BountySettlementsBaseURL") : api
+                record(try await service.status(for: id))
+            }
             catch let error as PaymentAPIError where error.statusCode == 404 && pendingIDs.contains(id) {
                 // A failed preparation never created this job; no payment could be launched.
                 pendingIDs.removeAll { $0 == id }
@@ -242,7 +255,7 @@ struct PaymentCheckoutView: View {
                 if model.isFunded {
                     Section {
                         Label(JobStatus.api(model.job?.status ?? "funded").rawValue, systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(BountyTheme.success)
+                            .foregroundStyle(BountyColor.greenInk)
                             .font(.title2.bold())
                         Text("Your job is now in Jobs → Posted.")
                         Button("Done") { onFunded(); dismiss() }

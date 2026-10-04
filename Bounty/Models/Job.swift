@@ -1,16 +1,20 @@
 import Foundation
+import SwiftUI
 
 struct Job: Identifiable, Hashable {
-    var id = UUID()
+    let id: String
     let title: String
-    let pay: Decimal
-    let distance: String
+    let pay: Int
+    let location: String
     let deadline: String
-    let matchReason: String
+    let sticker: Sticker
+    let tileColor: Color
     var status: JobStatus
     var currency = "USD"
+    var payCents: Int? = nil
     var displayPay: String {
-        currency == "USDC" ? "\(pay.formatted()) USDC" : pay.formatted(.currency(code: currency))
+        let amount = Decimal(payCents ?? pay * 100) / 100
+        return currency == "USDC" ? "\(amount.formatted()) USDC" : amount.formatted(.currency(code: currency))
     }
 }
 
@@ -21,6 +25,7 @@ enum JobStatus: String, CaseIterable, Identifiable {
     case inProgress = "In progress"
     case inReview = "In review"
     case paid = "Paid"
+
     case refunded = "Refunded"
     case releasePending = "Payment pending"
     case refundPending = "Refund pending"
@@ -41,43 +46,76 @@ enum JobStatus: String, CaseIterable, Identifiable {
     }
 
     var id: String { rawValue }
+
+    var chipTone: ChipTone {
+        switch self {
+        case .funded, .refunded: .grey
+        case .offered: .yellow
+        case .accepted, .inProgress: .lavender
+        case .inReview, .releasePending, .refundPending: .cream
+        case .settlementIssue: .yellow
+        case .paid: .mint
+        }
+    }
 }
 
 enum SampleJobs {
-    static let offer = Job(
+    static let coffeeLogo = Job(
+        id: "coffee-logo",
         title: "Sketch a coffee shop logo",
         pay: 15,
-        distance: "0.4 mi",
-        deadline: "Today, 6:00 PM",
-        matchReason: "Your illustration and brand design skills match this job.",
+        location: "0.4 mi",
+        deadline: "Today, 6 PM",
+        sticker: .coffee,
+        tileColor: BountyColor.cream,
         status: .offered
     )
 
-    static let jobs = [
-        offer,
-        Job(
-            title: "Photograph a vintage desk",
-            pay: 28,
-            distance: "1.2 mi",
-            deadline: "Tomorrow, 2:00 PM",
-            matchReason: "You have product photography experience.",
-            status: .accepted
-        ),
-        Job(
-            title: "Review a calculus worksheet",
-            pay: 35,
-            distance: "Remote",
-            deadline: "Oct 5, 8:00 PM",
-            matchReason: "Your tutoring history includes calculus.",
-            status: .inReview
-        ),
-        Job(
-            title: "Create event poster concepts",
-            pay: 60,
-            distance: "Remote",
-            deadline: "Completed",
-            matchReason: "Your graphic design experience matched the brief.",
-            status: .paid
-        )
-    ]
+    static let vintageDesk = Job(
+        id: "vintage-desk",
+        title: "Photograph a vintage desk",
+        pay: 28,
+        location: "1.2 mi",
+        deadline: "Tomorrow, 2 PM",
+        sticker: .camera,
+        tileColor: BountyColor.grey,
+        status: .accepted
+    )
+
+    static let calculus = Job(
+        id: "calculus",
+        title: "Review a calculus worksheet",
+        pay: 35,
+        location: "Remote",
+        deadline: "Oct 5, 8 PM",
+        sticker: .book,
+        tileColor: BountyColor.sky,
+        status: .inReview
+    )
+
+    static let poster = Job(
+        id: "poster",
+        title: "Event poster concepts",
+        pay: 60,
+        location: "Remote",
+        deadline: "Paid Oct 1",
+        sticker: .poster,
+        tileColor: BountyColor.lavender,
+        status: .paid
+    )
+
+    static let working = [coffeeLogo, vintageDesk, calculus, poster]
+
+    static let lawn = Job(
+        id: "lawn",
+        title: "Mow my front lawn",
+        pay: 40,
+        location: "1200 S University Ave",
+        deadline: "Sun 12 PM",
+        sticker: .mower,
+        tileColor: BountyColor.mint,
+        status: .inReview
+    )
+
+    static let posted = [lawn]
 }

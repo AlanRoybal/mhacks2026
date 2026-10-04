@@ -8,12 +8,15 @@ packages:
   CoinbaseWallet:
     url: https://github.com/MobileWalletProtocol/wallet-mobile-sdk
     exactVersion: 1.1.2
+  TwinKit:
+    path: Packages/TwinKit
   Stripe:
     url: https://github.com/stripe/stripe-ios-spm
     exactVersion: 26.12.1
 settings:
   base:
     SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
     DEVELOPMENT_TEAM: DVX8YZ9GG9
     CODE_SIGN_STYLE: Automatic
     ALWAYS_SEARCH_USER_PATHS: NO
@@ -22,6 +25,7 @@ settings:
   configs:
     Debug:
       ONLY_ACTIVE_ARCH: YES
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
 targets:
   Bounty:
     type: application
@@ -36,25 +40,48 @@ targets:
     dependencies:
       - package: CoinbaseWallet
         product: CoinbaseWalletSDK
+      - package: TwinKit
+        product: TwinKit
       - package: Stripe
         product: StripePaymentSheet
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alanroybal.BountyTwin
         PRODUCT_NAME: Bounty
-        GENERATE_INFOPLIST_FILE: YES
+        GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Bounty/Info.plist
         CODE_SIGN_ENTITLEMENTS: "$(BOUNTY_CODE_SIGN_ENTITLEMENTS)"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        INFOPLIST_KEY_CFBundleDisplayName: Bounty
-        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.business
-        INFOPLIST_KEY_NSCameraUsageDescription: Bounty uses the camera to capture proof that a job was completed.
-        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: Bounty uses your calendar availability to avoid offering jobs when you are busy.
-        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: Bounty uses your location to match nearby jobs and verify on-site work.
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
         TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: Bounty/Info.plist
+      properties:
+        CFBundleDisplayName: Bounty
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.business
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        UIApplicationSupportsIndirectInputEvents: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        CFBundleURLTypes:
+          - CFBundleURLName: com.alanroybal.BountyTwin.oauth
+            CFBundleURLSchemes: [bounty]
+        BountyLinkedInClientID: 86rcq1bjy06k5g
+        # Set in Config/*.xcconfig (Local.xcconfig for your machine).
+        BountyAPIBaseURL: $(BOUNTY_API_BASE_URL)
+        LSApplicationQueriesSchemes: [cbwallet, "mwp+1.1"]
+        BountySettlementsBaseURL: $(BOUNTY_SETTLEMENTS_BASE_URL)
+        BountyPaymentsBaseURL: $(BOUNTY_PAYMENTS_BASE_URL)
+        BountyApplePayMerchantIdentifier: $(BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Bounty connects to the local Bounty and payment test servers during development.
+        NSFaceIDUsageDescription: Bounty uses Face ID to confirm you want to accept a job.
+        NSCameraUsageDescription: Bounty uses the camera to capture proof that a job was completed.
+        NSCalendarsFullAccessUsageDescription: Bounty uses your calendar availability to avoid offering jobs when you are busy. Event names never leave this device.
+        NSLocationWhenInUseUsageDescription: Bounty uses your location to match nearby jobs and verify on-site work.
     scheme:
       testTargets: []

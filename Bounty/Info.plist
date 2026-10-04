@@ -2,22 +2,78 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>LSApplicationQueriesSchemes</key>
-    <array><string>cbwallet</string><string>mwp+1.1</string></array>
-    <key>BountyPaymentsBaseURL</key>
-    <string>$(BOUNTY_PAYMENTS_BASE_URL)</string>
-    <key>BountyApplePayMerchantIdentifier</key>
-    <string>$(BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER)</string>
-    <key>CFBundleURLTypes</key>
-    <array>
-        <dict>
-            <key>CFBundleURLName</key><string>com.alanroybal.BountyTwin.payments</string>
-            <key>CFBundleURLSchemes</key><array><string>bounty</string></array>
-        </dict>
-    </array>
-    <key>NSAppTransportSecurity</key>
-    <dict><key>NSAllowsLocalNetworking</key><true/></dict>
-    <key>NSLocalNetworkUsageDescription</key>
-    <string>Bounty connects to the local payment test server during development.</string>
+	<key>BountyAPIBaseURL</key>
+	<string>$(BOUNTY_API_BASE_URL)</string>
+	<key>BountyApplePayMerchantIdentifier</key>
+	<string>$(BOUNTY_APPLE_PAY_MERCHANT_IDENTIFIER)</string>
+	<key>BountyLinkedInClientID</key>
+	<string>86rcq1bjy06k5g</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Bounty</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.alanroybal.BountyTwin.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>bounty</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.business</string>
+	<key>BountyPaymentsBaseURL</key>
+	<string>$(BOUNTY_PAYMENTS_BASE_URL)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Bounty uses your calendar availability to avoid offering jobs when you are busy. Event names never leave this device.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Bounty uses the camera to capture proof that a job was completed.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Bounty uses Face ID to confirm you want to accept a job.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Bounty connects to the local Bounty and payment test servers during development.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Bounty uses your location to match nearby jobs and verify on-site work.</string>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>cbwallet</string>
+		<string>mwp+1.1</string>
+	</array>
+	<key>BountySettlementsBaseURL</key>
+	<string>$(BOUNTY_SETTLEMENTS_BASE_URL)</string>
 </dict>
 </plist>

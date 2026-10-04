@@ -1,3 +1,9 @@
+# Payment services after merging main
+
+Main's `backend/` is the matching and review API on port 8787. Its `/payment-sheet` route funds matchable jobs; it uses fake payments by default, or Stripe when `PAYMENTS_PROVIDER=stripe` is configured. `payments-server/` retains the Stripe ledger, Connect settlements and Base Sepolia escrow implementation on port 4242.
+
+The app uses `BOUNTY_PAYMENTS_BASE_URL` for card checkout and `BOUNTY_SETTLEMENTS_BASE_URL` for wallet funding, worker earnings and payout setup. Standalone payment jobs remain visible in Jobs; they are not automatically imported into main's matching database. For the standalone Stripe settlement flow, point both URLs to port 4242. For main's matching flow, leave card checkout on port 8787.
+
 # Stripe payments for Bounty
 
 The Post tab now opens Stripe's native PaymentSheet to fund a job. The backend computes the 10% platform fee, creates one PaymentIntent per checkout, and saves jobs in SQLite. Confirmed funding changes the job to `funded` and appends one `JOB_FUNDED` record to `LedgerEvents` in the same transaction. A job appears under Jobs → Posted only after the backend verifies the full payment succeeded. Pending payment IDs are saved on the phone so an interrupted confirmation can recover when the app reopens or returns to the foreground.
@@ -8,10 +14,10 @@ This is a local, test-mode integration with funding, Connect onboarding, transfe
 
 ## Run the backend
 
-Use Node 22.13 or newer. Test credentials are in the ignored `backend/.env`; keep this file private. Secret and publishable keys must belong to the same sandbox. Connect requires an account with Connect enabled and a key permitted to create accounts, account links, transfers, and refunds. The sandbox currently configured for this workspace has Connect enabled.
+Use Node 22.13 or newer. Test credentials are in the ignored `payments-server/.env`; keep this file private. Secret and publishable keys must belong to the same sandbox. Connect requires an account with Connect enabled and a key permitted to create accounts, account links, transfers, and refunds. The sandbox currently configured for this workspace has Connect enabled.
 
 ```sh
-cd backend
+cd payments-server
 npm ci
 npm start
 ```
@@ -63,9 +69,9 @@ The unit/integration suite covers authoritative amounts, validation, retries, pe
 ## Follow a payment through the code
 
 1. `CreateJobView.swift` creates a `FundingDraft` with a stable job UUID and an amount in cents, then opens `PaymentCheckoutView`.
-2. `PaymentAPI.prepare` sends the draft to `POST /payment-sheet`. In `backend/payments.mjs`, the server saves a `draft` job, calculates the 10% fee, and creates a PaymentIntent with `metadata.job_id`, the total, and an idempotency key derived from the job UUID. For a $25 job, the charge is $27.50. Retries reuse this PaymentIntent.
+2. `PaymentAPI.prepare` sends the draft to `POST /payment-sheet`. In `payments-server/payments.mjs`, the server saves a `draft` job, calculates the 10% fee, and creates a PaymentIntent with `metadata.job_id`, the total, and an idempotency key derived from the job UUID. For a $25 job, the charge is $27.50. Retries reuse this PaymentIntent.
 3. The server returns the client secret and publishable key. `PaymentAPI.prepare` builds Stripe's native PaymentSheet. Apple Pay, when configured below, confirms the same PaymentIntent as card entry.
-4. Stripe sends `payment_intent.succeeded` to `POST /stripe/webhook`. In `backend/app.mjs`, `express.raw` preserves the original request bytes and `stripe.webhooks.constructEvent` verifies the signature.
+4. Stripe sends `payment_intent.succeeded` to `POST /stripe/webhook`. In `payments-server/app.mjs`, `express.raw` preserves the original request bytes and `stripe.webhooks.constructEvent` verifies the signature.
 5. `Payments.applyIntent` matches the job and PaymentIntent, checks test mode, currency, expected total, and amount received, then atomically appends `JOB_FUNDED` to `LedgerEvents` and saves `status: 'funded'` in SQLite. The ledger includes the job, PaymentIntent, Stripe event ID, amounts, and timestamp. Unique constraints prevent duplicate funding records, and SQLite rejects updates or deletes to the ledger. Older failure/cancellation events and overlapping checkout retries cannot undo funding or rewind a later job state.
 6. After PaymentSheet completes, the app fetches `GET /jobs/:id` and adds the job to Jobs → Posted only when the server reports `funded`. The endpoint can also reconcile directly with Stripe if delivery is delayed. Pending job IDs survive app restarts.
 
@@ -80,7 +86,7 @@ Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig` and set `BOUNTY_
 PaymentSheet's Apple Pay configuration code already exists in `PaymentCheckoutView.swift`. Native Apple Pay requires an Apple Developer Program membership and a merchant ID owned by the same team that signs the app. The project currently uses team `DVX8YZ9GG9` and bundle ID `com.alanroybal.BountyTwin`; use the team's existing merchant ID or register one for this app.
 
 1. In [Apple Developer → Identifiers](https://developer.apple.com/account/resources/identifiers/add/merchant), register a **Merchant ID**. A suggested identifier is `merchant.com.alanroybal.BountyTwin`; use the exact registered value in every following step.
-2. In the **same Stripe account/sandbox used by `backend/.env`**, open [iOS Certificate Settings](https://dashboard.stripe.com/settings/ios_certificates), choose **Add new application**, and download Stripe's certificate signing request (CSR).
+2. In the **same Stripe account/sandbox used by `payments-server/.env`**, open [iOS Certificate Settings](https://dashboard.stripe.com/settings/ios_certificates), choose **Add new application**, and download Stripe's certificate signing request (CSR).
 3. Open your Merchant ID in Apple Developer. Create an **Apple Pay Payment Processing Certificate**, uploading the CSR downloaded from Stripe. Download Apple's resulting certificate and upload it back into the Stripe setup flow. Each Stripe CSR is for one certificate. This is the payment-processing certificate, not an Apple Pay Merchant Identity certificate.
 4. The project supplies `Config/ApplePay.entitlements`, which includes Apple Pay and the existing push-notification entitlements. Selecting it in the next step lets Xcode's automatic signing provision the matching merchant ID. If needed, open **Bounty project → Bounty target → Signing & Capabilities → Apple Pay** and select your registered Merchant ID. The default entitlement file remains usable before merchant setup is complete.
 5. Create `Config/Local.xcconfig` if needed. For the Simulator, use:

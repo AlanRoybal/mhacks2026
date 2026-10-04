@@ -1,84 +1,178 @@
 import SwiftUI
 
 struct RootTabView: View {
+    @Environment(AppRouter.self) private var router
+    @Environment(PosterStore.self) private var posterStore
     @Environment(\.scenePhase) private var scenePhase
-    @State private var selection = AppTab.home
+    // Jobs funded through Stripe checkout (payments branch), shown under Jobs > Posted.
     @StateObject private var postedJobs = PostedJobsStore()
     @StateObject private var workerPayments = WorkerPayments()
+    // The job being posted, shared by Post a job → Proof checklist → Fund.
+    @State private var postDraft = PostDraft()
+    /// The tab bar steps aside while typing, instead of riding up on the keyboard.
+    @State private var isKeyboardShown = false
 
     var body: some View {
-        TabView(selection: $selection) {
-            NavigationStack {
-                HomeView()
-            }
-            .tabItem {
-                Label("Home", systemImage: "house.fill")
-            }
-            .tag(AppTab.home)
+        Group {
+            if let route = router.route {
+                routeView(route)
+                    .id(route)
+            } else {
+                VStack(spacing: 0) {
+                    ZStack {
+                        tabView(router.tab)
+                            .id(router.tab)
+                            .transition(.opacity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            NavigationStack {
-                JobsView()
+                    if !isKeyboardShown {
+                        BountyTabBar(selection: router.tab) { router.select($0) }
+                    }
+                }
             }
-            .tabItem {
-                Label("Jobs", systemImage: "briefcase.fill")
-            }
-            .tag(AppTab.jobs)
-
-            NavigationStack {
-                CreateJobView()
-            }
-            .tabItem {
-                Label("Post", systemImage: "plus.circle.fill")
-            }
-            .tag(AppTab.post)
-
-            NavigationStack {
-                TwinView()
-            }
-            .tabItem {
-                Label("Twin", systemImage: "person.crop.circle.fill")
-            }
-            .tag(AppTab.twin)
-
-            NavigationStack {
-                EarningsView()
-            }
-            .tabItem {
-                Label("Earnings", systemImage: "dollarsign.circle.fill")
-            }
-            .tag(AppTab.earnings)
         }
-        .tint(BountyTheme.accent)
+        .environment(\.screenExiting, router.transition.isExiting)
+        .preferredColorScheme(router.route?.usesDarkStatusBar == true ? .dark : .light)
         .environmentObject(postedJobs)
         .environmentObject(workerPayments)
+        .environment(postDraft)
+        // Re-check pending checkouts whenever the app comes back to the foreground.
         .task(id: scenePhase) {
-            if scenePhase == .active {
-                await postedJobs.refresh()
-                await workerPayments.refresh()
-            }
+            if scenePhase == .active { await postedJobs.refresh(); await workerPayments.refresh() }
         }
-        .onAppear(perform:consumePendingPushRoute)
+        .onAppear(perform: consumePendingPushRoute)
         .onReceive(NotificationCenter.default.publisher(for: .pushRouteChanged)) { _ in
             consumePendingPushRoute()
+        }
+        // Hand the APNs token to the backend so it can push poster alerts (PushNotificationManager
+        // saves it on registration; this also catches a token from before launch finished).
+        .task {
+            if let token = UserDefaults.standard.string(forKey: PushRegistration.deviceTokenKey) {
+                await posterStore.registerForPush(token: token)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .didRegisterPushToken)) { note in
+            guard let token = note.object as? String else { return }
+            Task { await posterStore.registerForPush(token: token) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            isKeyboardShown = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            isKeyboardShown = false
+        }
+    }
+
+    @ViewBuilder
+    private func tabView(_ tab: AppTab) -> some View {
+        switch tab {
+        case .home: HomeView()
+        case .jobs: JobsView()
+        case .post: CreateJobView()
+        case .twin: TwinView()
+        case .earnings: EarningsView()
+        }
+    }
+
+    @ViewBuilder
+    private func routeView(_ route: AppRoute) -> some View {
+        switch route {
+        case .lockScreenOffer: LockScreenOfferView()
+        case .offer: OfferView()
+        case .jobDetail: JobDetailView()
+        case .proofCapture: ProofCaptureView()
+        case .proofCheck: ProofCheckView()
+        case .proofChecklist: ProofChecklistView()
+        case .fundJob: FundJobView()
+        case .reviewProof: ReviewProofView()
+        case .postedJob: PostedJobDetailView()
         }
     }
 
     private func consumePendingPushRoute() {
         let defaults = UserDefaults.standard
+        if defaults.string(forKey: PushRoute.destinationKey) == PushRoute.postedJobDestination,
+           let jobID = defaults.string(forKey: PushRoute.jobIDKey) {
+            let type = defaults.string(forKey: PushRoute.actionKey) ?? ""
+            [PushRoute.destinationKey, PushRoute.actionKey, PushRoute.jobIDKey].forEach(defaults.removeObject(forKey:))
+            Task { await openPostedJob(jobID, type: type) }
+            return
+        }
         guard defaults.string(forKey: PushRoute.destinationKey) == "jobs" else { return }
-        selection = .jobs
+        router.reset(to: .jobs)
         defaults.removeObject(forKey: PushRoute.destinationKey)
     }
 }
 
-private enum AppTab: Hashable {
-    case home
-    case jobs
-    case post
-    case twin
-    case earnings
+extension RootTabView {
+    /// Opens a poster alert's job: its review when it's waiting on the poster, else its timeline.
+    /// A shared alert (dispute, resolution, missed deadline) for a job that isn't ours goes to Jobs.
+    private func openPostedJob(_ jobID: String, type: String) async {
+        let job = await posterStore.refresh(jobId: jobID)
+        router.jobsSegment = .posted
+        router.reset(to: .jobs)
+        guard let job else { return }
+        let wantsReview = PosterPush.reviewTypes.contains(type) && job.status == .inReview
+        router.open(wantsReview ? .reviewProof : .postedJob, posterJob: job.id)
+    }
+}
+
+/// Five tabs: Home, Jobs, Post, Twin, Earnings. Post is always the yellow action.
+struct BountyTabBar: View {
+    let selection: AppTab
+    let onSelect: (AppTab) -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            item(.home, title: "Home", icon: .house)
+            item(.jobs, title: "Jobs", icon: .briefcase)
+            item(.post, title: "Post", icon: .plus)
+            item(.twin, title: "Twin", icon: .sparkles)
+            item(.earnings, title: "Earnings", icon: .wallet)
+        }
+        .padding(.top, 5)
+        .frame(height: 49, alignment: .top)
+        .background {
+            BountyColor.canvas
+                .overlay(alignment: .top) {
+                    BountyColor.divider.frame(height: 1)
+                }
+                .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    private func item(_ tab: AppTab, title: String, icon: BountyIcon) -> some View {
+        let isSelected = tab == selection
+        let isPost = tab == .post
+        return Button {
+            onSelect(tab)
+        } label: {
+            VStack(spacing: 3) {
+                IconGlyph(icon: icon, size: 24, weight: isPost ? .semibold : .regular)
+                    .foregroundStyle(isSelected || isPost ? BountyColor.inkPrimary : BountyColor.inkTertiary)
+                    .frame(width: isPost ? 52 : 56, height: 36)
+                    .background {
+                        Capsule()
+                            .fill(isPost ? BountyColor.yellow : BountyColor.pill)
+                            .opacity(isPost || isSelected ? 1 : 0)
+                    }
+                Text(title)
+                    .bountyType(.caption)
+                    .foregroundStyle(isSelected || isPost ? BountyColor.inkPrimary : BountyColor.inkTertiary)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle())
+        .animation(Motion.tabSwitch, value: isSelected)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
 }
 
 #Preview {
     RootTabView()
+        .environment(AppRouter())
+        .environment(PosterStore(api: MockJobsAPI(stepDelay: 0)))
 }

@@ -10,7 +10,7 @@ import { CryptoPayments } from './crypto.mjs';
 const secretKey = process.env.STRIPE_SECRET_KEY;
 const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
 if (!/^(sk_test_|rk_test_|rkcs_test_)/.test(secretKey ?? '') || !publishableKey?.startsWith('pk_test_')) {
-  throw new Error('Set test-mode STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY in backend/.env.');
+  throw new Error('Set test-mode STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY in payments-server/.env.');
 }
 mkdirSync(new URL('./data', import.meta.url), { recursive: true });
 const stripe = new Stripe(secretKey, { maxNetworkRetries: 2, timeout: 20_000 });

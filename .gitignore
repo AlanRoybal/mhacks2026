@@ -6,6 +6,6 @@ node_modules/
 .env
 .env.*
 !.env.example
-backend/data/
+payments-server/data/
 Config/Local.xcconfig
 .stripe/
