@@ -58,6 +58,10 @@ struct PostedJobDetailView: View {
                     .entrance(.rest(0))
                 }
 
+                // Step 9: paid or refunded jobs ask for a rating, then show the one given.
+                RateWorkerCard(job: job)
+                    .entrance(.rest(0))
+
                 if job.status != .draft {
                     StatusTimeline(job: job)
                         .padding(16)

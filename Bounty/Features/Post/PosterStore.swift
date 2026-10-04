@@ -120,6 +120,12 @@ final class PosterStore {
         upsert(try await api.dispute(jobId: job.id, checklistItemId: item.id, note: note))
     }
 
+    /// Rates the worker once the job is closed. `comment` is optional; blank means none.
+    func rate(_ job: PostedJob, stars: Int, comment: String) async throws {
+        let trimmed = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+        upsert(try await api.rate(jobId: job.id, stars: stars, comment: trimmed.isEmpty ? nil : trimmed))
+    }
+
     /// Jobs where the poster needs to act come first, then everything else by date.
     var sortedJobs: [PostedJob] {
         jobs.sorted { lhs, rhs in

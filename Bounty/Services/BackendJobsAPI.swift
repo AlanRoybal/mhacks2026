@@ -54,6 +54,15 @@ actor BackendJobsAPI: JobsAPI {
         try await send("POST", "jobs/\(jobId)/dispute", body: ["checklistItemId": checklistItemId, "note": note])
     }
 
+    func rate(jobId: String, stars: Int, comment: String?) async throws -> PostedJob {
+        try await send("POST", "jobs/\(jobId)/rating", body: RatingBody(stars: stars, comment: comment))
+    }
+
+    private struct RatingBody: Encodable {
+        let stars: Int
+        let comment: String?
+    }
+
     func registerDevice(token: String) async throws {
         #if DEBUG
         let env = "sandbox"     // Xcode builds use APNs' sandbox

@@ -32,6 +32,7 @@ Added on top of the integration without changing iosA's screens, `PostDraft` or 
 - **Post a job:** the address field has a locate button (search or current location). The picked coordinates go to `/payment-sheet` as the optional `location`.
 - **No backend running:** `PosterStore` switches to `MockJobsAPI` sample jobs and says so under the Posted list.
 - **Poster alerts:** the app registers its APNs token with `POST /me/devices` (as `guest-poster`) at launch. Tapping a poster push (`proof_ready`, `proof_needs_decision`, `offer_accepted`, …) opens that job: the review when it's waiting on the poster, else its timeline. A local "Review closing soon" reminder fires before payment auto-releases (30 s ahead in 2-minute windows, an hour ahead otherwise). `PosterPush.swift` has the type lists.
+- **Rating the worker:** after approving (and on a paid or refunded job's timeline), the poster picks 1–5 stars with an optional note; `RateWorkerCard` sends `POST /jobs/{id}/rating` and then shows the rating given (`ratings.byPoster`).
 - **Models:** the backend-shaped model is `PostedJob` (`Bounty/Models/PostedJob.swift`); `Job` stays iosA's display model for the worker screens.
 
 Verified on the iPhone 17 simulator (build, Posted list, review, approve, locate) and against `npm run dev` with curl (checkout with location, `/jobs/mine`, dispute, approve).

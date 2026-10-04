@@ -31,6 +31,9 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
     /// Distance from the worker, in miles. `nil` for remote jobs or the poster's own view.
     var distanceMiles: Double?
 
+    /// Ratings left after the job closed. `nil` until the backend sends them.
+    var ratings: JobRatings?
+
     init(
         id: String = UUID().uuidString,
         title: String,
@@ -95,6 +98,14 @@ extension PostedJob {
         if isRemote { return "Remote" }
         guard let distanceMiles else { return location?.address ?? "" }
         return "\(distanceMiles.formatted(.number.precision(.fractionLength(1)))) mi"
+    }
+
+    /// The poster's rating of the worker, once given.
+    var posterRating: JobRating? { ratings?.byPoster }
+
+    /// The poster can rate once the job is closed, if someone worked on it and they haven't yet.
+    var canRateWorker: Bool {
+        (status == .released || status == .refunded) && worker != nil && posterRating == nil
     }
 
     /// "Today, 6:00 PM", "Tomorrow, 2:00 PM", or "Oct 5, 8:00 PM".
@@ -329,4 +340,17 @@ struct NewJobDraft: Codable, Hashable, Sendable {
     var payAmount: Decimal = 25
     var currency = PayCurrency.usd
     var posterPhotos: [URL] = []
+}
+
+// MARK: - Ratings
+
+/// `ratings` on the backend's Job: each side rates the other once, after RELEASED or REFUNDED.
+struct JobRatings: Codable, Hashable, Sendable {
+    var byPoster: JobRating?
+    var byWorker: JobRating?
+}
+
+struct JobRating: Codable, Hashable, Sendable {
+    var stars: Int
+    var comment: String?
 }
