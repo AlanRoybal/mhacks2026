@@ -150,7 +150,7 @@ export interface Offer {
 }
 
 export type EvidencePhase = "before" | "after" | "single";
-export type EvidenceKind = "photo" | "link" | "file" | "location";
+export type EvidenceKind = "photo" | "video" | "link" | "file" | "location";
 
 export interface EvidenceItem {
   checklistItemId: string;
@@ -168,6 +168,8 @@ export interface EvidenceItem {
   // In-app capture: SHA-256 of the file and the app's signature over it (services/capture.ts).
   sha256?: string;
   signature?: string;
+  // A still the app took from a proof video (the video's blob key). The grader reads frames, not video.
+  frameOf?: string;
 }
 
 export interface ProofChecks {

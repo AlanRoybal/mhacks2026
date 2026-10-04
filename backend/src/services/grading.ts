@@ -19,12 +19,19 @@ const READABLE_IMAGES = new Set(["image/jpeg", "image/png", "image/webp", "image
 async function evidenceFor(deps: Deps, job: Job, proof: Proof): Promise<GradeEvidence[]> {
   const out: GradeEvidence[] = [];
   for (const e of proof.items) {
-    const base = { itemId: e.checklistItemId, phase: e.phase, kind: e.kind, note: e.note } as const;
+    const base = { itemId: e.checklistItemId, phase: e.phase, kind: e.kind === "video" ? "file" : e.kind, note: e.note } as const;
+    // The model reads stills: the app sends a few frames with every video, and those follow as photos.
+    if (e.kind === "video") {
+      const frames = proof.items.filter((f) => f.frameOf === e.blobKey).length;
+      out.push({ ...base, text: `The worker recorded a short video of this item in the app. ${frames} frame${frames === 1 ? "" : "s"} from it follow.` });
+      continue;
+    }
     if ((e.kind === "photo" || e.kind === "file") && e.blobKey) {
       const type = e.contentType ?? "";
       if (READABLE_IMAGES.has(type)) {
         const bytes = await deps.blobs.get(e.blobKey);
-        if (bytes) out.push({ ...base, image: { mediaType: type as "image/jpeg", base64: bytes.toString("base64") } });
+        const note = e.frameOf ? ["Frame from the video", e.note].filter(Boolean).join(". ") : e.note;
+        if (bytes) out.push({ ...base, note, image: { mediaType: type as "image/jpeg", base64: bytes.toString("base64") } });
         continue;
       }
       out.push({ ...base, text: `A ${type || "file"} was uploaded; it cannot be shown here.` });

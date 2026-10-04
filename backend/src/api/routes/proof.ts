@@ -26,9 +26,14 @@ const Photo = FileRef.extend({
   longitude: z.number().min(-180).max(180).optional(),
   ...InAppCapture,
 });
+// A short in-app video, with a few stills the app pulled from it (each signed like a photo).
+const Video = Photo.extend({
+  frames: z.array(FileRef.extend(InAppCapture)).min(1).max(4),
+});
 const ProofItemIn = z.object({
   checklistItemId: z.string(),
   photos: z.array(Photo).max(10).optional(),
+  videos: z.array(Video).max(3).optional(),
   link: z.string().url().optional(),
   files: z.array(FileRef).max(5).optional(),
   checkIn: z.object({ latitude: z.number(), longitude: z.number(), at: z.string().datetime({ offset: true }) }).optional(),
@@ -54,6 +59,20 @@ function toEvidence(deps: Deps, user: User, job: Job, body: z.infer<typeof Proof
         sha256: p.sha256,
         signature: p.signature,
       });
+    }
+    for (const v of item.videos ?? []) {
+      const capture = {
+        checklistItemId: item.checklistItemId,
+        phase: v.phase ?? (checklistItem.beforeAfter ? "after" : "single"),
+        capturedAt: new Date(v.capturedAt).toISOString(),
+        lat: v.latitude,
+        lng: v.longitude,
+      } as const;
+      const videoKey = ownedUploadKey(deps, user.userId, v);
+      out.push({ ...capture, kind: "video", blobKey: videoKey, sha256: v.sha256, signature: v.signature });
+      for (const f of v.frames) {
+        out.push({ ...capture, kind: "photo", blobKey: ownedUploadKey(deps, user.userId, f), sha256: f.sha256, signature: f.signature, frameOf: videoKey });
+      }
     }
     for (const f of item.files ?? []) out.push({ checklistItemId: item.checklistItemId, kind: "file", phase: "single", blobKey: ownedUploadKey(deps, user.userId, f) });
     if (item.link) out.push({ checklistItemId: item.checklistItemId, kind: "link", phase: "single", url: item.link });

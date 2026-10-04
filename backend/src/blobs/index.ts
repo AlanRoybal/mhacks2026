@@ -15,6 +15,8 @@ export function createBlobs(config: Config): Blobs {
 // Upload size limits, checked when the upload is used (presigned PUTs cannot enforce size).
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
+// Short proof videos from the in-app camera (about 20 seconds at medium quality).
+export const MAX_VIDEO_BYTES = 60 * 1024 * 1024;
 
 export * from "./blobs.js";
 export { LocalBlobs } from "./localBlobs.js";

@@ -245,3 +245,41 @@ test("only photos taken with the Bounty camera for this job count", async () => 
   assert.equal(ok.ok, true);
   assert.deepEqual(ok.notCapturedInApp, []);
 });
+
+test("a short in-app video can stand in for an item's photos", async () => {
+  const deps = testDeps();
+  const { api, poster, worker, job } = await startedJob(deps);
+  const items = await fullProof(deps, api, worker.token, job, 11);
+  const photoItem = items.find((i) => i.photos);
+  assert.ok(photoItem);
+
+  // The app records the clip, pulls three stills from it, and signs the clip and each still.
+  const { body: upload } = await api.call("POST", "/uploads/presign", worker.token, { contentType: "video/quicktime" });
+  const clip = [0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70, 11];
+  await api.app.request(upload.uploadURL.replace(deps.config.PUBLIC_BASE_URL, ""), { method: "PUT", headers: upload.headers, body: new Uint8Array(clip) });
+  const signedClip = await capturedPhoto(deps, api, worker.token, job, clip);
+  const frames = [];
+  for (const n of [1, 2, 3]) {
+    const frame = await capturedPhoto(deps, api, worker.token, job, [77, n]);
+    frames.push({ fileURL: frame.fileURL, sha256: frame.sha256, signature: frame.signature });
+  }
+  const video = { ...signedClip, fileURL: upload.fileURL, frames };
+  delete photoItem.photos;
+  photoItem.videos = [video];
+
+  const pre = await api.call("POST", `/jobs/${job.id}/proof/precheck`, worker.token, { items });
+  assert.equal(pre.body.checks.ok, true, JSON.stringify(pre.body.checks));
+
+  const unsigned = await api.call("POST", `/jobs/${job.id}/proof/precheck`, worker.token, {
+    items: items.map((i) => (i === photoItem ? { ...i, videos: [{ ...video, signature: undefined }] } : i)),
+  });
+  assert.deepEqual(unsigned.body.checks.notCapturedInApp, [photoItem.checklistItemId]);
+
+  assert.equal((await api.call("POST", `/jobs/${job.id}/proof`, worker.token, { items })).status, 200);
+  await deps.settle();
+  const review = await api.call("GET", `/jobs/${job.id}`, poster.token);
+  assert.equal(review.body.status, "IN_REVIEW");
+  const shown = (review.body.proof.items as Json[]).find((i) => i.checklistItemId === photoItem.checklistItemId);
+  assert.equal(shown?.videoURLs.length, 1, "the poster can watch the clip");
+  assert.deepEqual(shown?.photoURLs, [], "its stills aren't listed as separate photos");
+});

@@ -1,7 +1,7 @@
 // Serves LocalBlobs presigned URLs. Mounted only when BLOBS=local.
 import { Hono } from "hono";
 import type { LocalBlobs } from "../../blobs/index.js";
-import { MAX_FILE_BYTES } from "../../blobs/index.js";
+import { MAX_VIDEO_BYTES } from "../../blobs/index.js";
 import { AppError, forbidden, notFound } from "../../lib/errors.js";
 import type { AppEnv } from "../http.js";
 
@@ -13,7 +13,7 @@ export function localBlobRoutes(blobs: LocalBlobs): Hono<AppEnv> {
     const key = keyOf(c.req.path);
     if (!blobs.verify("PUT", key, c.req.query("exp"), c.req.query("sig"))) throw forbidden("Upload link expired or invalid");
     const bytes = Buffer.from(await c.req.arrayBuffer());
-    if (bytes.length > MAX_FILE_BYTES) throw new AppError(422, "too_large", "File is too large");
+    if (bytes.length > MAX_VIDEO_BYTES) throw new AppError(422, "too_large", "File is too large");
     await blobs.put(key, bytes, c.req.header("content-type"));
     return c.body(null, 200);
   });

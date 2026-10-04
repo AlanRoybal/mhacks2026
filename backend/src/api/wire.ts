@@ -67,7 +67,7 @@ export function proofWire(deps: Deps, proof: Proof) {
     submittedAt: wireDate(proof.createdAt),
     items: ids.map((checklistItemId) => {
       const items = proof.items.filter((i) => i.checklistItemId === checklistItemId);
-      const photos = items.filter((i) => i.kind === "photo");
+      const photos = items.filter((i) => i.kind === "photo" && !i.frameOf);
       const byPhase = (phase: string) => photos.filter((p) => p.phase === phase).map((p) => url(p.blobKey)).filter(Boolean);
       const location = items.find((i) => i.kind === "location");
       return {
@@ -77,6 +77,7 @@ export function proofWire(deps: Deps, proof: Proof) {
         afterPhotoURLs: byPhase("after"),
         link: items.find((i) => i.kind === "link")?.url ?? null,
         fileURLs: items.filter((i) => i.kind === "file").map((i) => url(i.blobKey)).filter(Boolean),
+        videoURLs: items.filter((i) => i.kind === "video").map((i) => url(i.blobKey)).filter(Boolean),
         checkedInAt: wireDate(location?.capturedAt),
         note: items.find((i) => i.note)?.note ?? null,
       };

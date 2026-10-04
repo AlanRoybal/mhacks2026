@@ -5,7 +5,7 @@
 // predates the start of the job, or a photo was already used as proof before. Location problems are warnings: they are shown to the grader and the
 // poster, and a CHECK_IN item outside the job site fails grading.
 
-import { MAX_FILE_BYTES, MAX_PHOTO_BYTES } from "../blobs/index.js";
+import { MAX_FILE_BYTES, MAX_PHOTO_BYTES, MAX_VIDEO_BYTES } from "../blobs/index.js";
 import type { Deps } from "../deps.js";
 import { haversineKm } from "../domain/geo.js";
 import { newId } from "../domain/ids.js";
@@ -40,7 +40,7 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
   for (const e of items) {
     if (!e.blobKey) continue;
     const info = await deps.blobs.head(e.blobKey);
-    const limit = e.kind === "photo" ? MAX_PHOTO_BYTES : MAX_FILE_BYTES;
+    const limit = e.kind === "photo" ? MAX_PHOTO_BYTES : e.kind === "video" ? MAX_VIDEO_BYTES : MAX_FILE_BYTES;
     if (!info || info.size > limit) {
       missingUploads.push(e.checklistItemId);
       continue;
@@ -51,20 +51,24 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
     if (usedBy && usedBy.jobId !== job.jobId) duplicates.push(e.checklistItemId);
     // Photos must come from the Bounty camera: the app's signature has to match these exact bytes.
     // Jobs started before in-app capture have no key and skip this.
-    if (e.kind === "photo" && job.capture && !(await capturedInApp(deps, job, e))) notCapturedInApp.push(e.checklistItemId);
+    if ((e.kind === "photo" || e.kind === "video") && job.capture && !(await capturedInApp(deps, job, e))) notCapturedInApp.push(e.checklistItemId);
   }
 
   // 2. Coverage, counting distinct uploaded images: the same image can't fill two photo slots or be
-  //    both the "before" and the "after".
+  //    both the "before" and the "after". A video of the item covers it on its own (its frames don't
+  //    count as separate photos).
   for (const item of job.checklist) {
     const evidence = items.filter((e) => e.checklistItemId === item.id);
-    const uploadedPhotos = evidence.filter((e) => e.kind === "photo" && e.etag);
+    const uploadedPhotos = evidence.filter((e) => e.kind === "photo" && e.etag && !e.frameOf);
     const before = new Set(uploadedPhotos.filter((p) => p.phase === "before").map((p) => p.etag));
     const after = new Set(uploadedPhotos.filter((p) => p.phase !== "before").map((p) => p.etag));
+    const videos = evidence.filter((e) => e.kind === "video" && e.etag);
+    const videoBefore = videos.some((v) => v.phase === "before");
+    const videoAfter = videos.some((v) => v.phase !== "before");
     let covered: boolean;
     switch (item.evidenceType) {
       case "PHOTO":
-        covered = after.size >= (item.photoCount ?? 1) && (!item.beforeAfter || before.size >= 1);
+        covered = (videoAfter || after.size >= (item.photoCount ?? 1)) && (!item.beforeAfter || videoBefore || before.size >= 1);
         if ([...before].some((etag) => after.has(etag))) duplicates.push(item.id);
         break;
       case "CHECK_IN":
@@ -74,7 +78,7 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
         covered = evidence.some((e) => e.kind === "link" && Boolean(e.url));
         break;
       case "FILE":
-        covered = evidence.some((e) => (e.kind === "file" || e.kind === "photo") && e.etag);
+        covered = evidence.some((e) => (e.kind === "file" || e.kind === "photo" || e.kind === "video") && e.etag);
         break;
     }
     if (item.required && !covered) missingRequired.push(item.id);
@@ -83,19 +87,20 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
   // 3. Time and place: photos and check-ins after the worker started, at the job.
   const issuedAt = Date.parse(job.capture?.issuedAt ?? job.challenge?.issuedAt ?? job.startedAt ?? "");
   for (const e of items) {
-    if (e.kind === "photo" || e.kind === "location") {
+    if (e.kind === "photo" || e.kind === "video" || e.kind === "location") {
       const at = Date.parse(e.capturedAt ?? "");
       if (!Number.isFinite(at) || at < issuedAt - CLOCK_SKEW_MS || at > now + CLOCK_SKEW_MS) outsideTimeWindow.push(e.checklistItemId);
     }
-    if (!job.remote && job.location && (e.kind === "photo" || e.kind === "location")) {
+    // A video's frames share its time and place, so they aren't checked twice.
+    if (!job.remote && job.location && ((e.kind === "photo" && !e.frameOf) || e.kind === "video" || e.kind === "location")) {
       const limit = e.kind === "location" ? deps.config.rules.checkInRadiusM : photoGeofenceM(deps);
       if (e.lat === undefined || e.lng === undefined) {
-        warnings.push(`${e.checklistItemId}: no GPS on ${e.kind === "location" ? "the check-in" : "a photo"}`);
+        warnings.push(`${e.checklistItemId}: no GPS on ${e.kind === "location" ? "the check-in" : `a ${e.kind}`}`);
         outsideGeofence.push(e.checklistItemId);
       } else {
         const meters = Math.round(haversineKm({ lat: e.lat, lng: e.lng }, job.location) * 1000);
         if (meters > limit) {
-          warnings.push(`${e.checklistItemId}: ${e.kind === "location" ? "check-in" : "photo"} taken ${meters} m from the job`);
+          warnings.push(`${e.checklistItemId}: ${e.kind === "location" ? "check-in" : e.kind} taken ${meters} m from the job`);
           outsideGeofence.push(e.checklistItemId);
         }
       }
