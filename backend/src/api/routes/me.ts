@@ -2,12 +2,15 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Deps } from "../../deps.js";
 import type { User } from "../../domain/types.js";
-import { reliability, updateUser } from "../../services/users.js";
+import { conflict } from "../../lib/errors.js";
+import { newUser, reliability, updateUser } from "../../services/users.js";
 import { isAdmin } from "../auth.js";
 import { parseBody, type AppEnv } from "../http.js";
 import { wireDate } from "../wire.js";
 
 const MAX_DEVICES = 5;
+// Money is still held or moving for jobs in these states.
+const OPEN_STATES = new Set(["FUNDED", "OFFERED", "ACCEPTED", "IN_PROGRESS", "SUBMITTED", "IN_REVIEW", "DISPUTED"]);
 
 export function meView(deps: Deps, user: User) {
   const r = reliability(user.stats);
@@ -43,6 +46,34 @@ export function meRoutes(deps: Deps): Hono<AppEnv> {
       u.displayName = body.displayName;
     });
     return c.json(meView(deps, user));
+  });
+
+  // Account deletion (settings): wipes personal data and the twin, and unlinks the sign-in identities so
+  // the next sign-in starts a new account. Jobs and ledger rows stay, since the other party and payment
+  // records depend on them. Refused while any job is open, because money is still held for it.
+  app.delete("/", async (c) => {
+    const user = c.get("user");
+    const [posted, working] = await Promise.all([deps.store.listJobsByPoster(user.userId), deps.store.listJobsByWorker(user.userId)]);
+    if ([...posted, ...working].some((j) => OPEN_STATES.has(j.state))) {
+      throw conflict("open_jobs", "Finish or cancel your open jobs before deleting your account");
+    }
+    for (const [provider, subject] of Object.entries(user.identities)) {
+      // There is no KV delete; an entry that expires in a second reads as absent, so the identity is free again.
+      if (subject) await deps.store.kvPut(`identity:${provider}:${subject}`, "deleted", { ttlSeconds: 1 });
+    }
+    await updateUser(deps, user.userId, (u) => {
+      const blank = newUser({ userId: u.userId, displayName: "Deleted user" }, deps.now());
+      u.displayName = blank.displayName;
+      u.email = undefined;
+      u.photoUrl = undefined;
+      u.identities = {};
+      u.twin = blank.twin;
+      u.prefs = blank.prefs;
+      u.availability = undefined;
+      u.devices = [];
+    });
+    deps.log.info("Account deleted", { userId: user.userId });
+    return c.body(null, 204);
   });
 
   // Called after registerForRemoteNotifications. env is "sandbox" for Xcode builds, "production" for TestFlight.

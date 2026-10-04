@@ -116,3 +116,19 @@ test("TwinKit's LinkedIn code exchange reports missing configuration clearly", a
   assert.equal(res.status, 400);
   assert.equal(((await res.json()) as { error: { code: string } }).error.code, "not_configured");
 });
+
+test("deleting an account wipes it and frees the sign-in identity", async () => {
+  const app = createApp(testDeps());
+  const first = await call(app, "POST", "/auth/demo", { handle: "leaver", displayName: "Leaver" });
+  const res = await app.request("/me", { method: "DELETE", headers: { authorization: `Bearer ${first.body.token}` } });
+  assert.equal(res.status, 204);
+
+  const me = await call(app, "GET", "/me", undefined, first.body.token);
+  assert.equal(me.body.displayName, "Deleted user");
+  assert.equal(me.body.email, null);
+
+  // The identity mapping expires a second later; the same handle then gets a new account.
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  const again = await call(app, "POST", "/auth/demo", { handle: "leaver" });
+  assert.notEqual(again.body.userId, first.body.userId);
+});

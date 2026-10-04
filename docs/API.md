@@ -62,6 +62,7 @@ Every sign-in returns the same session body:
 | POST | `/auth/demo` | `{ "handle": "judge", "displayName": "Judge" }` | Handles are lowercase letters, digits, `-` or `_`. The same handle is always the same account. Handle `admin` is an admin in local dev only; deployed admins come from `ADMIN_USER_IDS`. Allowed in local dev; on a deployed stage it needs `DEMO_MODE`, `DEMO_LOGIN_KEY`, and the header `x-demo-key: <key>`. |
 | GET | `/me` | — | `{ userId, displayName, email, photoUrl, isAdmin, payouts: { stripeConnected, stripeTransfersEnabled }, pushEnabled, stats: { …counts, acceptRate, completionRate, reliability, workerRating, posterRating }, createdAt }` (US-58). |
 | PATCH | `/me` | `{ "displayName" }` | |
+| DELETE | `/me` | — | 204. Deletes the account: clears the name, email, photo, twin, preferences, availability and devices, and unlinks the sign-in identities so the next sign-in starts fresh. Jobs and ledger rows stay. 409 `open_jobs` while any job is FUNDED through DISPUTED. |
 | POST | `/me/devices` | `{ "token": "<hex APNs token>", "env": "sandbox" \| "production" }` | Call it on every launch. `sandbox` is for Xcode builds and `production` for TestFlight. The server deletes tokens Apple rejects, which puts `notifications` back into `readiness.missing` and stops the worker being matched. |
 
 ## TwinKit routes
