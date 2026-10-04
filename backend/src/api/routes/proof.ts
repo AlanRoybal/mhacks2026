@@ -12,12 +12,19 @@ import { visibleJob } from "./jobs.js";
 import { ownedUploadKey } from "./uploads.js";
 
 const FileRef = z.object({ fileURL: z.string().optional(), blobKey: z.string().optional() });
+// Signed by the app right after it captured the file (services/capture.ts).
+const InAppCapture = {
+  sha256: z.string().regex(/^[0-9a-fA-F]{64}$/).optional(),
+  signature: z.string().max(200).optional(),
+};
 const Photo = FileRef.extend({
   // "before" photos are taken at the start of before/after items; everything else is the result.
   phase: z.enum(["before", "after"]).optional(),
+  // The capture time as the app signed it, so it is kept exactly as sent.
   capturedAt: z.string().datetime({ offset: true }),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
+  ...InAppCapture,
 });
 const ProofItemIn = z.object({
   checklistItemId: z.string(),
@@ -44,6 +51,8 @@ function toEvidence(deps: Deps, user: User, job: Job, body: z.infer<typeof Proof
         capturedAt: new Date(p.capturedAt).toISOString(),
         lat: p.latitude,
         lng: p.longitude,
+        sha256: p.sha256,
+        signature: p.signature,
       });
     }
     for (const f of item.files ?? []) out.push({ checklistItemId: item.checklistItemId, kind: "file", phase: "single", blobKey: ownedUploadKey(deps, user.userId, f) });

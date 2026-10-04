@@ -83,3 +83,12 @@ test("money formatting handles negatives and bad durations", () => {
   assert.equal(formatUsd(-150), "-$1.50");
   assert.equal(hourlyCents(1500, Number.NaN), 90000);
 });
+
+test("capture signatures match the app's (shared test vector)", async () => {
+  const { captureMessage, signCapture } = await import("../services/capture.js");
+  const claim = { jobId: "01JOB", sha256: "AB".repeat(32), capturedAt: "2026-10-04T15:20:07Z", lat: 42.2808, lng: -83.743 };
+  assert.equal(captureMessage(claim), `bounty-capture-v1\n01JOB\n${"ab".repeat(32)}\n1791127207\n42.28080\n-83.74300`);
+  assert.equal(captureMessage({ ...claim, lat: undefined, lng: undefined }).endsWith("\n1791127207\n\n"), true);
+  // Bounty/Features/Work/ProofCapture.swift must produce this for the same key and claim.
+  assert.equal(signCapture("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8", claim), "Mbs+Cp4HmHYRobxqCv7nixII08KFGEDy2j2JREh9F+M=");
+});

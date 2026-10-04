@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { FakeAi } from "../ai/fake.js";
 import { test } from "node:test";
 import type { Job, Proof } from "../domain/types.js";
+import { sha256Hex, signCapture } from "../services/capture.js";
 import { decide } from "../services/grading.js";
 import { applyEvent, getJobOrThrow } from "../services/jobs.js";
 import { apiClient, isoIn, type Json } from "../testing/api.js";
@@ -38,13 +39,21 @@ async function uploadPhoto(deps: TestDeps, api: ReturnType<typeof apiClient>, to
   return body.fileURL as string;
 }
 
+// What the app sends for a photo taken with the Bounty camera: the upload, plus its signed fingerprint.
+async function capturedPhoto(deps: TestDeps, api: ReturnType<typeof apiClient>, token: string, job: Json, bytes: number[], extra: Json = {}) {
+  const capturedAt = deps.now().toISOString();
+  const sha256 = sha256Hex(Buffer.from(bytes));
+  const signature = signCapture(job.captureKey, { jobId: job.id, sha256, capturedAt, lat: SITE.lat, lng: SITE.lng });
+  return { fileURL: await uploadPhoto(deps, api, token, bytes), capturedAt, latitude: SITE.lat, longitude: SITE.lng, sha256, signature, ...extra };
+}
+
 async function fullProof(deps: TestDeps, api: ReturnType<typeof apiClient>, token: string, job: Json, seed: number) {
   const now = deps.now().toISOString();
   const items: Json[] = [];
   for (const item of job.checklist as Json[]) {
     if (item.evidenceType === "PHOTO") {
       const photos = [];
-      for (let i = 0; i < item.photoCount; i++) photos.push({ fileURL: await uploadPhoto(deps, api, token, [seed, i, item.id.length]), capturedAt: now, latitude: SITE.lat, longitude: SITE.lng });
+      for (let i = 0; i < item.photoCount; i++) photos.push(await capturedPhoto(deps, api, token, job, [seed, i, item.id.length]));
       items.push({ checklistItemId: item.id, photos });
     }
     if (item.evidenceType === "CHECK_IN") items.push({ checklistItemId: item.id, checkIn: { latitude: SITE.lat, longitude: SITE.lng, at: now } });
@@ -203,4 +212,36 @@ test("a worker who takes over a job doesn't see the previous worker's proofs", a
   await api.call("POST", `/offers/${offer?.offerId}/accept`, next.token);
   assert.deepEqual((await api.call("GET", `/jobs/${job.id}/proofs`, next.token)).body, []);
   assert.equal(((await api.call("GET", `/jobs/${job.id}/proofs`, poster.token)).body as unknown as Json[]).length, 1);
+});
+
+test("only photos taken with the Bounty camera for this job count", async () => {
+  const deps = testDeps();
+  const { api, worker, job } = await startedJob(deps);
+  const items = await fullProof(deps, api, worker.token, job, 7);
+  const photoItem = items.find((i) => i.photos);
+  assert.ok(photoItem);
+  const check = async () => (await api.call("POST", `/jobs/${job.id}/proof/precheck`, worker.token, { items })).body.checks;
+
+  // From the camera roll: no signature.
+  const [signed] = photoItem.photos;
+  photoItem.photos = [{ fileURL: signed.fileURL, capturedAt: signed.capturedAt, latitude: SITE.lat, longitude: SITE.lng }];
+  assert.deepEqual((await check()).notCapturedInApp, [photoItem.checklistItemId]);
+
+  // Signed, but the uploaded bytes aren't the ones that were signed (edited after capture).
+  photoItem.photos = [{ ...signed, fileURL: await uploadPhoto(deps, api, worker.token, [9, 9, 9]) }];
+  assert.deepEqual((await check()).notCapturedInApp, [photoItem.checklistItemId]);
+
+  // Signed with a key from another job.
+  const elsewhere = await capturedPhoto(deps, api, worker.token, { ...job, id: "another-job" }, [4, 5, 6]);
+  photoItem.photos = [elsewhere];
+  assert.deepEqual((await check()).notCapturedInApp, [photoItem.checklistItemId]);
+
+  // A moved GPS fix breaks the signature too.
+  photoItem.photos = [{ ...signed, latitude: SITE.lat + 0.01 }];
+  assert.deepEqual((await check()).notCapturedInApp, [photoItem.checklistItemId]);
+
+  photoItem.photos = [signed];
+  const ok = await check();
+  assert.equal(ok.ok, true);
+  assert.deepEqual(ok.notCapturedInApp, []);
 });

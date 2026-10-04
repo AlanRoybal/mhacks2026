@@ -1,8 +1,8 @@
 // Proof of work: server-side evidence checks (US-39) and submission (US-41).
 //
 // Blocking problems (the app must fix them before submitting): a required item has no evidence,
-// an upload is missing or too large, a photo predates the start of the job, or a photo was already
-// used as proof before. Location problems are warnings: they are shown to the grader and the
+// an upload is missing or too large, a photo wasn't taken with the Bounty camera for this job, a photo
+// predates the start of the job, or a photo was already used as proof before. Location problems are warnings: they are shown to the grader and the
 // poster, and a CHECK_IN item outside the job site fails grading.
 
 import { MAX_FILE_BYTES, MAX_PHOTO_BYTES } from "../blobs/index.js";
@@ -11,6 +11,7 @@ import { haversineKm } from "../domain/geo.js";
 import { newId } from "../domain/ids.js";
 import type { EvidenceItem, Job, Proof, ProofChecks, User } from "../domain/types.js";
 import { conflict, forbidden } from "../lib/errors.js";
+import { verifyCapture, sha256Hex } from "./capture.js";
 import { applyEvent, getJobOrThrow } from "./jobs.js";
 
 // Photos may be stamped a little before the server clock says the job started (device clock skew).
@@ -31,6 +32,7 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
   const outsideGeofence: string[] = [];
   const duplicates: string[] = [];
   const missingUploads: string[] = [];
+  const notCapturedInApp: string[] = [];
   const warnings: string[] = [];
 
   // 1. Uploads exist and fit, and get a fingerprint (MD5 ETag). One photo may cover several items of
@@ -47,6 +49,9 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
     e.contentType = info.contentType ?? e.contentType;
     const usedBy = await deps.store.kvGet<{ jobId: string }>(`etag:${info.etag}`);
     if (usedBy && usedBy.jobId !== job.jobId) duplicates.push(e.checklistItemId);
+    // Photos must come from the Bounty camera: the app's signature has to match these exact bytes.
+    // Jobs started before in-app capture have no key and skip this.
+    if (e.kind === "photo" && job.capture && !(await capturedInApp(deps, job, e))) notCapturedInApp.push(e.checklistItemId);
   }
 
   // 2. Coverage, counting distinct uploaded images: the same image can't fill two photo slots or be
@@ -104,10 +109,19 @@ export async function checkEvidence(deps: Deps, job: Job, items: EvidenceItem[])
     outsideGeofence: uniq(outsideGeofence),
     duplicates: uniq(duplicates),
     missingUploads: uniq(missingUploads),
+    notCapturedInApp: uniq(notCapturedInApp),
     warnings,
   };
-  const ok = checks.missingRequired.length + checks.outsideTimeWindow.length + checks.duplicates.length + checks.missingUploads.length === 0;
+  const ok =
+    checks.missingRequired.length + checks.outsideTimeWindow.length + checks.duplicates.length + checks.missingUploads.length + checks.notCapturedInApp.length === 0;
   return { ok, ...checks };
+}
+
+async function capturedInApp(deps: Deps, job: Job, e: EvidenceItem): Promise<boolean> {
+  if (!job.capture || !e.blobKey || !e.sha256 || !e.signature || !e.capturedAt) return false;
+  const bytes = await deps.blobs.get(e.blobKey);
+  if (!bytes || sha256Hex(bytes) !== e.sha256.toLowerCase()) return false;
+  return verifyCapture(job.capture.key, { jobId: job.jobId, sha256: e.sha256, capturedAt: e.capturedAt, lat: e.lat, lng: e.lng }, e.signature);
 }
 
 export function requireWorker(job: Job, user: User): void {
@@ -125,7 +139,15 @@ export async function submitProof(deps: Deps, user: User, jobId: string, items: 
     workerId: user.userId,
     attempt: job.failedAttempts + 1,
     items,
-    checks: { ok: checks.ok, missingRequired: checks.missingRequired, outsideTimeWindow: checks.outsideTimeWindow, outsideGeofence: checks.outsideGeofence, duplicates: checks.duplicates, missingUploads: checks.missingUploads },
+    checks: {
+      ok: checks.ok,
+      missingRequired: checks.missingRequired,
+      outsideTimeWindow: checks.outsideTimeWindow,
+      outsideGeofence: checks.outsideGeofence,
+      duplicates: checks.duplicates,
+      missingUploads: checks.missingUploads,
+      notCapturedInApp: checks.notCapturedInApp,
+    },
     createdAt: deps.now().toISOString(),
   };
   if (!checks.ok) return { job, proof, checks };

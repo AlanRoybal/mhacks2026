@@ -165,6 +165,9 @@ export interface EvidenceItem {
   lat?: number;
   lng?: number;
   etag?: string;
+  // In-app capture: SHA-256 of the file and the app's signature over it (services/capture.ts).
+  sha256?: string;
+  signature?: string;
 }
 
 export interface ProofChecks {
@@ -174,6 +177,8 @@ export interface ProofChecks {
   outsideGeofence: string[];
   duplicates: string[];
   missingUploads: string[];
+  // Photos or videos that weren't taken with the Bounty camera for this job (or were changed since).
+  notCapturedInApp?: string[];
 }
 
 export interface ItemVerdict {
