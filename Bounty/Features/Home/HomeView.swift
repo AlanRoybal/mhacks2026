@@ -10,6 +10,8 @@ struct HomeView: View {
     @State private var showsSettings = false
     @State private var unreadCount = 0
     @State private var readiness: TwinSettings.Readiness?
+    /// Average seconds from approval to payout across this worker's paid jobs.
+    @State private var payoutSeconds: Int?
 
     private var greeting: String {
         switch Calendar.current.component(.hour, from: .now) {
@@ -56,6 +58,20 @@ struct HomeView: View {
 
             TwinStatusPill(readiness: readiness)
                 .entrance(.top)
+
+            if let payoutSeconds {
+                HStack(spacing: 10) {
+                    IconGlyph(icon: .zap, size: 18)
+                    Text("You\u{2019}re paid \(PayoutSpeed.text(payoutSeconds)) after approval, on average. Escrow means no invoices, no waiting.")
+                        .bountyType(.footnote)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .foregroundStyle(BountyColor.mintInk)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .tintedPanel(BountyColor.mint, radius: 18)
+                .entrance(.top)
+            }
 
             if let offer = marketplace.currentOffer, let job = marketplace.offeredJob {
                 NewMatchCard(
@@ -106,11 +122,13 @@ struct HomeView: View {
         async let me: MeProfile? = try? api.request(.get, "me")
         async let twin: TwinSettings? = try? api.request(.get, "twin")
         async let inbox: InboxPage? = try? api.request(.get, "me/notifications")
+        async let money: EarningsSummary? = try? api.request(.get, "wallet/earnings")
         if includingJobs {
             await marketplace.refresh(api: api)
             await workerPayments.refresh()
         }
-        let (profile, settings, page) = await (me, twin, inbox)
+        let (profile, settings, page, summary) = await (me, twin, inbox, money)
+        payoutSeconds = summary?.averageTimeToPaidSeconds
         if let profile { name = profile.displayName }
         if let settings { readiness = settings.readiness }
         if let page { withAnimation(Motion.press) { unreadCount = page.unreadCount } }

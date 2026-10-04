@@ -14,6 +14,7 @@
 		1506E89A595E9BD62C89C674 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 00653F176E5F56A7F9330976 /* Assets.xcassets */; };
 		16514389B84EE710DDA78727 /* LaunchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73000EEB1A791B50A761F983 /* LaunchView.swift */; };
 		1726AD4BE8F617078320C48C /* CryptoCheckoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62029D8562DB3F9C7D7719ED /* CryptoCheckoutView.swift */; };
+		1954734051052CB880C524AA /* MoneyTrailCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 181EC4939B2EE5B402A6EAAE /* MoneyTrailCard.swift */; };
 		2648EB0D8A6753B81B7323A1 /* MockJobsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A1732769B738D037D975B56 /* MockJobsAPI.swift */; };
 		27A55C706B72D4F97913F92B /* BountyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B75E78AC19B705475CC363 /* BountyApp.swift */; };
 		2F5AA839D4D7D9194209EB9C /* BountyLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B881345578D9442C60B1C2B /* BountyLogo.swift */; };
@@ -25,6 +26,7 @@
 		59293C4BEC733AAEB2C058A9 /* TwinSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E03DB252793796851AC0AF /* TwinSources.swift */; };
 		5B1B545EBF77BA68176EAC68 /* JobsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC90A7ACD84995DB726CAAA /* JobsView.swift */; };
 		5E9F407B368D43CF613B0AF1 /* OfferViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3603C166E2B033C894391DD7 /* OfferViews.swift */; };
+		63637CDEBCC24BDA2EF7CF9C /* ScreenshotTour.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD212D1E2A78823893D549EB /* ScreenshotTour.swift */; };
 		691999A29A6A649083EE701E /* TwinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 639DA50C5ED17C063F385A8F /* TwinView.swift */; };
 		6D9A16F3B9A74710F67B974F /* PostedJobDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F570C8F3A67231C4565BDF53 /* PostedJobDetailView.swift */; };
 		6E85723641B9BC0F24696229 /* LiveReviewProofView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C18A1C5BC0E979DCBE71869 /* LiveReviewProofView.swift */; };
@@ -41,6 +43,7 @@
 		9B904262EAE32B2FE36D5962 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11805AC99C87391587016471 /* Components.swift */; };
 		A260AAD49C3DC621DAB28FBF /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A659F3622D8C9A9C448F582 /* HomeView.swift */; };
 		A510F93D352ADCF910D48AE0 /* JobDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6879C2F5D256C818DE44FEAE /* JobDisplay.swift */; };
+		A53CC700FC9B47499EA69C9B /* RemoteControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034B84D7A195A97B090DF6A6 /* RemoteControl.swift */; };
 		A8B0B68E701E6FC2B59A7756 /* WorkerPayments.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE26CC60A4D4BA0F7F17E467 /* WorkerPayments.swift */; };
 		B04F46213A684C485B7CA242 /* TwinKit in Frameworks */ = {isa = PBXBuildFile; productRef = 58A11A2658EE3AFE68C27C79 /* TwinKit */; };
 		B59CF5857AF944956AA3AD6A /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 002403D446AD2EB6EC7217D6 /* NotificationsView.swift */; };
@@ -52,15 +55,27 @@
 		ED44C175F43DBF6E9510D01B /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7E2F09CDF905685D922897 /* Motion.swift */; };
 		EEA12735F082E2CC54C7B4F0 /* EarningsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125590A634C7CB2F1390755A /* EarningsView.swift */; };
 		F01C9A9668DA7DF4E35ACAC2 /* JobFundingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23558C67A39132B211B07398 /* JobFundingSheet.swift */; };
+		F26CFEF90837101B3C974F38 /* IncomeStatementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA2E289B4C07BF31ACAC251 /* IncomeStatementSheet.swift */; };
 		F2D014C6F39EE17DFC1D4D52 /* PaymentsServerAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA10D25328F0FF4EC9CFA6AD /* PaymentsServerAPI.swift */; };
 		F512E1F58EE4B3BF3293D44C /* GmailConnector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 983C07B6422F2BDF5703C0B9 /* GmailConnector.swift */; };
 		F5B1419706DA28BA5C504DB1 /* Job.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDEE0685875FF28B9B991034 /* Job.swift */; };
 		F60EC55A8E92B9A8A66F0C4D /* CoinbaseWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = A26A85414D248B6E3F7DD153 /* CoinbaseWalletSDK */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		C311CA2074AB06A735D1BB7F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 209C86035F696DCD6A8B3A57 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4E1E8CB3C8969962F03504E6;
+			remoteInfo = Bounty;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		002403D446AD2EB6EC7217D6 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		00653F176E5F56A7F9330976 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		034B84D7A195A97B090DF6A6 /* RemoteControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControl.swift; sourceTree = "<group>"; };
 		0B7E2F09CDF905685D922897 /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
 		0B881345578D9442C60B1C2B /* BountyLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BountyLogo.swift; sourceTree = "<group>"; };
 		0CC90A7ACD84995DB726CAAA /* JobsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsView.swift; sourceTree = "<group>"; };
@@ -68,6 +83,7 @@
 		11805AC99C87391587016471 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		125590A634C7CB2F1390755A /* EarningsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarningsView.swift; sourceTree = "<group>"; };
 		1406EF46384922539D8BA3BC /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		181EC4939B2EE5B402A6EAAE /* MoneyTrailCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyTrailCard.swift; sourceTree = "<group>"; };
 		209BEC4ADD47C11B13577D52 /* PosterStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterStore.swift; sourceTree = "<group>"; };
 		23558C67A39132B211B07398 /* JobFundingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobFundingSheet.swift; sourceTree = "<group>"; };
 		2679EADF798F7C549A97F3EA /* ProofFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProofFlow.swift; sourceTree = "<group>"; };
@@ -80,6 +96,7 @@
 		54627BC3FF0C2B627F7E9D8B /* PushNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationManager.swift; sourceTree = "<group>"; };
 		5A659F3622D8C9A9C448F582 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		5DA3B29F599F6FBA66D82AAA /* WorkViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkViews.swift; sourceTree = "<group>"; };
+		5EA2E289B4C07BF31ACAC251 /* IncomeStatementSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeStatementSheet.swift; sourceTree = "<group>"; };
 		62029D8562DB3F9C7D7719ED /* CryptoCheckoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoCheckoutView.swift; sourceTree = "<group>"; };
 		639DA50C5ED17C063F385A8F /* TwinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwinView.swift; sourceTree = "<group>"; };
 		6879C2F5D256C818DE44FEAE /* JobDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobDisplay.swift; sourceTree = "<group>"; };
@@ -108,6 +125,8 @@
 		EC74DC8BCAE700D156446104 /* JobsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsAPI.swift; sourceTree = "<group>"; };
 		EF3E583821FF7F355811EAC9 /* Bounty.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Bounty.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F570C8F3A67231C4565BDF53 /* PostedJobDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostedJobDetailView.swift; sourceTree = "<group>"; };
+		FC6DBE4C0FF9BD44AF836A86 /* BountyScreenshots.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BountyScreenshots.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FD212D1E2A78823893D549EB /* ScreenshotTour.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotTour.swift; sourceTree = "<group>"; };
 		FDEE0685875FF28B9B991034 /* Job.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Job.swift; sourceTree = "<group>"; };
 		FE4CCB7A0CC7D40B4A484826 /* MarketplaceEarnings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketplaceEarnings.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -160,6 +179,7 @@
 			isa = PBXGroup;
 			children = (
 				EF3E583821FF7F355811EAC9 /* Bounty.app */,
+				FC6DBE4C0FF9BD44AF836A86 /* BountyScreenshots.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -234,6 +254,7 @@
 			isa = PBXGroup;
 			children = (
 				31D185DA9D3C2251ADBCED05 /* Bounty */,
+				C5060A507CAB62D38E8B6BFA /* BountyScreenshots */,
 				5E99CE13E1E0A793BCE2C300 /* Config */,
 				9B382C510A78CB24D8367F76 /* Packages */,
 				14CAADA9C42464F5656FD4C9 /* Products */,
@@ -244,6 +265,7 @@
 			isa = PBXGroup;
 			children = (
 				0CC90A7ACD84995DB726CAAA /* JobsView.swift */,
+				181EC4939B2EE5B402A6EAAE /* MoneyTrailCard.swift */,
 			);
 			path = Jobs;
 			sourceTree = "<group>";
@@ -280,6 +302,7 @@
 			isa = PBXGroup;
 			children = (
 				125590A634C7CB2F1390755A /* EarningsView.swift */,
+				5EA2E289B4C07BF31ACAC251 /* IncomeStatementSheet.swift */,
 				FE4CCB7A0CC7D40B4A484826 /* MarketplaceEarnings.swift */,
 				BE26CC60A4D4BA0F7F17E467 /* WorkerPayments.swift */,
 			);
@@ -333,6 +356,15 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
+		C5060A507CAB62D38E8B6BFA /* BountyScreenshots */ = {
+			isa = PBXGroup;
+			children = (
+				034B84D7A195A97B090DF6A6 /* RemoteControl.swift */,
+				FD212D1E2A78823893D549EB /* ScreenshotTour.swift */,
+			);
+			path = BountyScreenshots;
+			sourceTree = "<group>";
+		};
 		C641E77F3707AFA884A49491 /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -346,6 +378,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		2D6032709166B4CBDCB68C63 /* BountyScreenshots */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 88CB311DC236D049A1D2B79F /* Build configuration list for PBXNativeTarget "BountyScreenshots" */;
+			buildPhases = (
+				B0971264702E3CA54A7D93FF /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F4CF4D5B9EA5A1D30BA8382E /* PBXTargetDependency */,
+			);
+			name = BountyScreenshots;
+			packageProductDependencies = (
+			);
+			productName = BountyScreenshots;
+			productReference = FC6DBE4C0FF9BD44AF836A86 /* BountyScreenshots.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		4E1E8CB3C8969962F03504E6 /* Bounty */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 6AE01037BF3CC444E4699D3B /* Build configuration list for PBXNativeTarget "Bounty" */;
@@ -377,6 +427,11 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					2D6032709166B4CBDCB68C63 = {
+						DevelopmentTeam = DVX8YZ9GG9;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 4E1E8CB3C8969962F03504E6;
+					};
 					4E1E8CB3C8969962F03504E6 = {
 						DevelopmentTeam = DVX8YZ9GG9;
 						ProvisioningStyle = Automatic;
@@ -403,6 +458,7 @@
 			projectRoot = "";
 			targets = (
 				4E1E8CB3C8969962F03504E6 /* Bounty */,
+				2D6032709166B4CBDCB68C63 /* BountyScreenshots */,
 			);
 		};
 /* End PBXProject section */
@@ -419,6 +475,15 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		B0971264702E3CA54A7D93FF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A53CC700FC9B47499EA69C9B /* RemoteControl.swift in Sources */,
+				63637CDEBCC24BDA2EF7CF9C /* ScreenshotTour.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C993DA9255A88FA5CB5ED6E9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -439,6 +504,7 @@
 				EEA12735F082E2CC54C7B4F0 /* EarningsView.swift in Sources */,
 				F512E1F58EE4B3BF3293D44C /* GmailConnector.swift in Sources */,
 				A260AAD49C3DC621DAB28FBF /* HomeView.swift in Sources */,
+				F26CFEF90837101B3C974F38 /* IncomeStatementSheet.swift in Sources */,
 				F5B1419706DA28BA5C504DB1 /* Job.swift in Sources */,
 				A510F93D352ADCF910D48AE0 /* JobDisplay.swift in Sources */,
 				F01C9A9668DA7DF4E35ACAC2 /* JobFundingSheet.swift in Sources */,
@@ -449,6 +515,7 @@
 				0A5758126FDDC608B81DB807 /* LocationPicker.swift in Sources */,
 				DD1917C3911F2E20D6E2DCBD /* MarketplaceEarnings.swift in Sources */,
 				2648EB0D8A6753B81B7323A1 /* MockJobsAPI.swift in Sources */,
+				1954734051052CB880C524AA /* MoneyTrailCard.swift in Sources */,
 				ED44C175F43DBF6E9510D01B /* Motion.swift in Sources */,
 				B59CF5857AF944956AA3AD6A /* NotificationsView.swift in Sources */,
 				5E9F407B368D43CF613B0AF1 /* OfferViews.swift in Sources */,
@@ -472,6 +539,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F4CF4D5B9EA5A1D30BA8382E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4E1E8CB3C8969962F03504E6 /* Bounty */;
+			targetProxy = C311CA2074AB06A735D1BB7F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		342FE7AA4E463D44F67F96EB /* Debug */ = {
@@ -506,6 +581,17 @@
 			};
 			name = Release;
 		};
+		7BD75C2E4A2AC8F8B2DAEFCC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alanroybal.BountyTwin.Screenshots;
+				PRODUCT_NAME = BountyScreenshots;
+				TEST_TARGET_NAME = Bounty;
+			};
+			name = Release;
+		};
 		8F2383395277C5B2EA3E06E5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -520,6 +606,17 @@
 				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
+		};
+		C915ED3432EB6BD0A3EAF6EE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alanroybal.BountyTwin.Screenshots;
+				PRODUCT_NAME = BountyScreenshots;
+				TEST_TARGET_NAME = Bounty;
+			};
+			name = Debug;
 		};
 		D94DD693020319A705ACC3B7 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -544,6 +641,15 @@
 			buildConfigurations = (
 				D94DD693020319A705ACC3B7 /* Debug */,
 				5E850E3B6F5BC9E925470F90 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		88CB311DC236D049A1D2B79F /* Build configuration list for PBXNativeTarget "BountyScreenshots" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C915ED3432EB6BD0A3EAF6EE /* Debug */,
+				7BD75C2E4A2AC8F8B2DAEFCC /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

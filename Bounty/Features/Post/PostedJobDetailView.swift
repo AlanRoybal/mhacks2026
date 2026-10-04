@@ -71,6 +71,9 @@ struct PostedJobDetailView: View {
                         .padding(16)
                         .borderedCard()
                         .entrance(.rest(1))
+
+                    MoneyTrailCard(jobId: job.id, refreshKey: job.status.rawValue)
+                        .entrance(.rest(1))
                 }
 
                 if !history.isEmpty {

@@ -80,6 +80,11 @@ struct JobDetailView: View {
             .borderedCard()
             .entrance(.rest(0))
 
+            if let job {
+                MoneyTrailCard(jobId: job.id, refreshKey: job.status.rawValue)
+                    .entrance(.rest(1))
+            }
+
             if !history.isEmpty {
                 JobHistoryCard(entries: history, payment: job?.payment)
                     .entrance(.rest(1))

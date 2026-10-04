@@ -10,6 +10,7 @@ struct EarningsView: View {
     @State private var onboarding: PayoutSetup?
     @State private var selected: EarningItem?
     @State private var showsSettings = false
+    @State private var showsIncomeStatement = false
     private func amount(_ cents: Int) -> String { (Decimal(cents) / 100).formatted(.number.precision(.fractionLength(2))) }
     private func usd(_ value: Decimal?) -> String { (value ?? 0).formatted(.currency(code: "USD")) }
 
@@ -33,8 +34,13 @@ struct EarningsView: View {
                     Text("USDC \(amount(usdcReleasedCents)) to your wallet")
                         .bountyType(.footnote)
                         .foregroundStyle(BountyColor.inkPill)
-                    Chip(label: "USD and USDC", tone: .dark)
-                        .padding(.top, 6)
+                    if let seconds = earnings.summary?.averageTimeToPaidSeconds {
+                        Chip(label: "Paid \(PayoutSpeed.text(seconds)) after approval", tone: .dark)
+                            .padding(.top, 6)
+                    } else {
+                        Chip(label: "USD and USDC", tone: .dark)
+                            .padding(.top, 6)
+                    }
                 }
                 .foregroundStyle(BountyColor.inkPrimary)
                 .padding(.leading, 20)
@@ -57,6 +63,25 @@ struct EarningsView: View {
 
             payoutPanel
                 .entrance(.rest(1))
+
+            if let summary = earnings.summary {
+                TaxJarCard(summary: summary) { percent in
+                    Task { await earnings.setTaxSetAside(percent, api: services.api) }
+                }
+                .entrance(.rest(1))
+
+                Button { showsIncomeStatement = true } label: {
+                    HStack(spacing: 12) {
+                        StickerTile(sticker: .shield, background: BountyColor.lavenderSoft, size: 44, stickerSize: 34, radius: 13)
+                        TitleSubtitle(title: "Proof of income", subtitle: "A verified statement for landlords and lenders")
+                        IconGlyph(icon: .navigation, size: 18).foregroundStyle(BountyColor.inkSecondary)
+                    }
+                    .padding(14)
+                    .borderedCard(radius: BountyRadius.row)
+                }
+                .buttonStyle(PressableStyle())
+                .entrance(.rest(1))
+            }
 
             SectionHeader(title: "Activity")
             if let items = earnings.summary?.items {
@@ -100,6 +125,7 @@ struct EarningsView: View {
         .sheet(item: $onboarding, onDismiss: { Task { await earnings.syncPayouts(api: services.api) } }) { setup in PayoutBrowser(url: setup.url) }
         .sheet(item: $selected) { item in TransactionDetailView(item: item) }
         .sheet(isPresented: $showsSettings) { SettingsView() }
+        .sheet(isPresented: $showsIncomeStatement) { IncomeStatementSheet() }
         // Stripe sends the worker back to bounty://wallet when onboarding ends.
         .onReceive(NotificationCenter.default.publisher(for: .payoutSetupReturned)) { _ in onboarding = nil }
     }
@@ -158,12 +184,24 @@ struct TransactionDetailView: View {
                     LabeledContent("Rail", value: item.railText)
                     if let reference = item.reference {
                         LabeledContent("Reference") {
-                            Text(reference).font(.caption.monospaced()).textSelection(.enabled)
+                            if let url = item.referenceUrl.flatMap(URL.init(string:)) {
+                                Link(reference, destination: url).font(.caption.monospaced())
+                            } else {
+                                Text(reference).font(.caption.monospaced()).textSelection(.enabled)
+                            }
                         }
+                    }
+                    if let seconds = item.timeToPaidSeconds {
+                        LabeledContent("Paid after approval", value: "in \(PayoutSpeed.text(seconds))")
                     }
                     LabeledContent("Updated", value: item.updatedAt.formatted(date: .abbreviated, time: .shortened))
                 } header: {
                     Text(item.title)
+                }
+                Section {
+                    MoneyTrailCard(jobId: item.jobId, refreshKey: item.status)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
                 }
                 Section("History") {
                     if timeline.isEmpty, message == nil { ProgressView() }
@@ -186,6 +224,50 @@ struct TransactionDetailView: View {
                 do { timeline = try await api.request(.get, "jobs/\(item.jobId)/timeline") } catch { message = error.localizedDescription }
             }
         }
+    }
+}
+
+/// The tax jar: tracks a share of this year's payouts to set aside for taxes. A budgeting aid only; the
+/// money stays in the worker's payout account.
+private struct TaxJarCard: View {
+    let summary: EarningsSummary
+    let onChange: (Int) -> Void
+
+    private var percent: Int { summary.taxSetAside?.percent ?? 0 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                StickerTile(sticker: .coins, background: BountyColor.cream, size: 44, stickerSize: 34, radius: 13)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Tax jar").bountyType(.bodyStrong)
+                    Text(percent == 0 ? "Track a share of each payout for taxes" : "\(percent)% of \((summary.yearToDatePaid ?? 0).formatted(.currency(code: "USD"))) paid this year")
+                        .bountyType(.footnote)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Menu {
+                    ForEach([0, 10, 15, 20, 25, 30], id: \.self) { option in
+                        Button(option == 0 ? "Off" : "\(option)%") { onChange(option) }
+                    }
+                } label: {
+                    Text(percent == 0 ? "Set up" : "\(percent)%")
+                        .bountyType(.subheadStrong)
+                        .foregroundStyle(BountyColor.lavenderInk)
+                }
+            }
+            if percent > 0 {
+                Text((summary.taxSetAside?.amount ?? 0).formatted(.currency(code: "USD")))
+                    .bountyType(.moneyM)
+                    .foregroundStyle(BountyColor.creamInk)
+                Text("Set aside so far. Bounty only tracks this; the money stays in your payout account. Self-employed workers usually owe 15\u{2013}30% of profit; check with a tax professional.")
+                    .bountyType(.caption)
+                    .foregroundStyle(BountyColor.inkSecondary)
+            }
+        }
+        .foregroundStyle(BountyColor.inkPrimary)
+        .padding(14)
+        .borderedCard(radius: BountyRadius.row)
     }
 }
 

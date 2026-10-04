@@ -39,6 +39,17 @@ final class MarketplaceEarnings {
         }
     }
 
+    /// Sets the share of each payout the tax jar tracks (0-50%).
+    func setTaxSetAside(_ percent: Int, api: APIClient?) async {
+        guard let api else { return }
+        do {
+            summary = try await api.request(.put, "wallet/tax", body: ["percent": percent])
+            message = nil
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
     /// After the worker comes back from Stripe: asks the backend to re-read the account's status.
     func syncPayouts(api: APIClient?) async {
         guard let api else { return }
@@ -58,6 +69,17 @@ struct EarningsSummary: Decodable, Sendable {
     let currencies: [CurrencyTotals]
     let payouts: PayoutStatus
     let items: [EarningItem]
+    /// USD paid out this calendar year.
+    let yearToDatePaid: Decimal?
+    /// Average seconds from approval to the payout landing.
+    let averageTimeToPaidSeconds: Int?
+    /// The tracked tax set-aside (nothing is withheld).
+    let taxSetAside: TaxSetAside?
+
+    struct TaxSetAside: Decodable, Sendable {
+        let percent: Int
+        let amount: Decimal
+    }
 
     struct CurrencyTotals: Decodable, Sendable {
         let currency: String
@@ -87,6 +109,10 @@ struct EarningItem: Decodable, Identifiable, Hashable, Sendable {
     let rail: String
     /// The Stripe transfer ID (or chain reference) once paid.
     let reference: String?
+    let referenceUrl: String?
+    let paidAt: Date?
+    /// Seconds from approval to the payout landing.
+    let timeToPaidSeconds: Int?
     let updatedAt: Date
 
     var id: String { jobId }

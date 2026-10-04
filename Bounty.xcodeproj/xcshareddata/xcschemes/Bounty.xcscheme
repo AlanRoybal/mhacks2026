@@ -39,6 +39,16 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "2D6032709166B4CBDCB68C63"
+               BuildableName = "BountyScreenshots.xctest"
+               BlueprintName = "BountyScreenshots"
+               ReferencedContainer = "container:Bounty.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

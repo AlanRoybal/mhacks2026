@@ -88,4 +88,18 @@ targets:
         NSCalendarsFullAccessUsageDescription: Bounty uses your calendar availability to avoid offering jobs when you are busy. Event names never leave this device.
         NSLocationWhenInUseUsageDescription: Bounty uses your location to match nearby jobs and verify on-site work.
     scheme:
-      testTargets: []
+      testTargets: [BountyScreenshots]
+  # Pitch screenshots in the Simulator (BountyScreenshots/ScreenshotTour.swift). Not part of the app.
+  BountyScreenshots:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [BountyScreenshots]
+    dependencies:
+      - target: Bounty
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alanroybal.BountyTwin.Screenshots
+        PRODUCT_NAME: BountyScreenshots
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Bounty
+        CODE_SIGN_ENTITLEMENTS: ""
