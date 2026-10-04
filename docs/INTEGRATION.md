@@ -33,6 +33,7 @@ Added on top of the integration without changing iosA's screens, `PostDraft` or 
 - **No backend running:** `PosterStore` switches to `MockJobsAPI` sample jobs and says so under the Posted list.
 - **Poster alerts:** the app registers its APNs token with `POST /me/devices` (as `guest-poster`) at launch. Tapping a poster push (`proof_ready`, `proof_needs_decision`, `offer_accepted`, …) opens that job: the review when it's waiting on the poster, else its timeline. A local "Review closing soon" reminder fires before payment auto-releases (30 s ahead in 2-minute windows, an hour ahead otherwise). `PosterPush.swift` has the type lists.
 - **Rating the worker:** after approving (and on a paid or refunded job's timeline), the poster picks 1–5 stars with an optional note; `RateWorkerCard` sends `POST /jobs/{id}/rating` and then shows the rating given (`ratings.byPoster`).
+- **Demo prep:** a **Demo job** chip on Post a job fills in the demo's coffee shop logo job ($15, remote, due 6 PM). The checklist button stays disabled until the form is complete and says what's missing. Jobs › Posted has loading, empty and error (Try again) states.
 - **Models:** the backend-shaped model is `PostedJob` (`Bounty/Models/PostedJob.swift`); `Job` stays iosA's display model for the worker screens.
 
 Verified on the iPhone 17 simulator (build, Posted list, review, approve, locate) and against `npm run dev` with curl (checkout with location, `/jobs/mine`, dispute, approve).
@@ -66,7 +67,7 @@ With fake payments, Fund shows "Job funded" right away. With `PAYMENTS_PROVIDER=
 3. **Location for in-person jobs.** Fixed when the poster uses the address field's locate button. A typed address with no pick still has no coordinates, so the backend uses its campus default; geocoding typed addresses would close this.
 4. **Offer accept/decline from a push.** `PushNotificationManager` should read `offerId` and call `OfferService.respond`. TwinKit's `JobOffer` DTO has no fetch endpoint; use `GET /offers/{id}`.
 5. **LinkedIn redirect.** TwinKit uses the custom-scheme redirect `bounty://oauth/linkedin`. If LinkedIn rejects custom schemes, use the server flow `/auth/linkedin/start`.
-6. **Sample-data screens.** The poster side (Posted list, posted job, review) now uses real data. Worker jobs, proof capture and the "What counts as done" step still use sample data; that step shows the lawn checklist for every job, because checkout creates the job (and its AI checklist) only at funding. [API.md](API.md) has the routes, and `allowedActions` on each job says which buttons to show.
+6. **Sample-data screens.** The poster side (Posted list, posted job, review) now uses real data. Worker jobs, proof capture and the "What counts as done" step still use sample data; that step shows a sample checklist (a logo one for Design jobs, the lawn one otherwise), because checkout creates the job (and its AI checklist) only at funding. [API.md](API.md) has the routes, and `allowedActions` on each job says which buttons to show.
 7. **Categories don't line up.** The Post screen's categories (Yard work, Errands, …) map onto the checkout's five (Design, Home, Tutoring, Photography, Technology). Yard work and Errands both become Home, for example.
 
 AWS is owned by someone else. [backend/infra/README.md](../backend/infra/README.md) has the deploy notes and what is still open.

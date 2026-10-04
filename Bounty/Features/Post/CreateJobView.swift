@@ -187,13 +187,31 @@ struct CreateJobView: View {
 
 struct ProofChecklistView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(PostDraft.self) private var draft
 
-    private let requirements: [(title: String, evidenceIcon: BountyIcon, evidence: String)] = [
-        ("Front lawn mowed, under 3 in", .camera, "4 after photos from marked angles"),
-        ("Clippings bagged or mulched", .camera, "1 photo of the bags"),
-        ("Sidewalk edges trimmed", .camera, "2 close-up photos"),
-        ("On-site check-in and out", .locate, "GPS and time, automatic")
-    ]
+    typealias Requirement = (title: String, evidenceIcon: BountyIcon, evidence: String)
+
+    /// Sample checklists until the backend drafts one before funding (the checkout creates the
+    /// job only at payment). The demo's logo job gets its own, so it doesn't show lawn items.
+    static func requirements(for draft: PostDraft) -> [Requirement] {
+        switch draft.category {
+        case "Design":
+            [
+                ("Hand-drawn logo with a coffee cup", .camera, "1 photo of the sketch"),
+                ("Shop name is readable", .camera, "Same photo, checked by AI"),
+                ("One-time code written on the page", .camera, "Shows it was drawn for this job")
+            ]
+        default:
+            [
+                ("Front lawn mowed, under 3 in", .camera, "4 after photos from marked angles"),
+                ("Clippings bagged or mulched", .camera, "1 photo of the bags"),
+                ("Sidewalk edges trimmed", .camera, "2 close-up photos"),
+                ("On-site check-in and out", .locate, "GPS and time, automatic")
+            ]
+        }
+    }
+
+    private var requirements: [Requirement] { Self.requirements(for: draft) }
 
     var body: some View {
         BountyScreen(glow: ScreenGlow(BountyColor.glowLavender, height: 300), spacing: 14) {
@@ -259,7 +277,7 @@ struct ProofChecklistView: View {
                     .bountyType(.bodyStrong)
             }
             .foregroundStyle(BountyColor.lavenderInk)
-            .entrance(.rest(5))
+            .entrance(.rest(1 + requirements.count))
         } bottom: {
             PillButton(title: "Looks right") { router.open(.fundJob) }
         }
@@ -313,7 +331,7 @@ struct FundJobView: View {
 
             HStack(spacing: 12) {
                 StickerTile(sticker: draft.sticker, background: draft.tileColor, size: 56, stickerSize: 46, radius: 17)
-                TitleSubtitle(title: draft.title, subtitle: "Due \(draft.deadlineText) · 4 proof items")
+                TitleSubtitle(title: draft.title, subtitle: "Due \(draft.deadlineText) · \(ProofChecklistView.requirements(for: draft).count) proof items")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -412,6 +430,7 @@ struct FundJobView: View {
 #Preview("Proof checklist") {
     ProofChecklistView()
         .environment(AppRouter())
+        .environment(PostDraft())
 }
 
 #Preview("Fund") {
