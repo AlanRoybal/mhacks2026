@@ -10,8 +10,11 @@ import type { Deps } from "../deps.js";
 import type { JobEventType, LedgerEvent } from "../domain/events.js";
 import { allowedActions } from "../domain/jobMachine.js";
 import { hourlyCents } from "../domain/money.js";
+import { verificationPlan } from "../domain/verification.js";
 import type { ChecklistItem, Job, Offer, Proof, User } from "../domain/types.js";
 import { notFound } from "../lib/errors.js";
+import { CONFIDENT } from "../services/grading.js";
+import { photoGeofenceM } from "../services/proof.js";
 import { reliability } from "../services/users.js";
 import { isAdmin } from "./auth.js";
 
@@ -168,6 +171,12 @@ export async function jobWire(ctx: WireContext, job: Job, viewer: User) {
     allowedActions: allowedActions(job, { userId: viewer.userId, isAdmin: isAdmin(deps, viewer) }, now),
     poster: personWire(poster, "poster"),
     estMinutes: job.estMinutes,
+    // What Bounty checks before paying, and what it records about the worker to do so. Shown to the
+    // poster before funding and to workers before they accept.
+    verification: verificationPlan(
+      { remote: job.remote, address: job.location?.address, checklist: job.checklist },
+      { checkInRadiusM: deps.config.rules.checkInRadiusM, photoRadiusM: photoGeofenceM(deps), confidence: CONFIDENT },
+    ),
     radiusMiles: job.remote ? null : kmToMiles(job.radiusKm),
     feeAmount: isPoster ? dollars(job.feeCents) : null,
     totalAmount: isPoster ? dollars(job.totalCents) : null,

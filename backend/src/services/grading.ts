@@ -13,7 +13,7 @@ import type { Grade, GradeDecision, ItemVerdict, Job, Proof } from "../domain/ty
 import { applyEvent } from "./jobs.js";
 import { briefOf } from "./postings.js";
 
-const CONFIDENT = 0.7;
+export const CONFIDENT = 0.7;
 
 // The model reports what it read; we decide whether that is the real code. Handwriting may lose the
 // dash or blur one character, so compare letters and digits only and allow a single mistake.
