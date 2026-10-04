@@ -331,8 +331,7 @@ struct ProofCaptureView: View {
             TitleSubtitle(title: job.title, subtitle: "Due \(job.deadlineText)")
                 .entrance(.top)
 
-            Label("Take photos or a short video with the Bounty camera. Each one is verified automatically, so there\u{2019}s nothing to write on your work.",
-                  systemImage: "checkmark.shield")
+            Label("Take photos or a short video with the Bounty camera. Each one is verified automatically, so there\u{2019}s nothing to write on your work.", icon: .shieldCheck)
                 .bountyType(.footnote)
                 .foregroundStyle(BountyColor.inkSecondary)
                 .entrance(.rest(0))
@@ -353,7 +352,7 @@ struct ProofCaptureView: View {
 
             if let checks = draft.checks, checks.ok {
                 Label(checks.warnings.isEmpty ? "Everything checks out. Ready to submit." : "Ready to submit. The reviewer will see: \(checks.warnings.joined(separator: "; "))",
-                      systemImage: "checkmark.seal.fill")
+                      icon: .badgeCheck)
                     .bountyType(.footnote)
                     .foregroundStyle(BountyColor.mintInk)
                     .padding(14)
@@ -611,7 +610,7 @@ private struct EvidenceCard: View {
                 }
             case .checkIn:
                 if let checkIn = draft.checkIns[item.id] {
-                    Label("Checked in at \(checkIn.at.formatted(date: .omitted, time: .shortened))", systemImage: "mappin.circle.fill")
+                    Label("Checked in at \(checkIn.at.formatted(date: .omitted, time: .shortened))", icon: .mapPin)
                         .bountyType(.footnote)
                         .foregroundStyle(BountyColor.mintInk)
                 } else {

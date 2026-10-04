@@ -302,7 +302,7 @@ struct FundedJobDetailView: View {
                         .font(.system(size: 42, weight: .bold, design: .rounded))
                     Text(job.title)
                         .font(.title2.bold())
-                    Label(currentStatus.rawValue, systemImage: "clock.fill")
+                    Label(currentStatus.rawValue, icon: .clock)
                         .foregroundStyle(BountyColor.greenInk)
                 }
 
@@ -318,8 +318,8 @@ struct FundedJobDetailView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Proof")
                         .font(.headline)
-                    Label("Photos or a short video of the finished work, taken in the Bounty app", systemImage: "camera")
-                    Label("Due \(job.deadline)", systemImage: "clock")
+                    Label("Photos or a short video of the finished work, taken in the Bounty app", icon: .camera)
+                    Label("Due \(job.deadline)", icon: .clock)
                 }
                 .padding(16)
                 .borderedCard()

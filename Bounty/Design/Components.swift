@@ -88,64 +88,72 @@ struct PillButton: View {
 
 // MARK: - Icons
 
-/// Lucide icons from the Figma file, mapped to the nearest SF Symbol.
+/// The Lucide icons from the Figma file (design/icons), as vector template images in Assets.xcassets/Icons.
 enum BountyIcon {
     case apple, bell, briefcase, calendar, camera, check, chevronLeft, clock, ellipsis, flag
     case hourglass, house, images, linkedin, locate, lock, mail, mapPin, navigation, pencil, plus
     case refresh, scanFace, shieldCheck, sliders, sparkles, timer, userRound, wallet, x, zap
+    case checkCircle, badgeCheck, alert
 
     var image: Image {
-        switch self {
-        case .linkedin: Image("icon-linkedin").renderingMode(.template).resizable()
-        default: Image(systemName: symbolName)
-        }
+        Image(assetName).renderingMode(.template).resizable()
     }
 
-    private var symbolName: String {
+    private var assetName: String {
         switch self {
-        case .apple: "apple.logo"
-        case .bell: "bell"
-        case .briefcase: "briefcase"
-        case .calendar: "calendar"
-        case .camera: "camera"
-        case .check: "checkmark"
-        case .chevronLeft: "chevron.left"
-        case .clock: "clock"
-        case .ellipsis: "ellipsis"
-        case .flag: "flag"
-        case .hourglass: "hourglass"
-        case .house: "house"
-        case .images: "photo.on.rectangle"
-        case .linkedin: ""
-        case .locate: "scope"
-        case .lock: "lock"
-        case .mail: "envelope"
-        case .mapPin: "mappin"
-        case .navigation: "location"
-        case .pencil: "pencil"
-        case .plus: "plus"
-        case .refresh: "arrow.triangle.2.circlepath"
-        case .scanFace: "faceid"
-        case .shieldCheck: "checkmark.shield"
-        case .sliders: "slider.horizontal.3"
-        case .sparkles: "sparkles"
-        case .timer: "timer"
-        case .userRound: "person"
-        case .wallet: "wallet.bifold"
-        case .x: "xmark"
-        case .zap: "bolt"
+        case .linkedin: "icon-linkedin"
+        case .apple: "icon-apple"
+        case .bell: "icon-bell"
+        case .briefcase: "icon-briefcase-business"
+        case .calendar: "icon-calendar-days"
+        case .camera: "icon-camera"
+        case .check: "icon-check"
+        case .chevronLeft: "icon-chevron-left"
+        case .clock: "icon-clock"
+        case .ellipsis: "icon-ellipsis"
+        case .flag: "icon-flag"
+        case .hourglass: "icon-hourglass"
+        case .house: "icon-house"
+        case .images: "icon-images"
+        case .locate: "icon-locate-fixed"
+        case .lock: "icon-lock"
+        case .mail: "icon-mail"
+        case .mapPin: "icon-map-pin"
+        case .navigation: "icon-navigation"
+        case .pencil: "icon-pencil"
+        case .plus: "icon-plus"
+        case .refresh: "icon-refresh-cw"
+        case .scanFace: "icon-scan-face"
+        case .shieldCheck: "icon-shield-check"
+        case .sliders: "icon-sliders-horizontal"
+        case .sparkles: "icon-sparkles"
+        case .timer: "icon-timer"
+        case .userRound: "icon-user-round"
+        case .wallet: "icon-wallet"
+        case .x: "icon-x"
+        case .zap: "icon-zap"
+        case .checkCircle: "icon-circle-check-big"
+        case .badgeCheck: "icon-badge-check"
+        case .alert: "icon-triangle-alert"
         }
+    }
+}
+
+extension Label where Title == Text, Icon == IconGlyph {
+    /// A label with one of the designed icons instead of an SF Symbol.
+    init(_ title: String, icon: BountyIcon) {
+        self.init { Text(title) } icon: { IconGlyph(icon: icon, size: 18) }
     }
 }
 
 struct IconGlyph: View {
     let icon: BountyIcon
     var size: CGFloat = 22
+    /// Kept for call sites written for SF Symbols; the designed icons have a fixed 2 pt stroke.
     var weight: Font.Weight = .medium
 
     var body: some View {
         icon.image
-            .font(.system(size: size * 0.8, weight: weight))
             .scaledToFit()
             .frame(width: size, height: size)
             .accessibilityHidden(true)

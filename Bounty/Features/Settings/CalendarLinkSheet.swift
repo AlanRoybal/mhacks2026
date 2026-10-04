@@ -34,7 +34,7 @@ struct CalendarLinkSheet: View {
                 switch access {
                 case .fullAccess where calendars.isEmpty:
                     Section {
-                        Label("No calendars on this iPhone", systemImage: "calendar.badge.exclamationmark")
+                        Label("No calendars on this iPhone", icon: .calendar)
                         Text("Add an account in Settings \u{203A} Apps \u{203A} Calendar \u{203A} Calendar Accounts (iCloud, Google, Outlook\u{2026}), then come back.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -54,14 +54,14 @@ struct CalendarLinkSheet: View {
                         Button {
                             Task { await requestAccess() }
                         } label: {
-                            Label("Allow calendar access", systemImage: "calendar")
+                            Label("Allow calendar access", icon: .calendar)
                         }
                     } footer: {
                         Text("iOS asks once. Then you choose which calendars to link.")
                     }
                 case .denied, .restricted, .writeOnly:
                     Section {
-                        Label("Calendar access is off", systemImage: "lock")
+                        Label("Calendar access is off", icon: .lock)
                         Button("Open Settings") {
                             if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                         }

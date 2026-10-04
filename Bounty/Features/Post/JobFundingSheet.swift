@@ -21,7 +21,7 @@ struct JobFundingSheet: View {
             List {
                 if let funded {
                     Section {
-                        Label("Funded", systemImage: "checkmark.circle.fill")
+                        Label("Funded", icon: .checkCircle)
                             .foregroundStyle(BountyColor.greenInk)
                             .font(.title2.bold())
                         Text("Your twin is looking for a worker now. Follow along in Jobs \u{2192} Posted.")

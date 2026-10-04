@@ -42,7 +42,7 @@ struct CreateJobView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                             .overlay {
                                 if photo.failed {
-                                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.white, BountyColor.red)
+                                    IconGlyph(icon: .alert, size: 18).foregroundStyle(BountyColor.red)
                                 } else if photo.fileURL == nil {
                                     ProgressView().tint(.white)
                                 }

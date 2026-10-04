@@ -22,7 +22,7 @@ struct LocationPicker: View {
                         Task { await useCurrentLocation() }
                     } label: {
                         HStack {
-                            Label("Use my current location", systemImage: "location.fill")
+                            Label("Use my current location", icon: .navigation)
                             Spacer()
                             if isLocating { ProgressView() }
                         }
