@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0107E97F3BC1B33F7FD4EF1B /* ProofFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2679EADF798F7C549A97F3EA /* ProofFlow.swift */; };
+		BD0000000000000000000012 /* ProofCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0000000000000000000011 /* ProofCapture.swift */; };
 		02AAB2D2B69EFB35E83E2D23 /* DisputeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B00BDB4B984BC9B96A3AA27 /* DisputeSheet.swift */; };
 		0A5758126FDDC608B81DB807 /* LocationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71B8D3FEA9D76F1C4CF92259 /* LocationPicker.swift */; };
 		0BFBABD98AF3B1B0E44A71E2 /* CreateJobView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F611717A4A9F0276C3E9675 /* CreateJobView.swift */; };
@@ -73,6 +74,7 @@
 		209BEC4ADD47C11B13577D52 /* PosterStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterStore.swift; sourceTree = "<group>"; };
 		23558C67A39132B211B07398 /* JobFundingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobFundingSheet.swift; sourceTree = "<group>"; };
 		2679EADF798F7C549A97F3EA /* ProofFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProofFlow.swift; sourceTree = "<group>"; };
+		BD0000000000000000000011 /* ProofCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProofCapture.swift; sourceTree = "<group>"; };
 		2A1732769B738D037D975B56 /* MockJobsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockJobsAPI.swift; sourceTree = "<group>"; };
 		2C1D3B1A55C4BCEE3995A847 /* TwinKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TwinKit; path = Packages/TwinKit; sourceTree = SOURCE_ROOT; };
 		30E03DB252793796851AC0AF /* TwinSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwinSources.swift; sourceTree = "<group>"; };
@@ -231,6 +233,7 @@
 			children = (
 				D886F3D6A6B5DE86BD1527D6 /* JobThreadCard.swift */,
 				2679EADF798F7C549A97F3EA /* ProofFlow.swift */,
+				BD0000000000000000000011 /* ProofCapture.swift */,
 				5DA3B29F599F6FBA66D82AAA /* WorkViews.swift */,
 			);
 			path = Work;
@@ -468,6 +471,7 @@
 				9516CE80CFD99ADD879D9651 /* PosterPush.swift in Sources */,
 				75699AB388309FB6BB304112 /* PosterStore.swift in Sources */,
 				0107E97F3BC1B33F7FD4EF1B /* ProofFlow.swift in Sources */,
+				BD0000000000000000000012 /* ProofCapture.swift in Sources */,
 				8F0C271BA61342672BB08AF3 /* PushNotificationManager.swift in Sources */,
 				4D295C77E60A3E16F14B00EC /* RateWorkerCard.swift in Sources */,
 				78AB2F56177B8016949DA2C6 /* RootTabView.swift in Sources */,

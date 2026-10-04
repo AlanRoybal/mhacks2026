@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 //
 // Evidence is uploaded as soon as it's captured, so the server checks (precheck) and the submission
 // only send file URLs. `ProofStore` keeps each job's evidence in memory, so a retry reuses earlier uploads.
+// Photos and videos come only from the Bounty camera and are signed on capture (`CaptureSignature`).
 
 // MARK: - State
 
@@ -42,7 +43,31 @@ final class ProofDraft {
         let latitude: Double?
         let longitude: Double?
         var fileURL: URL?
+        var signed: CaptureSignature.Signed?
         var failed = false
+    }
+
+    /// A short clip from the Bounty camera, plus the stills the grader reads.
+    struct Video: Identifiable {
+        struct Upload {
+            let fileURL: URL
+            let signed: CaptureSignature.Signed
+        }
+
+        let id = UUID()
+        let localURL: URL
+        let thumbnail: UIImage
+        let frames: [UIImage]
+        /// `before` or `after`.
+        let phase: String
+        let capturedAt: Date
+        let latitude: Double?
+        let longitude: Double?
+        var upload: Upload?
+        var frameUploads: [Upload] = []
+        var failed = false
+
+        var isUploaded: Bool { upload != nil && frameUploads.count == frames.count && !frames.isEmpty }
     }
 
     struct File: Identifiable {
@@ -59,6 +84,7 @@ final class ProofDraft {
     }
 
     var photos: [String: [Photo]] = [:]
+    var videos: [String: [Video]] = [:]
     var links: [String: String] = [:]
     var files: [String: [File]] = [:]
     var checkIns: [String: CheckIn] = [:]
@@ -71,8 +97,13 @@ final class ProofDraft {
         (photos[item.id] ?? []).filter { $0.phase == phase }
     }
 
+    func videos(for item: ChecklistItem, phase: String) -> [Video] {
+        (videos[item.id] ?? []).filter { $0.phase == phase }
+    }
+
     var isUploading: Bool {
         photos.values.joined().contains { $0.fileURL == nil && !$0.failed }
+            || videos.values.joined().contains { !$0.isUploaded && !$0.failed }
             || files.values.joined().contains { $0.fileURL == nil && !$0.failed }
     }
 
@@ -80,9 +111,12 @@ final class ProofDraft {
     func isCovered(_ item: ChecklistItem) -> Bool {
         switch item.evidenceType {
         case .photo:
+            // One video of the result (or of the "before") covers that side on its own.
             let after = photos(for: item, phase: "after").filter { $0.fileURL != nil }.count
             let before = photos(for: item, phase: "before").filter { $0.fileURL != nil }.count
-            return after >= (item.photoCount ?? 1) && (!item.needsBeforePhoto || before >= 1)
+            let videoAfter = videos(for: item, phase: "after").contains(where: \.isUploaded)
+            let videoBefore = videos(for: item, phase: "before").contains(where: \.isUploaded)
+            return (videoAfter || after >= (item.photoCount ?? 1)) && (!item.needsBeforePhoto || videoBefore || before >= 1)
         case .checkIn:
             return checkIns[item.id] != nil
         case .link:
@@ -90,6 +124,7 @@ final class ProofDraft {
         case .file:
             return (files[item.id] ?? []).contains { $0.fileURL != nil }
                 || (photos[item.id] ?? []).contains { $0.fileURL != nil }
+                || (videos[item.id] ?? []).contains(where: \.isUploaded)
         }
     }
 
@@ -99,13 +134,27 @@ final class ProofDraft {
             let uploaded = (photos[item.id] ?? []).compactMap { photo in
                 photo.fileURL.map {
                     ProofBody.PhotoRef(fileURL: $0.absoluteString, capturedAt: photo.capturedAt,
-                                       latitude: photo.latitude, longitude: photo.longitude, phase: photo.phase)
+                                       latitude: photo.latitude, longitude: photo.longitude, phase: photo.phase,
+                                       sha256: photo.signed?.sha256, signature: photo.signed?.signature)
+                }
+            }
+            let clips = (videos[item.id] ?? []).filter(\.isUploaded).compactMap { video in
+                video.upload.map { upload in
+                    ProofBody.VideoRef(
+                        fileURL: upload.fileURL.absoluteString, capturedAt: video.capturedAt,
+                        latitude: video.latitude, longitude: video.longitude, phase: video.phase,
+                        sha256: upload.signed.sha256, signature: upload.signed.signature,
+                        frames: video.frameUploads.map {
+                            ProofBody.FrameRef(fileURL: $0.fileURL.absoluteString, sha256: $0.signed.sha256, signature: $0.signed.signature)
+                        }
+                    )
                 }
             }
             let fileRefs = (files[item.id] ?? []).compactMap { $0.fileURL.map { ProofBody.FileRef(fileURL: $0.absoluteString) } }
             return ProofBody.Item(
                 checklistItemId: item.id,
                 photos: uploaded.isEmpty ? nil : uploaded,
+                videos: clips.isEmpty ? nil : clips,
                 link: Self.normalizedLink(links[item.id]),
                 files: fileRefs.isEmpty ? nil : fileRefs,
                 checkIn: checkIns[item.id].map { ProofBody.CheckInRef(latitude: $0.latitude, longitude: $0.longitude, at: $0.at) }
@@ -130,6 +179,7 @@ struct ProofBody: Encodable, Sendable {
     struct Item: Encodable, Sendable {
         let checklistItemId: String
         var photos: [PhotoRef]?
+        var videos: [VideoRef]?
         var link: String?
         var files: [FileRef]?
         var checkIn: CheckInRef?
@@ -141,6 +191,25 @@ struct ProofBody: Encodable, Sendable {
         let latitude: Double?
         let longitude: Double?
         let phase: String
+        let sha256: String?
+        let signature: String?
+    }
+
+    struct VideoRef: Encodable, Sendable {
+        let fileURL: String
+        let capturedAt: Date
+        let latitude: Double?
+        let longitude: Double?
+        let phase: String
+        let sha256: String
+        let signature: String?
+        let frames: [FrameRef]
+    }
+
+    struct FrameRef: Encodable, Sendable {
+        let fileURL: String
+        let sha256: String
+        let signature: String?
     }
 
     struct FileRef: Encodable, Sendable {
@@ -162,11 +231,14 @@ struct ProofChecks: Decodable, Sendable {
     let outsideGeofence: [String]
     let duplicates: [String]
     let missingUploads: [String]
+    /// Photos or videos the server couldn't verify as taken with the Bounty camera for this job.
+    var notCapturedInApp: [String]?
     let warnings: [String]
 
     /// What's wrong with one item, phrased for the worker. `nil` when nothing is.
     func problem(for itemId: String) -> String? {
         if missingUploads.contains(itemId) { return "An upload didn\u{2019}t finish. Take it again." }
+        if notCapturedInApp?.contains(itemId) == true { return "Take this again with the Bounty camera." }
         if missingRequired.contains(itemId) { return "Still needed." }
         if duplicates.contains(itemId) { return "Use a new photo. This one is a repeat." }
         if outsideTimeWindow.contains(itemId) { return "Taken before you started. Take it again." }
@@ -224,7 +296,8 @@ struct ProofCaptureView: View {
     private struct CameraRequest: Identifiable {
         let item: ChecklistItem
         let phase: String
-        var id: String { "\(item.id)-\(phase)" }
+        let video: Bool
+        var id: String { "\(item.id)-\(phase)-\(video)" }
     }
 
     private var job: PostedJob? {
@@ -258,21 +331,11 @@ struct ProofCaptureView: View {
             TitleSubtitle(title: job.title, subtitle: "Due \(job.deadlineText)")
                 .entrance(.top)
 
-            if let code = job.challengeCode {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("One-time code").bountyType(.bodyStrong)
-                        Spacer()
-                        Text(code).font(.system(.title2, design: .monospaced).bold())
-                    }
-                    Text("Write it on paper or show it on a screen so it\u{2019}s visible in your photos. Library photos aren\u{2019}t accepted, so every photo comes from the camera here.")
-                        .bountyType(.footnote)
-                }
-                .foregroundStyle(BountyColor.creamInk)
-                .padding(16)
-                .tintedPanel(BountyColor.cream, radius: BountyRadius.row)
+            Label("Take photos or a short video with the Bounty camera. Each one is verified automatically, so there\u{2019}s nothing to write on your work.",
+                  systemImage: "checkmark.shield")
+                .bountyType(.footnote)
+                .foregroundStyle(BountyColor.inkSecondary)
                 .entrance(.rest(0))
-            }
 
             ForEach(Array(job.checklist.enumerated()), id: \.element.id) { index, item in
                 EvidenceCard(
@@ -280,10 +343,10 @@ struct ProofCaptureView: View {
                     draft: draft,
                     problem: draft.checks?.problem(for: item.id),
                     previous: previousVerdicts.first { $0.checklistItemId == item.id && !$0.pass },
-                    onCamera: { phase in camera = CameraRequest(item: item, phase: phase) },
+                    onCamera: { phase, video in camera = CameraRequest(item: item, phase: phase, video: video) },
                     onFile: { filePickerItem = item },
                     onCheckIn: { Task { await checkIn(item, job: job, draft: draft) } },
-                    onRetryUpload: { Task { await retryUploads(draft) } }
+                    onRetryUpload: { Task { await retryUploads(job: job, draft: draft) } }
                 )
                 .entrance(.rest(index + 1))
             }
@@ -315,12 +378,18 @@ struct ProofCaptureView: View {
         }
         .fullScreenCover(item: $camera) { request in
             CameraCapture(
-                ghost: request.phase == "after" ? draft.photos(for: request.item, phase: "before").last?.image : nil,
+                ghost: request.phase == "after"
+                    ? (draft.photos(for: request.item, phase: "before").last?.image ?? draft.videos(for: request.item, phase: "before").last?.thumbnail)
+                    : nil,
                 hint: request.item.angleHint,
-                code: job.challengeCode,
+                video: request.video,
                 onCapture: { image in
                     camera = nil
                     Task { await addPhoto(image, item: request.item, phase: request.phase, job: job, draft: draft) }
+                },
+                onVideo: { url in
+                    camera = nil
+                    Task { await addVideo(url, item: request.item, phase: request.phase, job: job, draft: draft) }
                 },
                 onCancel: { camera = nil }
             )
@@ -343,24 +412,31 @@ struct ProofCaptureView: View {
     // MARK: Actions
 
     private func addPhoto(_ image: UIImage, item: ChecklistItem, phase: String, job: PostedJob, draft: ProofDraft) async {
-        let capturedAt = Date.now
+        let capturedAt = CaptureSignature.captureTime()
         // In-person photos carry GPS; the server flags photos taken away from the job.
         let coordinate = job.isRemote ? nil : await location.current()?.coordinate
         let photo = ProofDraft.Photo(image: image, phase: phase, capturedAt: capturedAt,
                                      latitude: coordinate?.latitude, longitude: coordinate?.longitude)
         draft.photos[item.id, default: []].append(photo)
         draft.checks = nil
-        await upload(photo.id, itemId: item.id, draft: draft)
+        await upload(photo.id, itemId: item.id, job: job, draft: draft)
     }
 
-    private func upload(_ photoId: UUID, itemId: String, draft: ProofDraft) async {
+    private func upload(_ photoId: UUID, itemId: String, job: PostedJob, draft: ProofDraft) async {
         guard let api = services.api,
               let index = draft.photos[itemId]?.firstIndex(where: { $0.id == photoId }),
-              let data = draft.photos[itemId]?[index].image.proofJPEG() else { return }
+              let photo = draft.photos[itemId]?[index],
+              let data = photo.image.proofJPEG() else { return }
         draft.photos[itemId]?[index].failed = false
+        // Signed over the exact bytes that are uploaded, right after capture.
+        let signed = CaptureSignature.sign(data, jobId: job.id, capturedAt: photo.capturedAt,
+                                           latitude: photo.latitude, longitude: photo.longitude, key: job.captureKey)
         do {
             let url = try await api.upload(data, contentType: "image/jpeg")
-            if let index = draft.photos[itemId]?.firstIndex(where: { $0.id == photoId }) { draft.photos[itemId]?[index].fileURL = url }
+            if let index = draft.photos[itemId]?.firstIndex(where: { $0.id == photoId }) {
+                draft.photos[itemId]?[index].fileURL = url
+                draft.photos[itemId]?[index].signed = signed
+            }
             draft.message = nil
         } catch {
             if let index = draft.photos[itemId]?.firstIndex(where: { $0.id == photoId }) { draft.photos[itemId]?[index].failed = true }
@@ -368,9 +444,58 @@ struct ProofCaptureView: View {
         }
     }
 
-    private func retryUploads(_ draft: ProofDraft) async {
+    private func addVideo(_ url: URL, item: ChecklistItem, phase: String, job: PostedJob, draft: ProofDraft) async {
+        let capturedAt = CaptureSignature.captureTime()
+        let coordinate = job.isRemote ? nil : await location.current()?.coordinate
+        let frames = await VideoFrames.extract(from: url)
+        guard let thumbnail = frames.first else {
+            draft.message = "That video couldn\u{2019}t be read. Record it again."
+            return
+        }
+        let video = ProofDraft.Video(localURL: url, thumbnail: thumbnail, frames: frames, phase: phase, capturedAt: capturedAt,
+                                     latitude: coordinate?.latitude, longitude: coordinate?.longitude)
+        draft.videos[item.id, default: []].append(video)
+        draft.checks = nil
+        await uploadVideo(video.id, itemId: item.id, job: job, draft: draft)
+    }
+
+    /// Uploads the clip and its stills; each is signed like a photo.
+    private func uploadVideo(_ videoId: UUID, itemId: String, job: PostedJob, draft: ProofDraft) async {
+        guard let api = services.api,
+              let index = draft.videos[itemId]?.firstIndex(where: { $0.id == videoId }),
+              let video = draft.videos[itemId]?[index] else { return }
+        draft.videos[itemId]?[index].failed = false
+        func sign(_ data: Data) -> CaptureSignature.Signed {
+            CaptureSignature.sign(data, jobId: job.id, capturedAt: video.capturedAt,
+                                  latitude: video.latitude, longitude: video.longitude, key: job.captureKey)
+        }
+        do {
+            let data = try Data(contentsOf: video.localURL)
+            guard data.count <= 60 * 1024 * 1024 else { throw JobsAPIError.server("Videos can be up to 60 MB. Record a shorter clip.") }
+            var frameUploads: [ProofDraft.Video.Upload] = []
+            for frame in video.frames {
+                guard let jpeg = frame.proofJPEG(maxSide: 1600) else { continue }
+                let url = try await api.upload(jpeg, contentType: "image/jpeg")
+                frameUploads.append(.init(fileURL: url, signed: sign(jpeg)))
+            }
+            let url = try await api.upload(data, contentType: VideoFrames.contentType(of: video.localURL))
+            if let index = draft.videos[itemId]?.firstIndex(where: { $0.id == videoId }) {
+                draft.videos[itemId]?[index].frameUploads = frameUploads
+                draft.videos[itemId]?[index].upload = .init(fileURL: url, signed: sign(data))
+            }
+            draft.message = nil
+        } catch {
+            if let index = draft.videos[itemId]?.firstIndex(where: { $0.id == videoId }) { draft.videos[itemId]?[index].failed = true }
+            draft.message = error.localizedDescription
+        }
+    }
+
+    private func retryUploads(job: PostedJob, draft: ProofDraft) async {
         for (itemId, photos) in draft.photos {
-            for photo in photos where photo.failed { await upload(photo.id, itemId: itemId, draft: draft) }
+            for photo in photos where photo.failed { await upload(photo.id, itemId: itemId, job: job, draft: draft) }
+        }
+        for (itemId, videos) in draft.videos {
+            for video in videos where video.failed { await uploadVideo(video.id, itemId: itemId, job: job, draft: draft) }
         }
     }
 
@@ -432,7 +557,8 @@ private struct EvidenceCard: View {
     let draft: ProofDraft
     let problem: String?
     let previous: Verdict?
-    let onCamera: (String) -> Void
+    /// Phase, and whether to record a video instead of a photo.
+    let onCamera: (String, Bool) -> Void
     let onFile: () -> Void
     let onCheckIn: () -> Void
     let onRetryUpload: () -> Void
@@ -481,7 +607,7 @@ private struct EvidenceCard: View {
                 }
                 HStack {
                     PillButton(title: "Add file", icon: .plus, style: .secondary, action: onFile)
-                    PillButton(title: "Photo", icon: .camera, style: .secondary) { onCamera("after") }
+                    PillButton(title: "Photo", icon: .camera, style: .secondary) { onCamera("after", false) }
                 }
             case .checkIn:
                 if let checkIn = draft.checkIns[item.id] {
@@ -503,8 +629,10 @@ private struct EvidenceCard: View {
 
     private func photoRow(phase: String, title: String, needed: Int) -> some View {
         let photos = draft.photos(for: item, phase: phase)
+        let videos = draft.videos(for: item, phase: phase)
+        let progress = videos.isEmpty ? "\(min(photos.count, needed)) of \(needed)" : "video"
         return VStack(alignment: .leading, spacing: 8) {
-            Text("\(title) · \(min(photos.count, needed)) of \(needed)")
+            Text("\(title) · \(progress)")
                 .bountyType(.footnote)
                 .foregroundStyle(BountyColor.inkSecondary)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -526,13 +654,42 @@ private struct EvidenceCard: View {
                                 }
                             }
                     }
-                    Button { onCamera(phase) } label: {
+                    ForEach(videos) { video in
+                        Image(uiImage: video.thumbnail)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 72, height: 72)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay {
+                                if video.failed {
+                                    Button(action: onRetryUpload) {
+                                        Image(systemName: "arrow.clockwise.circle.fill").font(.title2).foregroundStyle(.white, BountyColor.red)
+                                    }
+                                    .accessibilityLabel("Retry upload")
+                                } else if !video.isUploaded {
+                                    ProgressView().tint(.white)
+                                } else {
+                                    Image(systemName: "play.circle.fill").font(.title2).foregroundStyle(.white)
+                                }
+                            }
+                            .accessibilityLabel("\(title) video")
+                    }
+                    Button { onCamera(phase, false) } label: {
                         IconGlyph(icon: .camera, size: 22)
                             .frame(width: 72, height: 72)
                             .background(BountyColor.field, in: RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(PressableStyle())
                     .accessibilityLabel("Take \(title.lowercased()) photo")
+                    Button { onCamera(phase, true) } label: {
+                        Image(systemName: "video")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(BountyColor.inkPrimary)
+                            .frame(width: 72, height: 72)
+                            .background(BountyColor.field, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(PressableStyle())
+                    .accessibilityLabel("Record \(title.lowercased()) video")
                 }
             }
         }
@@ -541,13 +698,15 @@ private struct EvidenceCard: View {
 
 // MARK: - Camera
 
-/// The system camera, with the "before" shot as a ghost overlay for matching the angle (US-38)
-/// and the one-time code as a reminder. Library photos are deliberately not offered.
+/// The system camera, with the "before" shot as a ghost overlay for matching the angle (US-38).
+/// Library photos and videos are deliberately not offered: proof comes from the camera here.
 struct CameraCapture: View {
     let ghost: UIImage?
     let hint: String?
-    let code: String?
+    /// Record a short video instead of taking a photo.
+    var video = false
     let onCapture: (UIImage) -> Void
+    var onVideo: (URL) -> Void = { _ in }
     let onCancel: () -> Void
 
     var body: some View {
@@ -558,26 +717,37 @@ struct CameraCapture: View {
         let hasCamera = UIImagePickerController.isSourceTypeAvailable(.camera)
         #endif
         if hasCamera {
-            CameraPicker(ghost: ghost, hint: hint, code: code, onCapture: onCapture, onCancel: onCancel)
+            CameraPicker(ghost: ghost, hint: hint, video: video, onCapture: onCapture, onVideo: onVideo, onCancel: onCancel)
         } else {
-            NoCameraView(code: code, onCapture: onCapture, onCancel: onCancel)
+            NoCameraView(video: video, onCapture: onCapture, onCancel: onCancel)
         }
     }
 }
 
 private struct CameraPicker: UIViewControllerRepresentable {
+    /// Long enough to pan across finished work, short enough to upload quickly.
+    static let maxVideoSeconds: TimeInterval = 20
+
     let ghost: UIImage?
     let hint: String?
-    let code: String?
+    let video: Bool
     let onCapture: (UIImage) -> Void
+    let onVideo: (URL) -> Void
     let onCancel: () -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onCapture: onCapture, onCancel: onCancel) }
+    func makeCoordinator() -> Coordinator { Coordinator(onCapture: onCapture, onVideo: onVideo, onCancel: onCancel) }
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.sourceType = .camera
-        picker.cameraCaptureMode = .photo
+        if video {
+            picker.mediaTypes = [UTType.movie.identifier]
+            picker.cameraCaptureMode = .video
+            picker.videoMaximumDuration = Self.maxVideoSeconds
+            picker.videoQuality = .typeMedium
+        } else {
+            picker.cameraCaptureMode = .photo
+        }
         picker.delegate = context.coordinator
         picker.cameraOverlayView = overlay(bounds: UIScreen.main.bounds)
         return picker
@@ -599,7 +769,11 @@ private struct CameraPicker: UIViewControllerRepresentable {
             imageView.alpha = 0.35
             view.addSubview(imageView)
         }
-        let lines = [code.map { "Code \($0) must be visible" }, hint, ghost == nil ? nil : "Line up with the faded before photo"].compactMap { $0 }
+        let lines = [
+            video ? "Slowly show the finished work (up to \(Int(Self.maxVideoSeconds)) s)" : nil,
+            hint,
+            ghost == nil ? nil : "Line up with the faded before shot",
+        ].compactMap { $0 }
         if !lines.isEmpty {
             let label = UILabel()
             label.text = lines.joined(separator: "\n")
@@ -619,15 +793,23 @@ private struct CameraPicker: UIViewControllerRepresentable {
 
     final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let onCapture: (UIImage) -> Void
+        let onVideo: (URL) -> Void
         let onCancel: () -> Void
 
-        init(onCapture: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
+        init(onCapture: @escaping (UIImage) -> Void, onVideo: @escaping (URL) -> Void, onCancel: @escaping () -> Void) {
             self.onCapture = onCapture
+            self.onVideo = onVideo
             self.onCancel = onCancel
         }
 
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let image = info[.originalImage] as? UIImage { onCapture(image) } else { onCancel() }
+            if let url = info[.mediaURL] as? URL, let copy = VideoFrames.keepCopy(of: url) {
+                onVideo(copy)
+            } else if let image = info[.originalImage] as? UIImage {
+                onCapture(image)
+            } else {
+                onCancel()
+            }
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { onCancel() }
@@ -637,18 +819,20 @@ private struct CameraPicker: UIViewControllerRepresentable {
 /// The Simulator has no camera. Debug builds can submit a generated test photo so the flow can be
 /// exercised end to end; release builds just explain.
 private struct NoCameraView: View {
-    let code: String?
+    let video: Bool
     let onCapture: (UIImage) -> Void
     let onCancel: () -> Void
 
     var body: some View {
         VStack(spacing: 16) {
             Spacer()
-            Image(systemName: "camera.fill").font(.largeTitle)
-            Text("This device has no camera.").bountyType(.bodyStrong)
+            Image(systemName: video ? "video.fill" : "camera.fill").font(.largeTitle)
+            Text(video ? "Recording needs a real iPhone." : "This device has no camera.").bountyType(.bodyStrong)
             #if DEBUG
-            PillButton(title: "Use a test photo", icon: .images) { onCapture(Self.testPhoto(code: code)) }
-                .padding(.horizontal, 24)
+            if !video {
+                PillButton(title: "Use a test photo", icon: .images) { onCapture(Self.testPhoto()) }
+                    .padding(.horizontal, 24)
+            }
             #endif
             Button("Cancel", action: onCancel)
             Spacer()
@@ -659,13 +843,13 @@ private struct NoCameraView: View {
     }
 
     #if DEBUG
-    /// A unique image each time (the server rejects the same image twice) showing the code and time.
-    static func testPhoto(code: String?) -> UIImage {
+    /// A unique image each time (the server rejects the same image twice) showing the time.
+    static func testPhoto() -> UIImage {
         let size = CGSize(width: 1200, height: 1600)
         return UIGraphicsImageRenderer(size: size).image { context in
             UIColor(hue: .random(in: 0...1), saturation: 0.25, brightness: 0.95, alpha: 1).setFill()
             context.fill(CGRect(origin: .zero, size: size))
-            let text = "TEST PHOTO\n\(code ?? "")\n\(Date.now.formatted(date: .abbreviated, time: .standard))\n\(UUID().uuidString.prefix(8))"
+            let text = "TEST PHOTO\n\(Date.now.formatted(date: .abbreviated, time: .standard))\n\(UUID().uuidString.prefix(8))"
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = .center
             (text as NSString).draw(in: CGRect(x: 60, y: 560, width: 1080, height: 600), withAttributes: [

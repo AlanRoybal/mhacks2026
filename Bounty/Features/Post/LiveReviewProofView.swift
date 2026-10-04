@@ -306,6 +306,7 @@ private struct CheckRow: View {
     private var evidence: String {
         switch item.evidenceType {
         case .photo:
+            if let videos = proof?.videoURLs, !videos.isEmpty { return videos.count == 1 ? "1 video" : "\(videos.count) videos" }
             let count = proof?.photoURLs.count ?? 0
             return count == 1 ? "1 photo" : "\(count) photos"
         case .checkIn:
@@ -335,6 +336,13 @@ private struct CheckRow: View {
                         .foregroundStyle(BountyColor.inkSecondary)
                         .padding(.leading, 40)
                         .transition(.opacity)
+                }
+                if isExpanded, let video = proof?.videoURLs?.first {
+                    Link(destination: video) {
+                        Label("Watch the video", systemImage: "play.circle.fill")
+                            .bountyType(.footnote)
+                    }
+                    .padding(.leading, 40)
                 }
             }
             .padding(.vertical, 8)

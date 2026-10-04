@@ -31,7 +31,8 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
     /// Distance from the worker, in miles. `nil` for remote jobs or the poster's own view.
     var distanceMiles: Double?
     var poster: WorkerSummary?
-    var challengeCode: String?
+    /// Signs this worker's proof captures (`CaptureSignature`). Only sent to the assigned worker while the job is in progress.
+    var captureKey: String?
     var allowedActions: [String]?
 
     /// Ratings left after the job closed. `nil` until the backend sends them.
@@ -67,7 +68,7 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
         matchReason: String? = nil,
         distanceMiles: Double? = nil,
         poster: WorkerSummary? = nil,
-        challengeCode: String? = nil,
+        captureKey: String? = nil,
         allowedActions: [String]? = nil
     ) {
         self.id = id
@@ -89,7 +90,7 @@ struct PostedJob: Identifiable, Codable, Hashable, Sendable {
         self.matchReason = matchReason
         self.distanceMiles = distanceMiles
         self.poster = poster
-        self.challengeCode = challengeCode
+        self.captureKey = captureKey
         self.allowedActions = allowedActions
     }
 
@@ -378,6 +379,8 @@ struct ProofItem: Codable, Hashable, Sendable {
     var link: URL?
     var fileURLs: [URL]?
     var checkedInAt: Date?
+    /// Short clips from the worker's Bounty camera.
+    var videoURLs: [URL]?
 }
 
 /// The vision model's grade for one checklist item (plan feature 26).

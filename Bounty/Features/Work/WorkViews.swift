@@ -95,16 +95,6 @@ struct JobDetailView: View {
                     .entrance(.rest(1))
             }
 
-            if let code = job?.challengeCode {
-                HStack {
-                    Text("Proof code")
-                    Spacer()
-                    Text(code).monospaced().bold()
-                }
-                .padding(14)
-                .tintedPanel(BountyColor.cream, radius: BountyRadius.row)
-            }
-
             if let actionError {
                 Text(actionError)
                     .bountyType(.footnote)
