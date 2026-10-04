@@ -316,8 +316,8 @@ final class LocationPinger: NSObject, CLLocationManagerDelegate {
 
     private func sendIfDue(force: Bool) {
         guard let latest, Date.now.timeIntervalSince(lastSent) >= (force ? Self.interval - 1 : Self.interval) else { return }
-        // A fix older than two minutes isn't evidence of anything.
-        guard Date.now.timeIntervalSince(latest.timestamp) < 120 else { return }
+        // iOS stops delivering fixes while the phone doesn't move, so the last one still says where the
+        // worker is. What SpacetimeDB treats as lost signal is the pings stopping (app killed, no network).
         lastSent = .now
         onFix(Fix(latitude: latest.coordinate.latitude, longitude: latest.coordinate.longitude, accuracy: latest.horizontalAccuracy))
     }
