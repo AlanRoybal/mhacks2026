@@ -43,6 +43,10 @@ public final class AvailabilityService {
         calendar.authorizationStatus
     }
 
+    public var calendars: [DeviceCalendar] {
+        calendar.calendars
+    }
+
     public func requestAccess() async -> Bool {
         await calendar.requestAccess()
     }

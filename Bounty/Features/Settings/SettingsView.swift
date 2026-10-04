@@ -41,6 +41,11 @@ struct SettingsView: View {
     @State private var isWorking = false
     @State private var showsPreferences = false
     @State private var confirmsDelete = false
+    @State private var isSyncingCalendar = false
+    @State private var calendarNote: String?
+    @State private var calendarAccessOff = false
+    @State private var showsCalendarLink = false
+    @State private var confirmsUnlink = false
 
     var body: some View {
         NavigationStack {
@@ -67,10 +72,37 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Work") {
+                Section {
                     Button("Work preferences and availability") { showsPreferences = true }
-                    Button("Sync calendar now") { Task { await syncCalendar() } }
-                        .disabled(services.availability == nil || isWorking)
+                    LabeledContent("Calendar", value: calendarStatus)
+                    if services.isCalendarLinked {
+                        Button {
+                            Task { await syncCalendar() }
+                        } label: {
+                            HStack {
+                                Text(isSyncingCalendar ? "Syncing calendar\u{2026}" : "Sync calendar now")
+                                if isSyncingCalendar {
+                                    Spacer()
+                                    ProgressView()
+                                }
+                            }
+                        }
+                        .disabled(isSyncingCalendar)
+                        Button("Change linked calendars") { showsCalendarLink = true }
+                        Button("Unlink calendar", role: .destructive) { confirmsUnlink = true }
+                    } else {
+                        Button("Link calendar") { showsCalendarLink = true }
+                            .disabled(services.availability == nil)
+                    }
+                    if calendarAccessOff {
+                        Button("Turn on calendar access in Settings") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                        }
+                    }
+                } header: {
+                    Text("Work")
+                } footer: {
+                    Text(calendarNote ?? "Only the start and end of busy times leave your phone, never event names.")
                 }
 
                 Section {
@@ -106,6 +138,19 @@ struct SettingsView: View {
             } message: {
                 Text("This can\u{2019}t be undone.")
             }
+            .sheet(isPresented: $showsCalendarLink) {
+                CalendarLinkSheet { outcome in calendarNote = Self.note(for: outcome) }
+            }
+            .confirmationDialog("Unlink your calendar?", isPresented: $confirmsUnlink, titleVisibility: .visible) {
+                Button("Unlink calendar", role: .destructive) {
+                    Task {
+                        await services.unlinkCalendar()
+                        calendarNote = "Calendar unlinked. Your twin now goes by the free times in Work preferences."
+                    }
+                }
+            } message: {
+                Text("Bounty stops reading your calendar and removes the busy times it sent.")
+            }
             .fullScreenCover(isPresented: $showsPreferences) {
                 WorkPreferencesView(inSettings: true, onBack: { showsPreferences = false }, onContinue: { showsPreferences = false })
             }
@@ -136,24 +181,40 @@ struct SettingsView: View {
         }
     }
 
+    private var calendarStatus: String {
+        if let status = services.availability?.authorizationStatus, [.denied, .restricted].contains(status) { return "Access off" }
+        let linked = services.linkedCalendars
+        guard !linked.isEmpty else { return "Not linked" }
+        let what = linked.count == 1 ? linked[0].title : "\(linked.count) calendars"
+        guard let date = services.calendarSyncedAt else { return what }
+        return "\(what) \u{00B7} \(date.formatted(.relative(presentation: .named)))"
+    }
+
     private func syncCalendar() async {
-        guard let availability = services.availability else { return }
-        isWorking = true
-        defer { isWorking = false }
-        guard await availability.requestAccess() else {
-            message = "Calendar access is off. Turn it on in Settings › Privacy › Calendars."
-            return
-        }
-        do {
-            try await availability.sync()
-            message = "Calendar synced."
-        } catch {
-            message = error.localizedDescription
+        isSyncingCalendar = true
+        defer { isSyncingCalendar = false }
+        let outcome = await services.syncCalendar()
+        calendarAccessOff = outcome == .accessDenied
+        if outcome == .notLinked { showsCalendarLink = true }
+        calendarNote = Self.note(for: outcome)
+    }
+
+    private static func note(for outcome: AppServices.CalendarSyncOutcome) -> String? {
+        switch outcome {
+        case .synced(let busy):
+            busy == 0
+                ? "Calendar synced. Nothing is booked in the next two weeks."
+                : "Calendar synced. \(busy) busy \(busy == 1 ? "time" : "times") in the next two weeks. Your twin won\u{2019}t offer jobs then."
+        case .accessDenied:
+            "Bounty can\u{2019}t read your calendar. Turn on access in Settings \u{203A} Privacy & Security \u{203A} Calendars."
+        case .notLinked: nil
+        case .failed(let error): "Couldn\u{2019}t sync: \(error)"
         }
     }
 
     private func signOut() async {
         try? await services.session.signOut()
+        services.forgetCalendarSync()
         dismiss()
         hasCompletedOnboarding = false
     }

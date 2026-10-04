@@ -31,6 +31,7 @@
 		72ADE8E3DD17FCABABCB7084 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7535BD8DAFC6469AF250FA /* SettingsView.swift */; };
 		75699AB388309FB6BB304112 /* PosterStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 209BEC4ADD47C11B13577D52 /* PosterStore.swift */; };
 		78AB2F56177B8016949DA2C6 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E62E1AB9621E26837315559 /* RootTabView.swift */; };
+		82C3D916A32E24EA74FB2E71 /* CalendarLinkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB57653DB8B9887EEBBA102 /* CalendarLinkSheet.swift */; };
 		85B63159010D69B7AE220FF5 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA4291A1097864BCB54653E /* AppRouter.swift */; };
 		89EB37923DCD14C625896A87 /* PostedJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BD610BB72571AE34E8FDF26 /* PostedJob.swift */; };
 		8F0C271BA61342672BB08AF3 /* PushNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54627BC3FF0C2B627F7E9D8B /* PushNotificationManager.swift */; };
@@ -96,6 +97,7 @@
 		BA10D25328F0FF4EC9CFA6AD /* PaymentsServerAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentsServerAPI.swift; sourceTree = "<group>"; };
 		BE26CC60A4D4BA0F7F17E467 /* WorkerPayments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerPayments.swift; sourceTree = "<group>"; };
 		C9A15692336B82CDFFD4D2BF /* DebugLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLaunch.swift; sourceTree = "<group>"; };
+		DAB57653DB8B9887EEBBA102 /* CalendarLinkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarLinkSheet.swift; sourceTree = "<group>"; };
 		DC8624359FB1F5B608B1CFE0 /* PostDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDraft.swift; sourceTree = "<group>"; };
 		DEF56E5E9A62A25EF28F5955 /* RateWorkerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateWorkerCard.swift; sourceTree = "<group>"; };
 		E15A4CB086181C42A230B992 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
@@ -176,6 +178,7 @@
 		41A2CC6491D2672F974109E2 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				DAB57653DB8B9887EEBBA102 /* CalendarLinkSheet.swift */,
 				6B7535BD8DAFC6469AF250FA /* SettingsView.swift */,
 			);
 			path = Settings;
@@ -424,6 +427,7 @@
 				2F5AA839D4D7D9194209EB9C /* BountyLogo.swift in Sources */,
 				E77F4702B825C686E26EE94D /* BountyScreen.swift in Sources */,
 				34D8FC0D39B9BDA019E2486B /* BountyTheme.swift in Sources */,
+				82C3D916A32E24EA74FB2E71 /* CalendarLinkSheet.swift in Sources */,
 				9B904262EAE32B2FE36D5962 /* Components.swift in Sources */,
 				0BFBABD98AF3B1B0E44A71E2 /* CreateJobView.swift in Sources */,
 				1726AD4BE8F617078320C48C /* CryptoCheckoutView.swift in Sources */,

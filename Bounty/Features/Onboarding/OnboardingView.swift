@@ -181,6 +181,7 @@ private struct ProfileImportView: View {
     @State private var addedGmail = false
     @State private var addedLinkedIn = false
     @State private var addedCalendar = false
+    @State private var isLinkingCalendar = false
     @State private var isPickingLinkedIn = false
     @State private var addedResume = false
     @State private var isPickingResume = false
@@ -256,6 +257,10 @@ private struct ProfileImportView: View {
             PillButton(title: "Build my twin", icon: .sparkles, action: onContinue)
                 .disabled(isImporting || isConnectingGmail)
         }
+        .sheet(isPresented: $isLinkingCalendar) {
+            CalendarLinkSheet { _ in withAnimation(Motion.press) { addedCalendar = true } }
+        }
+        .onAppear { addedCalendar = addedCalendar || services.isCalendarLinked }
         .fileImporter(isPresented: $isPickingLinkedIn, allowedContentTypes: [.pdf, .zip]) { result in
             importDocument(result, isResume: false)
         }
@@ -316,23 +321,12 @@ private struct ProfileImportView: View {
     }
 
     private func connectCalendar() {
-        guard let availability = services.availability else {
+        guard services.availability != nil else {
             withAnimation(Motion.press) { addedCalendar = true }
             return
         }
         importError = nil
-        Task {
-            guard await availability.requestAccess() else {
-                importError = "Calendar access was not granted. You can enable it in Settings."
-                return
-            }
-            do {
-                try await availability.sync()
-                withAnimation(Motion.press) { addedCalendar = true }
-            } catch {
-                importError = error.localizedDescription
-            }
-        }
+        isLinkingCalendar = true
     }
 }
 
@@ -524,6 +518,9 @@ struct WorkPreferencesView: View {
     @State private var saveError: String?
     @State private var isReadingCalendar = false
     @State private var calendarNote: String?
+    /// Set when Fill from calendar finds no linked calendar; shows the link prompt instead of guessing.
+    @State private var showsLinkPrompt = false
+    @State private var isLinkingCalendar = false
 
     enum WorkMode: Hashable {
         case remote, inPerson, both
@@ -590,9 +587,14 @@ struct WorkPreferencesView: View {
                     }
                 }
 
-                Text(calendarNote ?? "Tap a block to switch it between free (green) and busy. Rows are mornings, afternoons and evenings.")
-                    .bountyType(.footnote)
-                    .foregroundStyle(BountyColor.inkSecondary)
+                if showsLinkPrompt {
+                    CalendarLinkPrompt { isLinkingCalendar = true }
+                        .transition(.opacity.combined(with: .offset(y: -6)))
+                } else {
+                    Text(calendarNote ?? "Tap a block to switch it between free (green) and busy. Rows are mornings, afternoons and evenings.")
+                        .bountyType(.footnote)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                }
             }
             .padding(16)
             .borderedCard()
@@ -652,6 +654,12 @@ struct WorkPreferencesView: View {
             .disabled(isSaving)
         }
         .task { await loadSaved() }
+        .sheet(isPresented: $isLinkingCalendar) {
+            CalendarLinkSheet { _ in
+                withAnimation(Motion.press) { showsLinkPrompt = false }
+                fillFreeSlots()
+            }
+        }
     }
 
     /// Starts from what the server has, so returning to this screen doesn't reset anything.
@@ -705,26 +713,34 @@ struct WorkPreferencesView: View {
         }
     }
 
-    /// The next two weeks of busy times from the phone's calendar, if the app may read it. Only start
-    /// and end times leave the phone.
+    /// The next two weeks of busy times from the linked calendars (none when nothing is linked). Only
+    /// start and end times leave the phone.
     private func calendarBusy() -> [BusyWindow] {
-        guard let availability = services.availability, availability.authorizationStatus == .fullAccess else { return [] }
-        return availability.busyBlocks(horizon: 14 * 86_400).map { BusyWindow(start: $0.start, end: $0.end) }
+        services.linkedBusyBlocks(horizon: 14 * 86_400).map { BusyWindow(start: $0.start, end: $0.end) }
+    }
+
+    /// Fills from the linked calendars. With none linked it offers "Link calendar" rather than reading
+    /// an empty calendar as "free all week".
+    private func fillFromCalendar() async {
+        guard services.isCalendarLinked else {
+            withAnimation(Motion.press) { showsLinkPrompt = true }
+            return
+        }
+        isReadingCalendar = true
+        defer { isReadingCalendar = false }
+        switch await services.syncCalendar() {
+        case .synced: fillFreeSlots()
+        case .notLinked, .accessDenied: withAnimation(Motion.press) { showsLinkPrompt = true }
+        case .failed(let error): calendarNote = "Couldn\u{2019}t sync your calendar: \(error)"
+        }
     }
 
     /// Marks each morning, afternoon and evening of the coming week free unless the calendar has
     /// something in it. The worker can still tap blocks to adjust.
-    private func fillFromCalendar() async {
-        guard let availability = services.availability else { return }
-        isReadingCalendar = true
-        defer { isReadingCalendar = false }
-        guard await availability.requestAccess() else {
-            calendarNote = "Calendar access is off. Turn it on in Settings › Privacy › Calendars, or tap the blocks yourself."
-            return
-        }
+    private func fillFreeSlots() {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: .now)
-        let busy = availability.busyBlocks(startingAt: today, horizon: 7 * 86_400)
+        let busy = services.linkedBusyBlocks(startingAt: today, horizon: 7 * 86_400)
         let ranges = [8..<12, 12..<17, 17..<22]
         var free: Set<Int> = []
         for offset in 0..<7 {
@@ -739,7 +755,7 @@ struct WorkPreferencesView: View {
         }
         withAnimation(Motion.press) { freeSlots = free }
         calendarNote = busy.isEmpty
-            ? "Your calendar is clear this week, so every block is free. Tap any you want to keep for yourself."
+            ? "Your linked calendars are clear this week, so every block is free. Tap any you want to keep for yourself."
             : "Filled from your calendar. Blocks with events are busy; tap any block to change it."
     }
 
@@ -804,6 +820,24 @@ struct TwinSettings: Decodable, Sendable {
 
     struct Skill: Decodable, Sendable {
         let name: String
+    }
+}
+
+/// Shown under the availability grid when Fill from calendar has no linked calendar to read.
+private struct CalendarLinkPrompt: View {
+    let onLink: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            TitleSubtitle(
+                title: "You don\u{2019}t have a calendar linked",
+                subtitle: "Link one so your twin knows when you\u{2019}re busy. You choose which calendars, and only start and end times leave your phone.",
+                subtitleType: .footnote
+            )
+            PillButton(title: "Link calendar", icon: .calendar, style: .secondary, action: onLink)
+        }
+        .padding(14)
+        .tintedPanel(BountyColor.lavenderSoft, radius: BountyRadius.row)
     }
 }
 

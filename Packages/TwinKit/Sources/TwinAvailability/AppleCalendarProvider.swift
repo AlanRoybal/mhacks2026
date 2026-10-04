@@ -1,6 +1,23 @@
 import EventKit
 import Foundation
 
+/// A calendar the user can link, grouped in the picker by its account (`source`).
+public struct DeviceCalendar: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let title: String
+    /// Account name, e.g. "iCloud", "Gmail" or an Exchange address.
+    public let source: String
+    /// sRGB components of the calendar's color.
+    public let color: [Double]
+
+    public init(id: String, title: String, source: String, color: [Double]) {
+        self.id = id
+        self.title = title
+        self.source = source
+        self.color = color
+    }
+}
+
 public enum CalendarAccessStatus: Equatable, Sendable {
     case notDetermined
     case denied
@@ -32,6 +49,17 @@ public final class AppleCalendarProvider {
         @unknown default:
             .denied
         }
+    }
+
+    /// Event calendars on the phone (iCloud, Google, Exchange…). Empty until full access is granted.
+    public var calendars: [DeviceCalendar] {
+        guard authorizationStatus == .fullAccess else { return [] }
+        return store.calendars(for: .event)
+            .map { calendar in
+                let rgb = calendar.cgColor.flatMap { $0.converted(to: CGColorSpace(name: CGColorSpace.sRGB)!, intent: .defaultIntent, options: nil) }?.components ?? [0.5, 0.5, 0.5]
+                return DeviceCalendar(id: calendar.calendarIdentifier, title: calendar.title, source: calendar.source.title, color: rgb.prefix(3).map(Double.init))
+            }
+            .sorted { ($0.source, $0.title) < ($1.source, $1.title) }
     }
 
     public func requestAccess() async -> Bool {

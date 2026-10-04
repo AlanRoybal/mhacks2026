@@ -26,10 +26,20 @@ final class AppServices {
     let availability: AvailabilityService?
     let linkedIn: LinkedInServerAuthenticator?
     let gmail: GmailConnector?
+    /// Calendars the user chose in "Link your calendar". Empty means no calendar is linked, and nothing
+    /// is read from the phone's calendar until one is.
+    private(set) var linkedCalendarIDs: Set<String>
+    /// When the linked calendars' busy times were last sent to the server.
+    private(set) var calendarSyncedAt: Date?
+
+    private static let linkedCalendarsKey = "linkedCalendarIDs"
+    private static let calendarSyncedAtKey = "calendarLastSyncedAt"
 
     init(configuration: BountyRuntimeConfiguration = BountyRuntimeConfiguration()) {
         let session = SessionStore()
         self.session = session
+        linkedCalendarIDs = Set(UserDefaults.standard.stringArray(forKey: Self.linkedCalendarsKey) ?? [])
+        calendarSyncedAt = UserDefaults.standard.object(forKey: Self.calendarSyncedAtKey) as? Date
 
         guard let baseURL = configuration.apiBaseURL else {
             api = nil
@@ -57,6 +67,72 @@ final class AppServices {
         } else {
             linkedIn = nil
         }
+    }
+
+    enum CalendarSyncOutcome: Equatable {
+        case synced(busyBlocks: Int)
+        /// No calendar linked yet: show "Link your calendar".
+        case notLinked
+        case accessDenied
+        case failed(String)
+    }
+
+    /// Linked calendars that still exist on the phone with access on.
+    var linkedCalendars: [DeviceCalendar] {
+        (availability?.calendars ?? []).filter { linkedCalendarIDs.contains($0.id) }
+    }
+
+    var isCalendarLinked: Bool { !linkedCalendars.isEmpty }
+
+    /// Every calendar that isn't linked is skipped when reading busy times.
+    private var unlinkedCalendarIDs: Set<String> {
+        Set((availability?.calendars ?? []).map(\.id)).subtracting(linkedCalendarIDs)
+    }
+
+    /// Busy times from the linked calendars only. Empty when nothing is linked.
+    func linkedBusyBlocks(startingAt start: Date = .now, horizon: TimeInterval) -> [BusyBlock] {
+        guard let availability, isCalendarLinked else { return [] }
+        return availability.busyBlocks(startingAt: start, horizon: horizon, disabledCalendarIDs: unlinkedCalendarIDs)
+    }
+
+    /// Links exactly `ids` (from the picker) and syncs them.
+    func linkCalendars(_ ids: Set<String>) async -> CalendarSyncOutcome {
+        linkedCalendarIDs = ids
+        UserDefaults.standard.set(Array(ids), forKey: Self.linkedCalendarsKey)
+        return await syncCalendar()
+    }
+
+    /// Sends the next two weeks of busy times (start and end only) from the linked calendars. Never
+    /// asks for access or picks calendars itself: with nothing linked it returns `.notLinked`.
+    func syncCalendar() async -> CalendarSyncOutcome {
+        guard let availability else { return .failed("Not connected to the Bounty server.") }
+        if [.denied, .restricted, .writeOnly].contains(availability.authorizationStatus) { return .accessDenied }
+        guard isCalendarLinked else { return .notLinked }
+        do {
+            try await availability.sync(disabledCalendarIDs: unlinkedCalendarIDs)
+            let now = Date.now
+            calendarSyncedAt = now
+            UserDefaults.standard.set(now, forKey: Self.calendarSyncedAtKey)
+            return .synced(busyBlocks: linkedBusyBlocks(horizon: BusyExtractor.defaultHorizon).count)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    /// Stops reading the calendar and clears the busy times the server has from it.
+    func unlinkCalendar() async {
+        if let availability, availability.authorizationStatus == .fullAccess {
+            try? await availability.sync(disabledCalendarIDs: Set(availability.calendars.map(\.id)))
+        }
+        forgetCalendarSync()
+    }
+
+    /// On sign-out or unlink: the next account starts with no calendar linked.
+    func forgetCalendarSync() {
+        linkedCalendarIDs = []
+        calendarSyncedAt = nil
+        UserDefaults.standard.removeObject(forKey: Self.linkedCalendarsKey)
+        UserDefaults.standard.removeObject(forKey: Self.calendarSyncedAtKey)
     }
 
     func signInWithApple(_ credential: ASAuthorizationAppleIDCredential) async throws {
