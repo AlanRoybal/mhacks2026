@@ -1,0 +1,17 @@
+{
+  "name": "bounty-messenger",
+  "private": true,
+  "type": "module",
+  "description": "Bounty's iMessage bridge (Photon Spectrum): sends texts for the backend and forwards replies to it.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test server.test.mjs"
+  },
+  "dependencies": {
+    "@spectrum-ts/core": "12.10.1",
+    "@spectrum-ts/imessage": "12.10.1"
+  }
+}
