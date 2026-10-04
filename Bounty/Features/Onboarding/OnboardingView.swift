@@ -497,6 +497,8 @@ struct WorkPreferencesView: View {
     @State private var quietHours = true
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var isReadingCalendar = false
+    @State private var calendarNote: String?
 
     enum WorkMode: Hashable {
         case remote, inPerson, both
@@ -525,12 +527,17 @@ struct WorkPreferencesView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     IconGlyph(icon: .calendar, size: 20)
-                    Text("Free time from your calendar")
+                    Text("When you\u{2019}re free")
                         .bountyType(.bodyStrong)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("Edit")
+                    if services.availability != nil {
+                        Button(isReadingCalendar ? "Reading\u{2026}" : "Fill from calendar") {
+                            Task { await fillFromCalendar() }
+                        }
                         .bountyType(.subheadStrong)
                         .foregroundStyle(BountyColor.lavenderInk)
+                        .disabled(isReadingCalendar)
+                    }
                 }
                 .foregroundStyle(BountyColor.inkPrimary)
 
@@ -558,7 +565,7 @@ struct WorkPreferencesView: View {
                     }
                 }
 
-                Text("Mornings · Afternoons · Evenings. Only free/busy leaves your phone.")
+                Text(calendarNote ?? "Tap a block to switch it between free (green) and busy. Rows are mornings, afternoons and evenings.")
                     .bountyType(.footnote)
                     .foregroundStyle(BountyColor.inkSecondary)
             }
@@ -660,13 +667,52 @@ struct WorkPreferencesView: View {
                 try await api.send(.put, "twin/availability", body: TwinAvailabilityUpdate(
                     tz: TimeZone.current.identifier,
                     weekly: weeklyAvailability,
-                    busy: []
+                    // Keep the calendar's busy times; an empty list would erase what the calendar sync sent.
+                    busy: calendarBusy()
                 ))
                 onContinue()
             } catch {
                 saveError = error.localizedDescription
             }
         }
+    }
+
+    /// The next two weeks of busy times from the phone's calendar, if the app may read it. Only start
+    /// and end times leave the phone.
+    private func calendarBusy() -> [BusyWindow] {
+        guard let availability = services.availability, availability.authorizationStatus == .fullAccess else { return [] }
+        return availability.busyBlocks(horizon: 14 * 86_400).map { BusyWindow(start: $0.start, end: $0.end) }
+    }
+
+    /// Marks each morning, afternoon and evening of the coming week free unless the calendar has
+    /// something in it. The worker can still tap blocks to adjust.
+    private func fillFromCalendar() async {
+        guard let availability = services.availability else { return }
+        isReadingCalendar = true
+        defer { isReadingCalendar = false }
+        guard await availability.requestAccess() else {
+            calendarNote = "Calendar access is off. Turn it on in Settings › Privacy › Calendars, or tap the blocks yourself."
+            return
+        }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let busy = availability.busyBlocks(startingAt: today, horizon: 7 * 86_400)
+        let ranges = [8..<12, 12..<17, 17..<22]
+        var free: Set<Int> = []
+        for offset in 0..<7 {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: today) else { continue }
+            // Calendar weekday: 1 is Sunday. The grid starts on Monday.
+            let column = (calendar.component(.weekday, from: day) + 5) % 7
+            for (row, hours) in ranges.enumerated() {
+                guard let start = calendar.date(bySettingHour: hours.lowerBound, minute: 0, second: 0, of: day),
+                      let end = calendar.date(bySettingHour: hours.upperBound, minute: 0, second: 0, of: day) else { continue }
+                if !busy.contains(where: { $0.start < end && $0.end > start }) { free.insert(column * 3 + row) }
+            }
+        }
+        withAnimation(Motion.press) { freeSlots = free }
+        calendarNote = busy.isEmpty
+            ? "Your calendar is clear this week, so every block is free. Tap any you want to keep for yourself."
+            : "Filled from your calendar. Blocks with events are busy; tap any block to change it."
     }
 
     private var weeklyAvailability: String {
