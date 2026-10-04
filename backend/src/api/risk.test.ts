@@ -24,7 +24,7 @@ async function fundedJob(api: ReturnType<typeof apiClient>, deps: ReturnType<typ
   return body.id as string;
 }
 
-test("a brand-new worker's exposure limit keeps a $200 escrow away from them, not a $40 one", async () => {
+test("trust and the suggested exposure limit are metrics: matching still offers the job", async () => {
   const deps = testDeps();
   const api = apiClient(deps);
   const poster = await api.login("poster");
@@ -33,11 +33,9 @@ test("a brand-new worker's exposure limit keeps a $200 escrow away from them, no
   const trust = await api.call("GET", "/me/trust", worker.token);
   assert.deepEqual({ limit: trust.body.exposureLimit, open: trust.body.openExposure }, { limit: 50, open: 0 });
 
+  // Above the suggested limit, but matching doesn't use it.
   const big = await fundedJob(api, deps, poster.token, 200);
-  assert.equal((await getJobOrThrow(deps, big)).currentOffer, undefined, "over the limit: not offered");
-
-  const small = await fundedJob(api, deps, poster.token, 40);
-  assert.equal((await getJobOrThrow(deps, small)).currentOffer?.workerId, worker.userId);
+  assert.equal((await getJobOrThrow(deps, big)).currentOffer?.workerId, worker.userId);
 });
 
 test("the poster sees the escrow's risk, and admins get the reserve report", async () => {

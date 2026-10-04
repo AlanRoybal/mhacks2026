@@ -9,8 +9,8 @@
 //                    the poster disputing in bad faith; LGD depends on the rail: a refunded card charge
 //                    loses its processing fee, and a card payout can be charged back after release, while
 //                    a USDC release can't be reversed.
-//   3. Exposure      Like a credit limit: how much escrow a worker may hold at once grows with the size and
-//                    quality of their record, so a brand-new account can't be handed a $400 job.
+//   3. Exposure      Like a credit limit: a suggested ceiling on how much escrow a worker should hold at once,
+//                    growing with the size and quality of their record. Shown as a metric, not enforced.
 //   4. Reserve       Monte Carlo over every open escrow gives the platform's loss distribution: expected
 //                    loss, 95%/99% Value at Risk and 99% Expected Shortfall, the cash to hold in reserve.
 //
@@ -143,7 +143,8 @@ export function expectedLoss(input: { amountCents: number; rail: RiskRail; worke
   return { exposureCents: amount, pd, lgd, expectedLossCents: Math.round(el), events, tier: riskTier(el, amount) };
 }
 
-// Credit-limit style: $50 to start, growing with history and with the conservative trust score.
+// Credit-limit style: $50 to start, growing with history and with the conservative trust score. A metric:
+// matching doesn't enforce it.
 export const MIN_EXPOSURE_CENTS = 5_000;
 export const MAX_EXPOSURE_CENTS = 100_000;
 export function exposureLimitCents(trust: TrustScore): number {

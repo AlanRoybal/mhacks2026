@@ -263,7 +263,7 @@ private struct TrustCard: View {
             }
             .foregroundStyle(BountyColor.inkPrimary)
             Meter(value: min(1, trust.openExposure / max(trust.exposureLimit, 1)))
-            Text("You can hold up to \(trust.exposureLimit.formatted(.currency(code: "USD"))) of jobs at once (\(trust.openExposure.formatted(.currency(code: "USD"))) in use). Well-rated jobs for different people raise it.")
+            Text("Suggested escrow limit \(trust.exposureLimit.formatted(.currency(code: "USD"))), with \(trust.openExposure.formatted(.currency(code: "USD"))) in jobs right now. Well-rated jobs for different people raise it.")
                 .bountyType(.footnote)
                 .foregroundStyle(BountyColor.inkSecondary)
         }

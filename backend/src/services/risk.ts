@@ -1,6 +1,6 @@
 // Gathers the inputs for domain/risk.ts from the store: each worker's history, each poster's disputes,
-// every open escrow. Used by matching (exposure limits), the job view (risk shown to the poster) and
-// the admin risk report (the platform's reserve).
+// every open escrow. These are metrics to look at (the worker's trust and suggested limit, the risk on
+// the poster's job view, the admin reserve report); they don't change who gets matched.
 
 import type { Deps } from "../deps.js";
 import {
@@ -47,12 +47,6 @@ export async function workerTrust(deps: Deps, user: User): Promise<{ trust: Trus
   const trust = trustScore(workerHistory(jobs, user, now), now);
   const openCents = jobs.filter((j) => j.workerId === user.userId && OPEN.has(j.state)).reduce((sum, j) => sum + j.bountyCents, 0);
   return { trust, limitCents: exposureLimitCents(trust), openCents };
-}
-
-// Whether taking this job keeps the worker inside their exposure limit.
-export async function withinExposureLimit(deps: Deps, user: User, job: Job): Promise<boolean> {
-  const { limitCents, openCents } = await workerTrust(deps, user);
-  return openCents + job.bountyCents <= limitCents;
 }
 
 export async function posterDisputeRisk(deps: Deps, posterId: string): Promise<number> {

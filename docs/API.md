@@ -331,7 +331,7 @@ Every job carries `verification`: what Bounty checks before paying, and what it 
 
 | Where | What |
 |---|---|
-| `GET /me/trust` | `{ score, conservative, effectiveJobs, exposureLimit, openExposure }`. The worker's Beta-posterior trust: star-weighted, time-decayed, and the k-th job with the same poster counts 1/k. `exposureLimit` is how much escrow they can hold at once ($50 to start, up to $1000). Matching skips workers a job would push over it. |
+| `GET /me/trust` | `{ score, conservative, effectiveJobs, exposureLimit, openExposure }`. The worker's Beta-posterior trust: star-weighted, time-decayed, and the k-th job with the same poster counts 1/k. `exposureLimit` is a suggested ceiling on how much escrow they should hold at once ($50 to start, up to $1000). It's a metric; matching doesn't use it. |
 | Job `risk` (poster and admins, once funded) | `{ tier: A-E, rail, exposure, probabilityOfLoss, lossGivenDefault, expectedLoss, worker: { trust, conservative, ratedJobs }, posterDisputeProbability }`, with expected loss = PD × LGD × EAD. |
 | `GET /admin/risk` | Every open escrow: `exposureCents`; a Monte Carlo `portfolio` with `expectedLossCents`, `var95Cents`, `var99Cents` and `es99Cents` (99% Expected Shortfall, the reserve to hold); the largest worker `concentration`; `rating_ring` flags (3+ five-star jobs between one pair in 30 days); and the `riskiest` escrows. |
 
