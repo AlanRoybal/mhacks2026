@@ -56,6 +56,30 @@ public enum SkillSource: String, Codable, CaseIterable, Sendable {
     case resume
     case email
     case user
+    /// Proven by jobs posters rated.
+    case rating
+
+    /// A source this build doesn't know yet reads as `user` instead of failing the whole profile.
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = SkillSource(rawValue: raw) ?? .user
+    }
+}
+
+/// Rated jobs that exercised a skill.
+public struct SkillTrackRecord: Codable, Equatable, Sendable {
+    public var jobs: Int
+    public var averageStars: Double?
+
+    public init(jobs: Int, averageStars: Double?) {
+        self.jobs = jobs
+        self.averageStars = averageStars
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case jobs
+        case averageStars = "average_stars"
+    }
 }
 
 public struct TwinSkill: Codable, Identifiable, Equatable, Sendable {
@@ -64,19 +88,23 @@ public struct TwinSkill: Codable, Identifiable, Equatable, Sendable {
     public var confidence: Double
     public var source: SkillSource
     public var yearsOfExperience: Double?
+    /// Present once rated jobs have exercised this skill.
+    public var trackRecord: SkillTrackRecord?
 
     public init(
         id: String,
         name: String,
         confidence: Double,
         source: SkillSource,
-        yearsOfExperience: Double? = nil
+        yearsOfExperience: Double? = nil,
+        trackRecord: SkillTrackRecord? = nil
     ) {
         self.id = id
         self.name = name
         self.confidence = confidence
         self.source = source
         self.yearsOfExperience = yearsOfExperience
+        self.trackRecord = trackRecord
     }
 
     enum CodingKeys: String, CodingKey {
@@ -85,6 +113,7 @@ public struct TwinSkill: Codable, Identifiable, Equatable, Sendable {
         case confidence
         case source
         case yearsOfExperience = "years_of_experience"
+        case trackRecord = "track_record"
     }
 }
 
