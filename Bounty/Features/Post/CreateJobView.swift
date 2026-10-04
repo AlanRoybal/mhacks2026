@@ -16,17 +16,7 @@ struct CreateJobView: View {
         @Bindable var draft = draft
         BountyScreen(spacing: 14, alwaysBounces: true) {
             ScreenTitle(title: "Post a job") {
-                HStack(spacing: 8) {
-                    // Plan step 10: fills in the demo's coffee shop logo job.
-                    Button {
-                        withAnimation(Motion.press) { draft.fillDemo() }
-                    } label: {
-                        Chip(label: "Demo job", tone: .lavender)
-                    }
-                    .buttonStyle(PressableStyle())
-                    .accessibilityHint("Fills in a sample job: sketch a coffee shop logo for $15")
-                    Chip(label: "Draft", tone: .grey)
-                }
+                Chip(label: "Draft", tone: .grey)
             }
             .entrance(.top)
 
@@ -162,7 +152,8 @@ struct CreateJobView: View {
                     HStack(spacing: 10) {
                         HStack(spacing: 0) {
                             Text("$")
-                            TextField("40", value: $draft.pay, format: .number)
+                            // Empty until the poster types an amount, rather than a made-up price.
+                            TextField("0", value: Binding(get: { draft.pay > 0 ? draft.pay : nil }, set: { draft.pay = $0 ?? 0 }), format: .number)
                                 .keyboardType(.numberPad)
                         }
                         .bountyType(.moneyM)
