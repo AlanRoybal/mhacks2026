@@ -1,3 +1,4 @@
+import MapKit
 import PhotosUI
 import StripePaymentSheet
 import SwiftUI
@@ -126,6 +127,21 @@ struct CreateJobView: View {
                 .opacity(draft.inPerson ? 1 : 0.4)
                 .disabled(!draft.inPerson)
                 .animation(Motion.pressTint, value: draft.inPerson)
+
+                // The spot the worker has to be at to start, so the poster can confirm it's right.
+                if draft.inPerson, let place = draft.location {
+                    let center = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
+                    Map(initialPosition: .region(MKCoordinateRegion(center: center, latitudinalMeters: 500, longitudinalMeters: 500))) {
+                        Marker(place.address.isEmpty ? "Job" : place.address, coordinate: center)
+                    }
+                    .allowsHitTesting(false)
+                    .frame(height: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: BountyRadius.row, style: .continuous))
+                    .id(place)
+                    Text("The worker checks in here: Start only works on site.")
+                        .bountyType(.footnote)
+                        .foregroundStyle(BountyColor.inkSecondary)
+                }
             }
             .entrance(.rest(2))
 

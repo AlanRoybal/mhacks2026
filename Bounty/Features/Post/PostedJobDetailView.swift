@@ -61,6 +61,17 @@ struct PostedJobDetailView: View {
                     .borderedCard(radius: BountyRadius.row)
                     .entrance(.rest(0))
 
+                    // Checked by the server the moment the worker tapped Start.
+                    if let check = job.startCheck {
+                        Label(check.summary, icon: .mapPin)
+                            .bountyType(.footnote)
+                            .foregroundStyle(BountyColor.mintInk)
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .tintedPanel(BountyColor.mint, radius: BountyRadius.row)
+                            .entrance(.rest(0))
+                    }
+
                     JobThreadCard(jobId: job.id, role: .poster, counterpartName: worker.name)
                         .entrance(.rest(0))
                 }
