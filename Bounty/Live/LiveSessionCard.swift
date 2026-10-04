@@ -54,12 +54,12 @@ struct LiveSessionCard: View {
         let state = session.content
         return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
-                LivePulse(active: state.isOnSite || session.phase == "started", color: tint(state))
+                LivePulse(active: state.isOnSite || session.phase == "started", color: dot(state))
                 Text(state.headline)
                     .bountyType(.bodyStrong)
                     .foregroundStyle(BountyColor.inkPrimary)
                 Spacer()
-                Chip(label: session.provider == "spacetime" ? "Live \u{00B7} SpacetimeDB" : "Live", tone: .dark)
+                Chip(label: session.provider == "spacetime" ? "Live \u{00B7} SpacetimeDB" : "Live", tone: chipTone(state))
             }
 
             if !job.isRemote {
@@ -102,7 +102,7 @@ struct LiveSessionCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(BountyLiveAttributes.ContentState.clock(seconds))
-                        .bountyType(.money(size: 40, lineHeight: 44))
+                        .bountyType(.moneyL)
                         .monospacedDigit()
                         .foregroundStyle(BountyColor.inkPrimary)
                         .contentTransition(.numericText())
@@ -111,8 +111,7 @@ struct LiveSessionCard: View {
                         .foregroundStyle(BountyColor.inkSecondary)
                 }
                 if needed > 0 {
-                    ProgressView(value: Double(min(seconds, needed)), total: Double(needed))
-                        .tint(seconds >= needed ? BountyColor.greenInk : tint(state))
+                    Meter(value: Double(min(seconds, needed)) / Double(needed), fill: seconds >= needed || state.isOnSite ? BountyColor.green : tint(state))
                     Text(seconds >= needed
                          ? "Enough time on site for the proof."
                          : "\(Int(ceil(Double(needed - seconds) / 60))) more min on site before the proof can be approved automatically.")
@@ -162,6 +161,22 @@ struct LiveSessionCard: View {
                 }
             }
         }
+    }
+
+    /// Color meaning from the design: green = verified/active, coral = urgent, cream/yellow = proof and
+    /// review, lavender = matching and remote work.
+    private func chipTone(_ state: BountyLiveAttributes.ContentState) -> ChipTone {
+        switch state.phase {
+        case "on_site", "paid": .mint
+        case "away", "signal_lost": .coral
+        case "submitted", "verifying", "in_review": .cream
+        case "refunded", "closed": .grey
+        default: .lavender
+        }
+    }
+
+    private func dot(_ state: BountyLiveAttributes.ContentState) -> Color {
+        state.phase == "on_site" || state.phase == "paid" ? BountyColor.green : tint(state)
     }
 
     private func tint(_ state: BountyLiveAttributes.ContentState) -> Color {
