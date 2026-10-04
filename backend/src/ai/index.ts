@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
+import { AnthropicBedrock, AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
 import type { Config } from "../config.js";
 import type { Logger } from "../lib/log.js";
 import type { Ai } from "./ai.js";
@@ -17,9 +17,14 @@ export function createAi(config: Config, log: Logger): Ai {
     case "anthropic":
       // Reads ANTHROPIC_API_KEY (or an `ant auth login` profile).
       return new ResilientAi(new ClaudeAi(new Anthropic(), config.AI_MODEL ?? DEFAULT_MODEL, log, true), log);
-    case "bedrock":
+    case "bedrock": {
       // Uses the Lambda role (or your AWS profile) for SigV4.
-      return new ResilientAi(new ClaudeAi(new AnthropicBedrockMantle({ awsRegion: config.AWS_REGION }), config.AI_MODEL ?? `anthropic.${DEFAULT_MODEL}`, log, false), log);
+      const model = config.AI_MODEL ?? `anthropic.${DEFAULT_MODEL}`;
+      // Mantle serves only the newest models; inference-profile IDs (us.anthropic.claude-opus-4-5-...) need the InvokeModel client.
+      const profile = /^(us|eu|apac|global)\./.test(model);
+      const client = profile ? new AnthropicBedrock({ awsRegion: config.AWS_REGION }) : new AnthropicBedrockMantle({ awsRegion: config.AWS_REGION });
+      return new ResilientAi(new ClaudeAi(client, model, log, false, profile), log);
+    }
   }
 }
 

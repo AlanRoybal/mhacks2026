@@ -21,9 +21,9 @@ import { CHECKLIST, EXTRACT_PROFILE, gradePrompt, RERANK } from "./prompts.js";
 
 type Effort = "low" | "medium" | "high";
 
-// Both Anthropic and AnthropicBedrockMantle expose the same beta messages API.
+// Anthropic, AnthropicBedrock and AnthropicBedrockMantle all expose the same beta messages.parse.
 export interface MessagesClient {
-  beta: { messages: Anthropic["beta"]["messages"] };
+  beta: { messages: Pick<Anthropic["beta"]["messages"], "parse"> };
 }
 
 interface CallOptions<T extends z.ZodType> {
@@ -65,8 +65,14 @@ export class ClaudeAi implements Ai {
     private readonly log: Logger,
     // Server-side refusal fallbacks exist on the Claude API only (not Bedrock).
     private readonly serverFallbacks: boolean,
+    // Models before Opus 5 only accept output_config.effort behind this beta.
+    private readonly effortBeta = false,
   ) {
     this.name = model;
+  }
+
+  private get betas(): string[] {
+    return [...(this.serverFallbacks ? ["server-side-fallback-2026-07-01"] : []), ...(this.effortBeta ? ["effort-2025-11-24"] : [])];
   }
 
   private async call<T extends z.ZodType>(o: CallOptions<T>): Promise<z.infer<T>> {
@@ -78,7 +84,8 @@ export class ClaudeAi implements Ai {
         system: o.system,
         messages: [{ role: "user", content: o.content }],
         output_config: { effort: o.effort, format: betaZodOutputFormat(o.schema) },
-        ...(this.serverFallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+        ...(this.serverFallbacks ? { fallbacks: "default" as const } : {}),
+        ...(this.betas.length ? { betas: this.betas } : {}),
       },
       { timeout: o.timeoutMs, maxRetries: o.maxRetries ?? 1 },
     );
