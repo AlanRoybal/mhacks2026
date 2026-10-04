@@ -34,6 +34,12 @@ async function evidenceFor(deps: Deps, job: Job, proof: Proof): Promise<GradeEvi
         if (bytes) out.push({ ...base, note, image: { mediaType: type as "image/jpeg", base64: bytes.toString("base64") } });
         continue;
       }
+      // Digital deliverables are judged on the file itself.
+      if (type === "application/pdf") {
+        const bytes = await deps.blobs.get(e.blobKey);
+        if (bytes) out.push({ ...base, pdfBase64: bytes.toString("base64") });
+        continue;
+      }
       out.push({ ...base, text: `A ${type || "file"} was uploaded; it cannot be shown here.` });
       continue;
     }

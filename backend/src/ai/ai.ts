@@ -111,6 +111,8 @@ export interface GradeEvidence {
   kind: "photo" | "link" | "file" | "location";
   // The app uploads JPEG; Claude does not read HEIC.
   image?: { mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif"; base64: string };
+  // A PDF deliverable, read as a document.
+  pdfBase64?: string;
   url?: string;
   text?: string;
   note?: string;

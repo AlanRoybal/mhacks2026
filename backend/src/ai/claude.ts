@@ -175,6 +175,7 @@ export class ClaudeAi implements Ai {
       if (e.image) {
         content.push({ type: "image", source: { type: "base64", media_type: e.image.mediaType, data: e.image.base64 } });
       }
+      if (e.pdfBase64) content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: e.pdfBase64 } });
       if (e.url) content.push({ type: "text", text: tag("link", e.url) });
       if (e.text) content.push({ type: "text", text: tag("worker_text", e.text) });
     }
